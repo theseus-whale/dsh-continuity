@@ -1,4 +1,4 @@
-# dsh-continuity 4.9.103-safe.1
+# dsh-continuity 4.9.104-safe.1
 
 给 DSH 的长上下文连续性插件。每个 session 拥有自己完整的一套记忆；
 persona 只是身份/启用标签。
@@ -40,6 +40,7 @@ peer_message    明确投递给另一个 live session
   rules.md         硬规则，从 templates/rules.md 起
   habits.md        软偏好，从 templates/habits.md 起
   rebuild.md       本地重建说明
+  dropped-ranges.json  本 session 的合并覆盖（seq 空间只属于本 session）
 ```
 
 共享/诊断：
@@ -50,7 +51,6 @@ peer_message    明确投递给另一个 live session
   personas/<pid>/persona.json {"enabled": true}
   folds.json
   passes.jsonl
-  dropped-ranges.json
   context-log.jsonl
 ```
 
@@ -62,7 +62,7 @@ peer_message    明确投递给另一个 live session
 ## 安装
 
 ```text
-dsh-continuity-4.9.103-safe.1.tgz
+dsh-continuity-4.9.104-safe.1.tgz
 ```
 
 装进目标 profile，备份 `~/.dsh/continuity`，重启 DSH。  

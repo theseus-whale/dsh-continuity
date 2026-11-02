@@ -7,7 +7,7 @@
 确认版本：
 
 ```text
-dsh-continuity 4.9.103-safe.1
+dsh-continuity 4.9.104-safe.1
 ```
 
 ## 2. 第一次 pre-step 做什么
@@ -56,7 +56,7 @@ standard preset   -> 原生 compaction-basic 80%；没有原生 recall/session_l
 ## 6. 重启后自检
 
 ```text
-1. 版本 = 4.9.103-safe.1
+1. 版本 = 4.9.104-safe.1
 2. sessions/<id>/ 有六个基础文件
 3. rules.md / habits.md 在 session 目录
 4. 面板显示 A/B/C/K，空表有明确空状态

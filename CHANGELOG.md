@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.9.104
+
+- `dropped-ranges.json` is per session: `sessions/<id>/dropped-ranges.json`
+- Global dropped-ranges is no longer written; seq spaces from different sessions
+  must not be merged
+- Startup rebuild and per-pass rebuild are session-scoped
+
 ## 4.9.103
 
 First public-source cleanup.

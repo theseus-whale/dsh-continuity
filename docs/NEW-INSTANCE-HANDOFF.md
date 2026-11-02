@@ -1,4 +1,4 @@
-# Continuity 4.9.102-safe.1 — 新实例交接
+# Continuity 4.9.104-safe.1 — 新实例交接
 
 > 给下一个实例。你接手的是当前 session 的目录、规则和词表，不是另一个
 > session 的记忆。先读这份，再读当前 session 的 `rules.md` / `habits.md`。
@@ -6,7 +6,7 @@
 ## 1. 版本与边界
 
 ```text
-dsh-continuity 4.9.102-safe.1
+dsh-continuity 4.9.104-safe.1
 安全模式：pointersOnly；peer 保留
 不做：T 分类 / TAG 填写 / TAG 闸 / 工作线 / 自动打标 / tags.json
 ```
@@ -74,13 +74,13 @@ sessions/<id>/keywords.md
 sessions/<id>/aliases.md
 sessions/<id>/rules.md
 sessions/<id>/habits.md
+sessions/<id>/dropped-ranges.json
 
 ~/.dsh/continuity/
   session-persona.json
   personas/<pid>/persona.json
   folds.json
   passes.jsonl
-  dropped-ranges.json
   context-log.jsonl
 ```
 

@@ -1,4 +1,4 @@
-# Session 布局与权限 — 4.9.103
+# Session 布局与权限 — 4.9.102
 
 这是本包路径/权限的权威文档。若其他文档与它冲突，以本文为准。
 
@@ -18,10 +18,11 @@
   habits.md               软偏好，从 templates/habits.md 起
   rebuild.md              本地重建说明
   turns.jsonl             可选，relabel 用
+  dropped-ranges.json     本 session 的合并覆盖（只属于本 session）
 ```
 
 以上全部是 session-local。任何 session 都不读另一个 session 的 A/C/K、
-rules、habits、index、审计或提示。
+rules、habits、index、审计、提示或 dropped-ranges。
 
 新 session：
 
@@ -41,7 +42,6 @@ index      <- 第一次 pre-step
   personas/<pid>/persona.json {"enabled": true|false}
   folds.json                 全局折叠历史
   passes.jsonl               全局 pass 回执
-  dropped-ranges.json        合并后的覆盖
   context-log.jsonl          上下文测量
   handoff-pending.json       交接标记
 ```
@@ -59,8 +59,8 @@ index      <- 第一次 pre-step
 continuity preset 挂载的引擎可以读写：
 
 ```text
-自己的 session 目录
-folds.json / passes.jsonl / dropped-ranges.json / context-log.jsonl
+自己的 session 目录（含 dropped-ranges.json）
+folds.json / passes.jsonl / context-log.jsonl
 ```
 
 这是宿主代码，不是模型工具。
@@ -80,7 +80,7 @@ workspace 文件
 另一个 session 的 sessions/<other>/
 personas/
 session-persona.json
-folds.json / passes.jsonl / dropped-ranges.json
+folds.json / passes.jsonl
 continuity 根目录的 rules.md / habits.md
 ```
 

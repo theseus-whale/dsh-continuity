@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.102-safe.1
+# Continuity architecture — 4.9.104-safe.1
 
 ## 1. Shape
 
@@ -201,11 +201,13 @@ Files:
 ~/.dsh/continuity/passes.jsonl       append-only, no 24-row cap
 ~/.dsh/continuity/folds.json         from/to/gistSeq/at;
                                      new folds also count/compactionId
-~/.dsh/continuity/dropped-ranges.json merged ranges + coverageFrom
+~/.dsh/continuity/sessions/<id>/dropped-ranges.json
+                                     per-session merged ranges + coverageFrom
 ```
 
-`dropped-ranges.json` merges `folds.json` (history before pass receipts) and
-`passes.jsonl`.
+`sessions/<id>/dropped-ranges.json` merges only that session's folds (history
+before pass receipts) and passes. The global `dropped-ranges.json` is no longer
+written; merging different seq spaces was invalid.
 
 ## 7. Audit
 

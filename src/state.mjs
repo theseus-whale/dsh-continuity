@@ -11,8 +11,10 @@ import { join } from 'node:path';
 
 const continuityDir = () => join(process.env.USERPROFILE ?? process.env.HOME ?? '.', '.dsh', 'continuity');
 
-/** Recompute the merged view from passes.jsonl plus the pre-pass folds sidecar. */
-export function rebuildDroppedRanges() {
+/** Recompute the merged view from passes.jsonl plus the pre-pass folds sidecar.
+ *  Each session gets its own sessions/<id>/dropped-ranges.json; sequence spaces
+ *  from different sessions must never be merged together. */
+export function rebuildDroppedRanges(sessionId = null) {
   try {
     const dir = continuityDir();
     let passes = [];
@@ -22,38 +24,54 @@ export function rebuildDroppedRanges() {
           try { return JSON.parse(line.replace(/^\uFEFF/, '')); } catch { return null; }
         }).filter(Boolean);
     } catch { /* no new pass log yet; folds may still cover history */ }
-    let folds = [];
+    let foldSessions = {};
     try {
       const parsed = JSON.parse(readFileSync(join(dir, 'folds.json'), 'utf8').replace(/^\uFEFF/, ''));
-      folds = Object.values(parsed?.sessions ?? {}).flatMap((session) => (
-        Array.isArray(session?.folds) ? session.folds : []
-      ));
+      foldSessions = parsed?.sessions ?? {};
     } catch { /* old install may have no folds sidecar */ }
-    const entries = [
-      ...passes.map((row) => ({ from: row.start, to: row.end, at: row.at, source: 'pass' })),
-      ...folds.map((row) => ({ from: row.from, to: row.to, at: row.at, source: 'fold' })),
-    ];
-    const ranges = entries
-      .map((row) => [Number(row.from), Number(row.to)])
-      .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && start <= end)
-      .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-    const merged = [];
-    for (const [start, end] of ranges) {
-      const last = merged.at(-1);
-      if (last && start <= last[1] + 1) last[1] = Math.max(last[1], end);
-      else merged.push([start, end]);
+
+    const passesBySession = new Map();
+    for (const row of passes) {
+      const id = row?.sessionId;
+      if (typeof id !== 'string' || id === '') continue;
+      if (!passesBySession.has(id)) passesBySession.set(id, []);
+      passesBySession.get(id).push(row);
     }
-    const totalSeqs = merged.reduce((sum, [start, end]) => sum + (end - start + 1), 0);
-    const times = entries.map((row) => row.at).filter((at) => typeof at === 'string' && at).sort();
-    writeFileSync(join(dir, 'dropped-ranges.json'), `${JSON.stringify({
-      updatedAt: new Date().toISOString(),
-      ranges: merged,
-      totalSeqs,
-      passes: passes.length,
-      folds: folds.length,
-      coverageFrom: times[0] ?? null,
-      coverageNote: 'passes.jsonl is complete after 4.9.80; earlier ranges come from folds.json with no token counts',
-    }, null, 2)}\n`, 'utf8');
+    const ids = sessionId
+      ? [String(sessionId)]
+      : [...new Set([...passesBySession.keys(), ...Object.keys(foldSessions)])];
+    for (const id of ids) {
+      const sessionPasses = passesBySession.get(id) ?? [];
+      const sessionFolds = Array.isArray(foldSessions?.[id]?.folds) ? foldSessions[id].folds : [];
+      const entries = [
+        ...sessionPasses.map((row) => ({ from: row.start, to: row.end, at: row.at, source: 'pass' })),
+        ...sessionFolds.map((row) => ({ from: row.from, to: row.to, at: row.at, source: 'fold' })),
+      ];
+      const ranges = entries
+        .map((row) => [Number(row.from), Number(row.to)])
+        .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && start <= end)
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const merged = [];
+      for (const [start, end] of ranges) {
+        const last = merged.at(-1);
+        if (last && start <= last[1] + 1) last[1] = Math.max(last[1], end);
+        else merged.push([start, end]);
+      }
+      const totalSeqs = merged.reduce((sum, [start, end]) => sum + (end - start + 1), 0);
+      const times = entries.map((row) => row.at).filter((at) => typeof at === 'string' && at).sort();
+      const sessionDir = join(dir, 'sessions', id);
+      mkdirSync(sessionDir, { recursive: true });
+      writeFileSync(join(sessionDir, 'dropped-ranges.json'), `${JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        sessionId: id,
+        ranges: merged,
+        totalSeqs,
+        passes: sessionPasses.length,
+        folds: sessionFolds.length,
+        coverageFrom: times[0] ?? null,
+        coverageNote: 'passes.jsonl is complete after 4.9.80; earlier ranges come from folds.json with no token counts',
+      }, null, 2)}\n`, 'utf8');
+    }
   } catch { /* diagnostics must never block compaction */ }
 }
 
@@ -69,7 +87,7 @@ export function appendPassLog(pass) {
       at: new Date(at).toISOString(),
       atMs: at,
     })}\n`, 'utf8');
-    rebuildDroppedRanges();
+    rebuildDroppedRanges(pass?.sessionId ?? null);
   } catch { /* diagnostics must never block compaction */ }
 }
 

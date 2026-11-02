@@ -15,7 +15,7 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_POLICY } from './policy.mjs';
 import { SYSTEM_CONVENTION, gistHeader } from './provenance.mjs';
-import { continuityState } from './state.mjs';
+import { continuityState, rebuildDroppedRanges } from './state.mjs';
 import { buildFacetState } from './facets/panel-state.mjs';
 import { PEER_PATH, handlePeerRequest, peerAgents } from './peer.mjs';
 import { migrateThreadsFile } from './threads-store.mjs';
@@ -92,6 +92,9 @@ const FACTS = [
 
 export function apply(ctx, config = {}) {
   const log = ctx.logger ?? console;
+  try { rebuildDroppedRanges(); } catch (error) {
+    try { log.warn?.(`dsh-continuity: dropped-ranges rebuild skipped: ${error?.message ?? error}`); } catch { /* ignore */ }
+  }
   try { installSessionGuard(ctx); } catch (error) {
     try { log.warn?.(`dsh-continuity: session guard not installed: ${error?.message ?? error}`); } catch { /* ignore */ }
   }

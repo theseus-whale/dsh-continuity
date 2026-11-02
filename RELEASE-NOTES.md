@@ -1,8 +1,20 @@
-# 发行说明 — 4.9.103-safe.1
+# 发行说明 — 4.9.104-safe.1
 
 日期：2026-11-03
 
 这是第一个**可公开发布**的清理版。
+
+## 按 session 的 dropped-ranges
+
+`folds.json` 仍按 `sessions/<id>` 分键，`passes.jsonl` 仍保留 `sessionId`；
+`dropped-ranges.json` 改为：
+
+```text
+sessions/<sessionId>/dropped-ranges.json
+```
+
+每个文件只合并本 session 的 folds/passes。全局 `dropped-ranges.json` 不再写入，
+因为不同 session 的 seq 空间不同源。
 
 ## 相对 4.9.102 的变化
 
