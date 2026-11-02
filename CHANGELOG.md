@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.9.109
+
+- Normalize JSON `null` audit state
+- Add a cross-process `audit.lock` with stale/future-mtime recovery
+- Require strict base64 before vector decoding
+- Update remaining legacy gate selectors to accept both prefixes
+
 ## 4.9.108
 
 - Recover stale `running:true` audit state after a 15-minute TTL

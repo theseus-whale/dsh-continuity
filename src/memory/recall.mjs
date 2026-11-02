@@ -9,7 +9,7 @@ import { eventText } from '../session-log.mjs';
 import { BM25Index } from './bm25.mjs';
 import { tokenize } from './tokenize.mjs';
 
-const INJECTED_PREFIXES = ['[continuity:', '[抽取]', '[工作线]', '[标签]', '[规矩]', '[习惯]', '[技能]', '[归位', '[候选', '[存?]', '[闸', '[回正]', '[学习', '[话题?]'];
+const INJECTED_PREFIXES = ['[continuity:', '[抽取]', '[工作线]', '[标签]', '[规矩]', '[习惯]', '[技能]', '[归位', '[候选', '[存?]', '[闸', '[gate', '[peer', '[回正]', '[学习', '[话题?]'];
 
 function isInjected(text) {
   return INJECTED_PREFIXES.some((prefix) => text.startsWith(prefix));

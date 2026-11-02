@@ -40,7 +40,7 @@ export function hasWordEvidence({ userText = '', assistantText = '', word = '' }
   if (needle.length === 0) return false;
   const visible = (text) => String(text ?? '')
     .split(/\r?\n/)
-    .filter((line) => !isTagLine(line) && !/^\s*\[闸/.test(line))
+    .filter((line) => !isTagLine(line) && !/^\s*\[(?:闸|gate|peer)/.test(line))
     .join('\n')
     .toLowerCase();
   return visible(userText).includes(needle) || visible(assistantText).includes(needle);

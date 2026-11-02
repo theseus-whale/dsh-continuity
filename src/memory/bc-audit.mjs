@@ -28,6 +28,7 @@ const writeJson = (file, value) => {
 };
 const decodeVec = (text) => {
   if (typeof text !== 'string' || text.length === 0) throw new Error('audit: empty vector');
+  if (text.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(text)) throw new Error('audit: invalid base64');
   const buffer = Buffer.from(text, 'base64');
   if (buffer.length === 0 || buffer.length % 4 !== 0) throw new Error('audit: invalid vector length');
   const values = Array.from(new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4));
@@ -48,7 +49,38 @@ export function auditPaths(indexFile) {
 }
 
 export function readAuditState(indexFile) {
-  return readJson(auditPaths(indexFile).stateFile, { lastAuditTurn: 0 });
+  const value = readJson(auditPaths(indexFile).stateFile, null);
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : { lastAuditTurn: 0 };
+}
+
+const AUDIT_RUNNING_TTL_MS = 15 * 60 * 1000;
+const auditLockFile = (indexFile) => path.join(path.dirname(indexFile), 'audit.lock');
+
+function acquireAuditLock(indexFile) {
+  const file = auditLockFile(indexFile);
+  try {
+    const fd = fs.openSync(file, 'wx');
+    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, at: Date.now() }));
+    fs.closeSync(fd);
+    return true;
+  } catch (error) {
+    if (error?.code !== 'EEXIST') return false;
+    try {
+      const stat = fs.statSync(file);
+      const future = stat.mtimeMs > Date.now() + 5 * 60 * 1000;
+      if (!future && Date.now() - stat.mtimeMs <= AUDIT_RUNNING_TTL_MS) return false;
+      fs.unlinkSync(file);
+      return acquireAuditLock(indexFile);
+    } catch {
+      return false;
+    }
+  }
+}
+
+function releaseAuditLock(indexFile) {
+  try { fs.unlinkSync(auditLockFile(indexFile)); } catch { /* already gone */ }
 }
 
 export function consumePendingHint(indexFile) {
@@ -66,22 +98,40 @@ export function maybeRunAudit({ indexFile, conceptsFile = null, lastTurn, onErro
   if (!Number.isInteger(lastTurn)) return false;
   let state = readAuditState(indexFile);
   if (lastTurn - (state.lastAuditTurn ?? 0) < 200) return false;
-  const AUDIT_RUNNING_TTL_MS = 15 * 60 * 1000;
   if (state.running === true) {
     const startedAt = Number(state.runningAt ?? 0);
-    const stale = !Number.isFinite(startedAt) || startedAt <= 0 || Date.now() - startedAt > AUDIT_RUNNING_TTL_MS;
+    const future = startedAt > Date.now() + 5 * 60 * 1000;
+    const stale = !Number.isFinite(startedAt) || startedAt <= 0 || future || Date.now() - startedAt > AUDIT_RUNNING_TTL_MS;
     if (!stale) return false;
-    state = { ...state, running: false, runningAt: null, recoveredAt: new Date().toISOString() };
-    writeJson(auditPaths(indexFile).stateFile, state);
   }
-  writeJson(auditPaths(indexFile).stateFile, { ...state, running: true, runningAt: Date.now() });
-  setImmediate(() => {
-    runAudit({ indexFile, conceptsFile }).catch((error) => {
-      try { onError?.(error); } catch { /* ignore */ }
-      writeJson(auditPaths(indexFile).stateFile, { ...readAuditState(indexFile), running: false, runningAt: null, lastError: String(error?.message ?? error) });
+  if (!acquireAuditLock(indexFile)) return false;
+  try {
+    state = readAuditState(indexFile);
+    if (state.running === true) {
+      const startedAt = Number(state.runningAt ?? 0);
+      const future = startedAt > Date.now() + 5 * 60 * 1000;
+      const stale = !Number.isFinite(startedAt) || startedAt <= 0 || future || Date.now() - startedAt > AUDIT_RUNNING_TTL_MS;
+      if (!stale) {
+        releaseAuditLock(indexFile);
+        return false;
+      }
+      state = { ...state, running: false, runningAt: null, recoveredAt: new Date().toISOString() };
+    }
+    writeJson(auditPaths(indexFile).stateFile, { ...state, running: true, runningAt: Date.now() });
+    setImmediate(() => {
+      runAudit({ indexFile, conceptsFile })
+        .then(() => releaseAuditLock(indexFile))
+        .catch((error) => {
+          try { onError?.(error); } catch { /* ignore */ }
+          writeJson(auditPaths(indexFile).stateFile, { ...readAuditState(indexFile), running: false, runningAt: null, lastError: String(error?.message ?? error) });
+          releaseAuditLock(indexFile);
+        });
     });
-  });
-  return true;
+    return true;
+  } catch {
+    releaseAuditLock(indexFile);
+    return false;
+  }
 }
 
 export async function runAudit({ indexFile, conceptsFile } = {}) {

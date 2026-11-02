@@ -1,4 +1,4 @@
-# 发行说明 — 4.9.108-safe.1
+# 发行说明 — 4.9.109-safe.1
 
 日期：2026-11-03
 
@@ -14,14 +14,15 @@ const k = Math.min(points.length, Math.max(20, Math.min(60, Math.round(points.le
 
 1–19 条记录的导入/恢复索引不会再卡在“选 20 个不同中心”的循环里。
 
-## 审计恢复与输入校验（4.9.108）
+## 审计恢复与输入校验（4.9.109）
 
 ```text
 running:true 现在带 runningAt；超过 15 分钟自动恢复
-旧状态没有 runningAt 也按 stale 恢复
-vec 必须合法 base64、有限数、非零、维度一致
+JSON null / 缺 runningAt 的旧状态按空状态恢复
+audit.lock 提供跨进程调度锁；未来 mtime 按 stale 处理
+vec 必须是严格 base64、有限数、非零、维度一致
 坏 vec 不推进审计游标
-过滤同时接受 legacy [闸] 前缀
+gate/peer/tag-confirm 选择器同时接受 legacy [闸] 与 [gate]/[peer]
 ```
 
 ## 深层清理（4.9.106）

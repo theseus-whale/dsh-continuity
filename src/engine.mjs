@@ -1160,7 +1160,7 @@ export class ContinuityEngine extends BaseEngine {
         for (const event of users) {
           let userText = '';
           try { userText = eventText(event, { includeReasoning: false }); } catch { userText = ''; }
-          if (String(userText).trim().length > 0 && !/^\s*\[闸/.test(userText)) lastUserText = userText;
+          if (String(userText).trim().length > 0 && !/^\s*\[(?:闸|gate|peer)/.test(userText)) lastUserText = userText;
         }
         // Last-resort fallback for an old host without a readable session log.
         if (lastText === '') {
