@@ -81,5 +81,5 @@ package.json / lockfile
 3. `/dsh-continuity/bc.json` 200。
 4. `/dsh-continuity/tags.json` 404。
 5. `continuity` 工具不存在；`recall` / `peer_message` 存在。
-6. “上次跑团”出现 `[追忆]` 上下文块，不是用户气泡。
-7. “创看看”不自动触发；“上次创…”才触发。
+6. “上次示例活动”出现 `[追忆]` 上下文块，不是用户气泡。
+7. “一个单字称呼看看”不自动触发；“上次那个单字称呼…”才触发。

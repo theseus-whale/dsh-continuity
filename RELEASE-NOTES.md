@@ -1,8 +1,21 @@
-# 发行说明 — 4.9.104-safe.1
+# 发行说明 — 4.9.105-safe.1
 
 日期：2026-11-03
 
 这是第一个**可公开发布**的清理版。
+
+## 个人示例与默认名
+
+公开树不再包含个人示例词或个人 K 默认名：
+
+```text
+README / ARCHITECTURE 示例改为“示例主题 / 示例词”
+templates 中的示例改为“示例活动 / 示例名 / 示例项目”
+空 keywords.md 不再回退到任何个人/内部默认名
+DEFAULT_SPECIAL_KEYWORDS 现在是空数组
+```
+
+空 K 文件仍然合法：没有默认精确名，需要用户自己写 keywords.md。
 
 ## 按 session 的 dropped-ranges
 

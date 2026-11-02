@@ -23,10 +23,10 @@
 
 ```text
 recall()
-recall({ query: "跑团", recent: true })
-recall({ query: "K标签 Coo" })
+recall({ query: "示例活动", recent: true })
+recall({ query: "K标签 示例名" })
 recall({ query: "B标签 技术" })
-recall({ query: "C标签 跑团" })
+recall({ query: "C标签 示例活动" })
 ```
 
 - `[追忆]` 是候选列表，不是结论。
@@ -49,15 +49,15 @@ K  精确名字（~/.dsh/continuity/sessions/<当前 session>/keywords.md）
 C 格式：
 
 ```text
-跑团 => 游戏 / 故事 / 对话
+示例活动 => 游戏 / 故事 / 对话
 ```
 
 K 格式：
 
 ```text
-Coo
+示例名
 LTS版
-DSHC
+示例项目
 ```
 
 选表：
@@ -152,6 +152,6 @@ peer_message({ to, text, from? })
 3. `/dsh-continuity/bc.json` 200，有 B/C/K。
 4. `/dsh-continuity/tags.json` 404。
 5. `continuity` 工具不存在；`recall` / `peer_message` 存在。
-6. “上次跑团”出现 `[追忆]` 上下文块，不是用户气泡。
-7. “创看看”不自动触发；“上次创…”也不触发（单字 K 不算锚）；只有 cue + 实词锚才触发。
+6. “上次示例活动”出现 `[追忆]` 上下文块，不是用户气泡。
+7. “一个单字称呼看看”不自动触发；“上次那个单字称呼…”也不触发（单字 K 不算锚）；只有 cue + 实词锚才触发。
 8. `gate-errors` 没有新错误。

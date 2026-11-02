@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.9.105
+
+- Empty K fallback is now empty; no personal/default names
+- README, architecture, and templates use neutral examples
+- Removed a personal example phrase and emoji from the public source
+
 ## 4.9.104
 
 - `dropped-ranges.json` is per session: `sessions/<id>/dropped-ranges.json`

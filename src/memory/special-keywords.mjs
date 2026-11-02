@@ -1,17 +1,15 @@
 /**
- * Special keywords are names the user/LLM wants exact-matched:
- * Coo, Continuity, DSHC, project names, handles, etc.
+ * Special keywords are exact names the user wants matched: project names,
+ * handles, product names, etc.
  *
  * They are not B generic concepts and cannot be decomposed into them.
- * The list is intentionally small and editable.
+ * The fallback is empty: a new session should not inherit anyone's names.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const DEFAULT_SPECIAL_KEYWORDS = Object.freeze([
-  'Coo', 'Continuity', 'DSHC', 'DeepSeek Harness', '创', '🐋',
-]);
+export const DEFAULT_SPECIAL_KEYWORDS = Object.freeze([]);
 
 export function defaultSpecialKeywordsPath(home = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir()) {
   return path.join(home, '.dsh', 'continuity', 'keywords.md');

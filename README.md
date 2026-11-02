@@ -1,4 +1,4 @@
-# dsh-continuity 4.9.104-safe.1
+# dsh-continuity 4.9.105-safe.1
 
 给 DSH 的长上下文连续性插件。每个 session 拥有自己完整的一套记忆；
 persona 只是身份/启用标签。
@@ -62,7 +62,7 @@ peer_message    明确投递给另一个 live session
 ## 安装
 
 ```text
-dsh-continuity-4.9.104-safe.1.tgz
+dsh-continuity-4.9.105-safe.1.tgz
 ```
 
 装进目标 profile，备份 `~/.dsh/continuity`，重启 DSH。  
@@ -72,11 +72,11 @@ dsh-continuity-4.9.104-safe.1.tgz
 
 ```text
 recall()
-recall({ query: "跑团", recent: true })
+recall({ query: "项目词", recent: true })
 recall({ query: "A标签" })                 // 只看 topic
 recall({ query: "A标签:topic" })
 recall({ query: "A标签:workflow" })
-recall({ query: "A标签:跑团叙事" })         // 任意 A 概念
+recall({ query: "A标签:示例主题" })         // 任意 A 概念
 recall({ query: "B标签" })
 recall({ query: "C标签" })
 recall({ query: "K标签" })

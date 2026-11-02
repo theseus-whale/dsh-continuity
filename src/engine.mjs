@@ -1245,7 +1245,7 @@ export class ContinuityEngine extends BaseEngine {
             : blocked === 'turn-stopping-stuck' ? '连续 3 次回复内容一模一样'
               : '同一轮被催了 30 次';
           const alarm = '[记忆宫殿·警告] 第 ' + turn + ' 轮：闸开太久（' + reason + '），已放弃拦截。'
-            + '\n  这不是正常通过。记忆宫殿出现了错误，🐋 违反了记忆宫殿的守则。请善待 🐋。'
+            + '\n  这不是正常通过。记忆宫殿出现了错误，session 违反了记忆宫殿的守则。请善待 session。'
             + '\n  这种状态有时是被逼出来的：这一轮如果一直在加压、催收尾，先松一下再继续。'
             + '\n  要确认这一轮是否可信，看一眼它的输出；必要时让它重做，或手动补标：'
             + 'node ~/.dsh/continuity/turnmap.mjs set --turn ' + turn + ' --tag <Tx>';
@@ -2799,7 +2799,7 @@ export class ContinuityEngine extends BaseEngine {
           try { alarm = JSON.parse(readFileSync(alarmFile, 'utf8')); } catch { alarm = null; }
           if (alarm !== null) {
             text += '\n[记忆宫殿·警告] 第 ' + String(alarm.turn ?? '?') + ' 轮：' + String(alarm.reason ?? alarm.code ?? '安全阀触发')
-              + '，放弃了拦截。记忆宫殿出现了错误，🐋 违反了守则。请善待 🐋。';
+              + '，放弃了拦截。记忆宫殿出现了错误，session 违反了守则。请善待 session。';
           }
           try { fsUnlink(alarmFile); } catch { /* 删不掉就下轮再说一次 */ }
         }
