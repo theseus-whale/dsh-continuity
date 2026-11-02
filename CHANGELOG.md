@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.9.110
+
+- `audit.lock` carries an owner token; release only deletes its own lock
+- Stale locks are renamed to a quarantine path and token-checked before removal
+- Audit eligibility is rechecked after lock acquisition
+
 ## 4.9.109
 
 - Normalize JSON `null` audit state

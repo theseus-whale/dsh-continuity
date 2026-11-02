@@ -7,6 +7,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { loadIndexJsonl } from './bc-index.mjs';
 import { loadConcepts, defaultConceptsPath } from './concepts-file.mjs';
 
@@ -60,27 +61,45 @@ const auditLockFile = (indexFile) => path.join(path.dirname(indexFile), 'audit.l
 
 function acquireAuditLock(indexFile) {
   const file = auditLockFile(indexFile);
+  const token = randomUUID();
   try {
     const fd = fs.openSync(file, 'wx');
-    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, at: Date.now() }));
+    fs.writeFileSync(fd, JSON.stringify({ token, pid: process.pid, at: Date.now() }));
     fs.closeSync(fd);
-    return true;
+    return token;
   } catch (error) {
-    if (error?.code !== 'EEXIST') return false;
+    if (error?.code !== 'EEXIST') return null;
     try {
       const stat = fs.statSync(file);
       const future = stat.mtimeMs > Date.now() + 5 * 60 * 1000;
-      if (!future && Date.now() - stat.mtimeMs <= AUDIT_RUNNING_TTL_MS) return false;
-      fs.unlinkSync(file);
+      if (!future && Date.now() - stat.mtimeMs <= AUDIT_RUNNING_TTL_MS) return null;
+      const stale = readJson(file, null);
+      if (!stale || typeof stale !== 'object') return null;
+      const quarantine = `${file}.stale.${process.pid}.${randomUUID()}`;
+      fs.renameSync(file, quarantine);
+      const moved = readJson(quarantine, null);
+      if (moved?.token !== stale.token) {
+        try { fs.renameSync(quarantine, file); } catch { /* lost race */ }
+        return null;
+      }
+      try { fs.unlinkSync(quarantine); } catch { /* ignore */ }
       return acquireAuditLock(indexFile);
     } catch {
-      return false;
+      return null;
     }
   }
 }
 
-function releaseAuditLock(indexFile) {
-  try { fs.unlinkSync(auditLockFile(indexFile)); } catch { /* already gone */ }
+function releaseAuditLock(indexFile, token) {
+  const file = auditLockFile(indexFile);
+  try {
+    const current = readJson(file, null);
+    if (current?.token !== token) return false;
+    fs.unlinkSync(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function consumePendingHint(indexFile) {
@@ -104,15 +123,20 @@ export function maybeRunAudit({ indexFile, conceptsFile = null, lastTurn, onErro
     const stale = !Number.isFinite(startedAt) || startedAt <= 0 || future || Date.now() - startedAt > AUDIT_RUNNING_TTL_MS;
     if (!stale) return false;
   }
-  if (!acquireAuditLock(indexFile)) return false;
+  const token = acquireAuditLock(indexFile);
+  if (!token) return false;
   try {
     state = readAuditState(indexFile);
+    if (lastTurn - (state.lastAuditTurn ?? 0) < 200) {
+      releaseAuditLock(indexFile, token);
+      return false;
+    }
     if (state.running === true) {
       const startedAt = Number(state.runningAt ?? 0);
       const future = startedAt > Date.now() + 5 * 60 * 1000;
       const stale = !Number.isFinite(startedAt) || startedAt <= 0 || future || Date.now() - startedAt > AUDIT_RUNNING_TTL_MS;
       if (!stale) {
-        releaseAuditLock(indexFile);
+        releaseAuditLock(indexFile, token);
         return false;
       }
       state = { ...state, running: false, runningAt: null, recoveredAt: new Date().toISOString() };
@@ -120,16 +144,16 @@ export function maybeRunAudit({ indexFile, conceptsFile = null, lastTurn, onErro
     writeJson(auditPaths(indexFile).stateFile, { ...state, running: true, runningAt: Date.now() });
     setImmediate(() => {
       runAudit({ indexFile, conceptsFile })
-        .then(() => releaseAuditLock(indexFile))
+        .then(() => releaseAuditLock(indexFile, token))
         .catch((error) => {
           try { onError?.(error); } catch { /* ignore */ }
           writeJson(auditPaths(indexFile).stateFile, { ...readAuditState(indexFile), running: false, runningAt: null, lastError: String(error?.message ?? error) });
-          releaseAuditLock(indexFile);
+          releaseAuditLock(indexFile, token);
         });
     });
     return true;
   } catch {
-    releaseAuditLock(indexFile);
+    releaseAuditLock(indexFile, token);
     return false;
   }
 }
