@@ -23,7 +23,7 @@ panel           每个 session 自己的 A/B/C/K
 peer_message    明确投递给另一个 live session
 ```
 
-不做 T 分类、TAG 闸、工作线注入、自动打标。
+不包含额外的提示词分类、自动标注或工作线注入；本包只负责记忆索引、压缩和检索。
 
 ## 每个 session 的完整一套
 

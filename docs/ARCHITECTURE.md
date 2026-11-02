@@ -21,7 +21,7 @@ Client
   └ per-session A/B/C/K right tab
 ```
 
-No `/dsh-continuity/tags.json`. No T tool, TAG gate, or workline in safe mode.
+Safe mode does not add a separate prompt-classification, tagging, or workline layer.
 
 ## 2. Session owns everything
 
@@ -314,6 +314,6 @@ A candidate is not a fact.
 [gist] is reconstruction, not verbatim.
 A pass receipt is append-only.
 floor(T) depends on the current baseline.
-No T/TAG/workline in safe mode.
+No extra prompt-classification/tagging/workline layer in safe mode.
 Tool guard is not an OS security boundary.
 ```

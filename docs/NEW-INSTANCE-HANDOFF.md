@@ -8,7 +8,7 @@
 ```text
 dsh-continuity 4.9.104-safe.1
 安全模式：pointersOnly；peer 保留
-不做：T 分类 / TAG 填写 / TAG 闸 / 工作线 / 自动打标 / tags.json
+不包含：额外的提示词分类、自动标注或工作线注入。
 ```
 
 它做：
