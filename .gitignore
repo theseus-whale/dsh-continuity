@@ -1,0 +1,11 @@
+node_modules/
+.venvs/
+.npm-cache/
+*.log
+*.tgz
+*.zip
+.DS_Store
+Thumbs.db
+*.pyc
+__pycache__/
+.publish/

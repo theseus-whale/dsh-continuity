@@ -1,0 +1,146 @@
+{
+  "name": "dsh-continuity",
+  "version": "4.9.103-safe.1",
+  "description": "Session-scoped long-term memory for DeepSeek Harness: band-controlled compaction, per-session A/B/C/K indexes, offline recall, and verifiable pass receipts.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./engine": "./src/engine.mjs",
+    "./policy": "./src/policy.mjs",
+    "./provenance": "./src/provenance.mjs",
+    "./range": "./src/range.mjs",
+    "./session-log": "./src/session-log.mjs",
+    "./session-log-tool": "./src/session-log-tool.mjs",
+    "./threads": "./src/threads.mjs",
+    "./threads-tool": "./src/threads-tool.mjs",
+    "./threads-core": "./src/threads-core.mjs",
+    "./threads-store": "./src/threads-store.mjs",
+    "./threads-backend": "./src/threads-backend.mjs",
+    "./tags": "./src/tags.mjs",
+    "./tags-store": "./src/tags-store.mjs",
+    "./folds-store": "./src/folds-store.mjs",
+    "./deleted-store": "./src/deleted-store.mjs",
+    "./tag-reject": "./src/tag-reject.mjs",
+    "./tool-preview": "./src/tool-preview.mjs",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json",
+    "./facets/schema": "./src/facets/schema.mjs",
+    "./facets/extract": "./src/facets/extract.mjs",
+    "./facets/index": "./src/facets/index.mjs",
+    "./facets/scanner": "./src/facets/scanner.mjs",
+    "./facets/classifier": "./src/facets/classifier.mjs",
+    "./facets/hybrid": "./src/facets/hybrid.mjs",
+    "./facets/service": "./src/facets/service.mjs",
+    "./facets/store": "./src/facets/store.mjs",
+    "./memory/event-log": "./src/memory/event-log.mjs",
+    "./memory/bm25": "./src/memory/bm25.mjs",
+    "./memory/summary-tree": "./src/memory/summary-tree.mjs",
+    "./memory/vector-index": "./src/memory/vector-index.mjs",
+    "./memory/planner": "./src/memory/planner.mjs",
+    "./memory/tokenize": "./src/memory/tokenize.mjs",
+    "./memory/event-model": "./src/memory/event-model.mjs",
+    "./memory/term-extractor": "./src/memory/term-extractor.mjs",
+    "./memory/referent-ledger": "./src/memory/referent-ledger.mjs",
+    "./memory/event-summary-tree": "./src/memory/event-summary-tree.mjs",
+    "./memory/calibration": "./src/memory/calibration.mjs",
+    "./memory/pre-turn": "./src/memory/pre-turn.mjs",
+    "./memory/language-router": "./src/memory/language-router.mjs",
+    "./memory/extraction-core": "./src/memory/extraction-core.mjs",
+    "./memory/extraction-score": "./src/memory/extraction-score.mjs",
+    "./memory/referent-candidates": "./src/memory/referent-candidates.mjs",
+    "./memory/structured-adapters": "./src/memory/structured-adapters.mjs",
+    "./memory/extraction-adapter": "./src/memory/extraction-adapter.mjs",
+    "./memory/coref-slots": "./src/memory/coref-slots.mjs",
+    "./memory/relik-adapter": "./src/memory/relik-adapter.mjs",
+    "./memory/extraction-provider": "./src/memory/extraction-provider.mjs",
+    "./memory/extraction-composite": "./src/memory/extraction-composite.mjs",
+    "./memory/extraction-pre-step": "./src/memory/extraction-pre-step.mjs",
+    "./peer": "./src/peer.mjs",
+    "./peer-tool": "./src/peer-tool.mjs"
+  },
+  "files": [
+    "src",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "RELEASE-NOTES.md",
+    "bin/bc-relabel.mjs",
+    "bin/export-turns.py",
+    "models",
+    "docs/*.md",
+    "guides",
+    "templates/*.md",
+    "LICENSE",
+    "DISCLAIMER.md",
+    "PRIVACY.md",
+    "SECURITY.md",
+    "THIRD-PARTY-NOTICES.md",
+    "CHANGELOG.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "scripts": {},
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-agent": "*",
+    "@deepseek-ai/dsh-compaction": "*",
+    "@deepseek-ai/dsh-compaction-basic": "*",
+    "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-session": "*",
+    "@deepseek-ai/dsh-token-meter": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-compaction-basic": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-token-meter": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "compaction",
+    "continuity",
+    "provenance",
+    "context"
+  ],
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.2",
+    "sharp": "^0.35.5"
+  },
+  "author": "dsh-continuity contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/USERNAME/dsh-continuity.git"
+  },
+  "homepage": "https://github.com/USERNAME/dsh-continuity",
+  "bugs": {
+    "url": "https://github.com/USERNAME/dsh-continuity/issues"
+  }
+}

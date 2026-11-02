@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Continuity",
+    "description": "Band-controlled compaction with [gist] provenance and a read-only session_log retrieval tool (index / get / grep), plus a left-sidebar control panel and two opt-in agent presets."
+  }
+}
