@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.107-safe.1
+# Continuity architecture — 4.9.108-safe.1
 
 ## 1. Shape
 

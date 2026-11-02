@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.9.108
+
+- Recover stale `running:true` audit state after a 15-minute TTL
+- Validate vector payloads (base64, finite, non-zero, consistent dimensions)
+- Accept the legacy gate prefix alongside the neutral peer/gate prefix
+
 ## 4.9.107
 
 - Audit k is capped by the number of vector-bearing records

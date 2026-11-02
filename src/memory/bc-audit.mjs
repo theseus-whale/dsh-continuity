@@ -27,8 +27,15 @@ const writeJson = (file, value) => {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 };
 const decodeVec = (text) => {
+  if (typeof text !== 'string' || text.length === 0) throw new Error('audit: empty vector');
   const buffer = Buffer.from(text, 'base64');
-  return Array.from(new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4));
+  if (buffer.length === 0 || buffer.length % 4 !== 0) throw new Error('audit: invalid vector length');
+  const values = Array.from(new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4));
+  if (values.length === 0 || values.some((value) => !Number.isFinite(value))) {
+    throw new Error('audit: vector contains non-finite values');
+  }
+  if (values.every((value) => value === 0)) throw new Error('audit: zero vector');
+  return values;
 };
 
 export function auditPaths(indexFile) {
@@ -57,14 +64,21 @@ export function consumePendingHint(indexFile) {
 
 export function maybeRunAudit({ indexFile, conceptsFile = null, lastTurn, onError = null } = {}) {
   if (!Number.isInteger(lastTurn)) return false;
-  const state = readAuditState(indexFile);
+  let state = readAuditState(indexFile);
   if (lastTurn - (state.lastAuditTurn ?? 0) < 200) return false;
-  if (state.running === true) return false;
-  writeJson(auditPaths(indexFile).stateFile, { ...state, running: true });
+  const AUDIT_RUNNING_TTL_MS = 15 * 60 * 1000;
+  if (state.running === true) {
+    const startedAt = Number(state.runningAt ?? 0);
+    const stale = !Number.isFinite(startedAt) || startedAt <= 0 || Date.now() - startedAt > AUDIT_RUNNING_TTL_MS;
+    if (!stale) return false;
+    state = { ...state, running: false, runningAt: null, recoveredAt: new Date().toISOString() };
+    writeJson(auditPaths(indexFile).stateFile, state);
+  }
+  writeJson(auditPaths(indexFile).stateFile, { ...state, running: true, runningAt: Date.now() });
   setImmediate(() => {
     runAudit({ indexFile, conceptsFile }).catch((error) => {
       try { onError?.(error); } catch { /* ignore */ }
-      writeJson(auditPaths(indexFile).stateFile, { ...readAuditState(indexFile), running: false, lastError: String(error?.message ?? error) });
+      writeJson(auditPaths(indexFile).stateFile, { ...readAuditState(indexFile), running: false, runningAt: null, lastError: String(error?.message ?? error) });
     });
   });
   return true;
@@ -80,11 +94,14 @@ export async function runAudit({ indexFile, conceptsFile } = {}) {
     throw new Error(`audit needs vec on at least 90% of records (${withVec.length}/${records.length})`);
   }
   const concepts = rows.map((row) => row.label);
-  const points = withVec.map((record) => ({
-    turn: record.turn,
-    v: norm(decodeVec(record.vec)),
-    record,
-  }));
+  const points = [];
+  let dimension = null;
+  for (const record of withVec) {
+    const values = decodeVec(record.vec);
+    if (dimension === null) dimension = values.length;
+    else if (values.length !== dimension) throw new Error(`audit: mixed vector dimensions (${dimension} vs ${values.length})`);
+    points.push({ turn: record.turn, v: norm(values), record });
+  }
   const k = Math.min(points.length, Math.max(20, Math.min(60, Math.round(points.length / 50))));
   let seed = 42;
   const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
@@ -148,6 +165,7 @@ export async function runAudit({ indexFile, conceptsFile } = {}) {
     candidates: candidates.length,
     at,
     running: false,
+    runningAt: null,
   });
   return { candidates: candidates.length };
 }

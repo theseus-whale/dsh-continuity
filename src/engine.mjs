@@ -2210,7 +2210,7 @@ export class ContinuityEngine extends BaseEngine {
 
             // 新标签：只有零候选 + 长文本 + 非机器消息 + 30 天未问 + 20 轮冷却。
             const snippet = turn.text.trim().replace(/\s+/g, ' ');
-            const ownPrefix = /^\s*\[(peer|gate)(?:\]|·)/.test(snippet);
+            const ownPrefix = /^\s*\[(?:peer|gate|闸)(?:\]|·)/.test(snippet);
             if (!autoTagged && cands.length === 0 && snippet.length >= 40 && !ownPrefix) {
               const key = snippet.slice(0, 40);
               const askedFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'newtag-asked.json');

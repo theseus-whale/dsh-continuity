@@ -72,7 +72,7 @@ export function contentUndecided({ events = [], tagsDoc = null, decisions = [], 
     if (source?.peer === true) continue;
     if (typeof source?.kind === 'string' && source.kind !== 'user') continue;
     // Host 可能把 source 的额外字段洗掉，只留 kind:"user"；[peer]/[gate] 是投递侧的稳定前缀。
-    if (/^\[(?:peer|gate)(?:\]|·)/.test(text)) continue;
+    if (/^\[(?:peer|gate|闸)(?:\]|·)/.test(text)) continue;
     content += 1;
     const tags = tagsDoc === null ? [] : [...tagsAtSeq(tagsDoc, seq)].filter((tag) => tag !== 'T0');
     if (tags.length > 0) { tagged += 1; continue; }
