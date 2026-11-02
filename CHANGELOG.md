@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.9.107
+
+- Audit k is capped by the number of vector-bearing records
+- Added coverage for sparse 1, 5, and 19 record indexes
+
 ## 4.9.106
 
 - Removed personal validation probes from `bin/bc-relabel.mjs`

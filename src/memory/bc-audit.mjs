@@ -85,7 +85,7 @@ export async function runAudit({ indexFile, conceptsFile } = {}) {
     v: norm(decodeVec(record.vec)),
     record,
   }));
-  const k = Math.max(20, Math.min(60, Math.round(points.length / 50)));
+  const k = Math.min(points.length, Math.max(20, Math.min(60, Math.round(points.length / 50))));
   let seed = 42;
   const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
   const centers = [];
