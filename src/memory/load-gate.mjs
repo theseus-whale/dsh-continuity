@@ -84,7 +84,7 @@ export class MemoryLoadState {
 
     if (strongBoundary) {
       if (!hasCandidate) return { action: 'none', reason: 'boundary-no-candidate' };
-      const autoBoundary = this.autoActivityLoad || role === 'coo';
+      const autoBoundary = this.autoActivityLoad || role === 'peer';
       if (!autoBoundary) {
         return { action: 'hint', reason: 'boundary-hint', query: text, facets, candidate };
       }
@@ -95,7 +95,7 @@ export class MemoryLoadState {
     if (hasBoundary && !strongBoundary) {
       if (boundaryScore > 0 && activityChanged) {
         if (!hasActivitySignal(text, activity)) return { action: 'none', reason: 'no-activity-signal' };
-        if (role === 'coo' || this.autoActivityLoad) {
+        if (role === 'peer' || this.autoActivityLoad) {
           return { action: 'load', reason: 'activity-change', query: activity, facets, candidate };
         }
         return { action: 'hint', reason: 'activity-change-hint', query: activity, facets, candidate };
@@ -106,7 +106,7 @@ export class MemoryLoadState {
     if (activityChanged) {
       if (!hasCandidate) return { action: 'none', reason: 'activity-no-candidate' };
       if (!hasActivitySignal(text, activity)) return { action: 'none', reason: 'no-activity-signal' };
-      const autoActivity = this.autoActivityLoad || role === 'coo';
+      const autoActivity = this.autoActivityLoad || role === 'peer';
       if (!autoActivity) {
         return { action: 'hint', reason: 'activity-change-hint', query: activity, facets, candidate };
       }

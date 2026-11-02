@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.9.106
+
+- Removed personal validation probes from `bin/bc-relabel.mjs`
+- Replaced historical dates, turn counts, and seq ranges in comments with
+  generic descriptions
+- Cleaned personal names and prefixes from `event-alias-ledger.mjs`, `t0.mjs`,
+  `threads-core.mjs`, and source comments
+
 ## 4.9.105
 
 - Empty K fallback is now empty; no personal/default names

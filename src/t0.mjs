@@ -38,7 +38,7 @@ export function visibleText(event) {
  */
 export function contentUndecided({ events = [], tagsDoc = null, decisions = [], turnTagRows = [], fromSeq = 0, toSeq = Infinity } = {}) {
   // 轮标签：调用方一直传 turnTagRows，但函数签名没接——于是在这里抛 ReferenceError，
-  // 又被 save 的 catch 吞掉，四道闸集体静默失效（2026-10-29 反向验收抓到：97 轮无标签也存了）。
+  // 又被 save 的 catch 吞掉，四道闸集体静默失效（历史调试 反向验收抓到：一批无标签也存了）。
   const taggedTurns = new Set();
   for (const row of Array.isArray(turnTagRows) ? turnTagRows : []) {
     const turn = Number(row?.turn);
@@ -71,8 +71,8 @@ export function contentUndecided({ events = [], tagsDoc = null, decisions = [], 
     const source = event?.data?.message?.source ?? event?.data?.source;
     if (source?.peer === true) continue;
     if (typeof source?.kind === 'string' && source.kind !== 'user') continue;
-    // Host 可能把 source 的额外字段洗掉，只留 kind:"user"；[创]/[闸] 是投递侧的稳定前缀。
-    if (/^\[(?:创|闸)(?:\]|·)/.test(text)) continue;
+    // Host 可能把 source 的额外字段洗掉，只留 kind:"user"；[peer]/[gate] 是投递侧的稳定前缀。
+    if (/^\[(?:peer|gate)(?:\]|·)/.test(text)) continue;
     content += 1;
     const tags = tagsDoc === null ? [] : [...tagsAtSeq(tagsDoc, seq)].filter((tag) => tag !== 'T0');
     if (tags.length > 0) { tagged += 1; continue; }
@@ -81,7 +81,7 @@ export function contentUndecided({ events = [], tagsDoc = null, decisions = [], 
     const turnNumber = Number(event?.data?.turn);
     if (Number.isInteger(turnNumber) && taggedTurns.has(turnNumber)) { tagged += 1; continue; } // 轮标签已判
     // 没有轮号 ≠ 不用判：归属靠 run 区间（[from,to,tagId]），run 不需要轮号。
-    // 之前这里写「无轮号 → 跳过」，等于把 37 条真实用户消息当成不用管（2026-10-30 用户纠正）。
+    // 之前这里写「无轮号 → 跳过」，等于把 一批真实用户消息当成不用管（历史调试 用户纠正）。
     if (!Number.isInteger(turnNumber)) noTurn += 1;
     undecided.push({ seq, type: event.type, head: text.replace(/\s+/g, ' ').slice(0, 60) });
   }

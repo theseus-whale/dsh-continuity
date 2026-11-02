@@ -175,7 +175,7 @@ export function apply(ctx, config = {}) {
     } catch { /* registration failure must not block the plugin */ }
   }
   // 回合闸注册在这里，不在 engine 里：engine 是挂在 agent preset 里的 compaction service，
-  // 它自己的 ctx 接不到 agent/* 事件（2026-10-30 实测：重启后 turn-stopping 一次都没触发，
+  // 它自己的 ctx 接不到 agent/* 事件（历史调试 实测：重启后 turn-stopping 一次都没触发，
   // 也没有注册错误——引擎那边是可选链，ctx 不对就静默跳过）。插件入口的 ctx 一定在。
   const hookHome = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
   if (config.safeMode === true) {

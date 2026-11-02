@@ -43,7 +43,7 @@ export class ReferentLedger {
       nilCount: 0,
       confirmed: false,
     };
-    if (source === 'user' || source === 'coo') record.user += 1;
+    if (source === 'user' || source === 'peer') record.user += 1;
     else record.assistant += 1;
     record.events.add(eventId);
     if (confirmed) record.confirmed = true;

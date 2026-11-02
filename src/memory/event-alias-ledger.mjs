@@ -3,7 +3,7 @@
  *
  * A term becomes an alias only when:
  *   - it is not already a known alias
- *   - the user/Coo has used it at least twice
+ *   - the user/peer has used it at least twice
  *   - it appears in at least two distinct events
  *   - its role is stable
  *   - it maps to an existing facet
@@ -45,7 +45,7 @@ export class EventAliasLedger {
       proposed: false,
       accommodated: false,
     };
-    if (source === 'user' || source === 'coo') record.user += 1;
+    if (source === 'user' || source === 'peer') record.user += 1;
     else record.assistant += 1;
     record.events.add(eventId);
     if (role !== null) record.roles[role] = (record.roles[role] ?? 0) + 1;
