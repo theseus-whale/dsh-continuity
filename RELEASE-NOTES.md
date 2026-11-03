@@ -1,10 +1,14 @@
-# 发行说明 — 4.10.1
+# 发行说明 — 4.10.2
 
-## 4.10.1 修正（4.10.0 作废）
+## coo/peer 双角色兼容（4.10.2）
 
-4.10.0 的 public 包从 `publish/dsh-continuity-public` 打出，但该树 `src/engine.mjs` 仍是旧的 `warnOnce`（仍写 lastError）。4.10.1 已把 dev 的 engine 同步进 public 并重新打包。逐文件哈希：engine `8081CF81B0EC` 两侧一致；其余 14 个 src 差异为既有的 public 去个人化差异，不是行为漂移。
+load-gate / event-alias-ledger / referent-ledger 同时接受 role/source 的 coo 与 peer；public 版不再把 coo 替换成 peer。pet bridge 传 coo 时行为保留，公共包仍保持 peer 命名。special keywords 默认空是 public 的故意隐私默认，K 表不受影响。
 
-## Stable 首版（4.10.1）
+## 4.10.2 修正（4.10.0 作废）
+
+4.10.0 的 public 包从 `publish/dsh-continuity-public` 打出，但该树 `src/engine.mjs` 仍是旧的 `warnOnce`（仍写 lastError）。4.10.2 已把 dev 的 engine 同步进 public 并重新打包。逐文件哈希：engine `8081CF81B0EC` 两侧一致；其余 14 个 src 差异为既有的 public 去个人化差异，不是行为漂移。
+
+## Stable 首版（4.10.2）
 
 相对 4.9.136：
 

@@ -45,7 +45,7 @@ export class EventAliasLedger {
       proposed: false,
       accommodated: false,
     };
-    if (source === 'user' || source === 'peer') record.user += 1;
+    if (source === 'user' || source === 'coo' || source === 'peer') record.user += 1;
     else record.assistant += 1;
     record.events.add(eventId);
     if (role !== null) record.roles[role] = (record.roles[role] ?? 0) + 1;
