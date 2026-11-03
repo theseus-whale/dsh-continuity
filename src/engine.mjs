@@ -49,7 +49,7 @@ import { loadAnswered, filterAnswered } from './learning.mjs';
 import { pathToFileURL } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { eventText } from './session-log.mjs';
-import { planFold, resolvePolicy } from './policy.mjs';
+import { planFold, resolvePolicy, calibrateProtect } from './policy.mjs';
 import { annotateSummary, gistHeader, SYSTEM_CONVENTION } from './provenance.mjs';
 import { selectOldestRange } from './range.mjs';
 import { planFacetFold, loadFacetFoldFile, defaultFacetFoldFile } from './facets/fold-plan.mjs';
@@ -126,7 +126,10 @@ function passReceiptLine(pass) {
     : `seq ${pass.start}\u2013${pass.end}`;
   const window = Number.isFinite(pass.windowTokens) ? ` \u00b7 window ${n(pass.windowTokens)}` : '';
   const policy = pass.protectBinds === true
-    ? ` \u00b7 protectBinds \u00b7 preBaseline ${n(pass.preBaselineTokens)} \u00b7 floor ${n(pass.floorTokens)} \u2265 low ${n(pass.lowTargetTokens)} \u00b7 after ${n(pass.afterTokens)} \u00b7 suggest protect \u2264 ${Number.isFinite(pass.protectSuggested) ? pass.protectSuggested.toFixed(3) : '?'}`
+    ? ` \u00b7 protectBinds \u00b7 ${pass.protectSource ?? 'default'} protect ${Number.isFinite(pass.protectEffective) ? pass.protectEffective.toFixed(3) : '?'} \u00b7 preBaseline ${n(pass.preBaselineTokens)} \u00b7 floor ${n(pass.floorTokens)} \u2265 low ${n(pass.lowTargetTokens)} \u00b7 after ${n(pass.afterTokens)}`
+      + (Number.isFinite(pass.protectSuggested) ? ` \u00b7 suggest protect \u2264 ${pass.protectSuggested.toFixed(3)}` : '')
+      + (pass.lowUnreachable && Number.isFinite(pass.lowMinTokens) ? ` \u00b7 low must be \u2265 ${n(pass.lowMinTokens)}` : '')
+      + (pass.driftReported ? ` \u00b7 baseline drifted from ${n(pass.protectB0)}` : '')
     : '';
   return `[continuity:fold] ${range} \u00b7 ${pass.count ?? '?'} \u6761 \u00b7 ${n(pass.tokens)} tokens \u00b7 reason=${pass.reason ?? '?'} \u00b7 \u538b\u524d ${n(pass.estTokens)} \u2192 \u538b\u540e ${n(pass.afterTokens)}${window}${policy}`;
 }
@@ -267,6 +270,9 @@ export class ContinuityEngine extends BaseEngine {
     this.headers = new WeakMap();
     /** Last measurement per agent, reused by oldestRange(). */
     this.measured = new WeakMap();
+    /** First-band-high calibration per agent; frozen for the session. */
+    this.protectCalibration = new WeakMap();
+    this.protectDriftWarned = new WeakSet();
     /** Resolved model metadata, cached per provider/model. */
     this.modelInfo = new Map();
     this.warned = new Set();
@@ -459,12 +465,25 @@ export class ContinuityEngine extends BaseEngine {
     return measured;
   }
 
-  protectFor() {
-    return this.continuity.protect;
+  protectFor(agent) {
+    return this.protectCalibration.get(agent)?.protect ?? this.continuity.protect;
   }
 
-  policyFor() {
-    return this.continuity;
+  policyFor(agent) {
+    return Object.freeze({ ...this.continuity, protect: this.protectFor(agent) });
+  }
+
+  calibrateAtFirstBand(agent, measured) {
+    if (this.protectCalibration.has(agent)) return this.protectCalibration.get(agent);
+    const preBaseline = Math.max(0, measured.estTokens - measured.surfaceTokens);
+    const calibration = calibrateProtect({
+      low: this.continuity.low,
+      windowTokens: measured.windowTokens,
+      baselineTokens: preBaseline,
+    });
+    if (calibration === null) return null;
+    this.protectCalibration.set(agent, calibration);
+    return calibration;
   }
 
   /** Resolve once per route; adapters own the call and its defaults are static. */
@@ -3162,6 +3181,17 @@ export class ContinuityEngine extends BaseEngine {
       windowTokens: measured.windowTokens,
       policy: this.policyFor(agent),
     });
+    // First band-high is the only calibration point. The same fold uses it.
+    if (plan.reason === 'band-high' && !this.protectCalibration.has(agent)) {
+      const calibration = this.calibrateAtFirstBand(agent, measured);
+      if (calibration !== null) {
+        plan = planFold({
+          estTokens: measured.estTokens,
+          windowTokens: measured.windowTokens,
+          policy: this.policyFor(agent),
+        });
+      }
+    }
     if (plan.budget <= 0) return null;
 
     let activePins = new Set();
@@ -3296,16 +3326,27 @@ export class ContinuityEngine extends BaseEngine {
       const afterBaseline = after === null ? undefined : Math.max(0, after.estTokens - after.surfaceTokens);
       const preBaseline = Math.max(0, measured.estTokens - measured.surfaceTokens);
       const protectEffective = this.protectFor(agent);
+      const calibration = this.protectCalibration.get(agent) ?? null;
+      const protectSource = calibration === null ? 'default' : 'calibration';
+      const protectB0 = calibration?.baselineTokens ?? preBaseline;
+      const protectMargin = calibration?.marginTokens ?? 0.01 * measured.windowTokens;
       const floorWindow = measured.windowTokens;
       const floorTokens = preBaseline + protectEffective * floorWindow;
       const lowTargetTokens = this.continuity.low * floorWindow;
       const protectBinds = floorTokens >= lowTargetTokens;
+      const lowUnreachable = protectEffective <= 0.1000001 && protectBinds;
+      const lowMinTokens = lowUnreachable ? floorTokens + protectMargin : undefined;
       const protectSuggested = Math.max(0, (lowTargetTokens - preBaseline - 0.01 * floorWindow) / floorWindow);
+      const drift = calibration !== null && Math.abs(preBaseline - protectB0) > 0.10 * floorWindow;
+      const driftReported = drift && !this.protectDriftWarned.has(agent);
+      if (driftReported) this.protectDriftWarned.add(agent);
       if (protectBinds) {
         this.warnOnce(
           `protect-floor:${agent.session.id}`,
           `dsh-continuity: protect floor is above low (pre ${measured.estTokens} / floor ${Math.round(floorTokens)} / low ${Math.round(lowTargetTokens)}); `
-          + `suggest protect <= ${protectSuggested.toFixed(3)}`,
+          + `suggest protect <= ${protectSuggested.toFixed(3)}`
+          + (lowUnreachable ? `; low must be >= ${Math.round(lowMinTokens)}` : '')
+          + (driftReported ? `; baseline drifted from calibration ${Math.round(protectB0)}` : ''),
         );
       }
       const receipt = {
@@ -3325,10 +3366,16 @@ export class ContinuityEngine extends BaseEngine {
         afterSurfaceTokens: after?.surfaceTokens,
         afterBaselineTokens: afterBaseline,
         protectEffective,
+        protectSource,
+        protectB0,
+        protectMargin,
         floorTokens,
         lowTargetTokens,
+        lowUnreachable,
+        lowMinTokens,
         protectBinds,
         protectSuggested,
+        driftReported,
         rebloatTokens: after === null ? undefined : Math.max(0, after.estTokens - measured.estTokens),
       };
       recordPass(receipt);

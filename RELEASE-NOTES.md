@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.128-safe.1
+# 发行说明 — 4.9.129-safe.1
+
+## 首次 band-high 校准（4.9.129）
+
+B0 = 首次 band-high 的 preBaseline；protect_eff=clamp((low*W−B0−.01W)/W,.10,.20)，同一 fold 立即用，session 内冻结。calibration 缺失才用 .14。drift >10%W 只给一次 suggestion，不改 policy；clamp .10 且 floor≥low 时同时报 low_min。
 
 ## K-04 验收条款（4.9.128）
 

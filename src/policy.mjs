@@ -90,6 +90,33 @@ export function resolvePolicy(overrides = {}) {
 }
 
 /**
+ * Calibrate `protect` once, at the first band-high trigger, from the
+ * triggering request's pre-fold baseline. The value is frozen for the session;
+ * later drift is reported, never re-applied.
+ */
+export function calibrateProtect({
+  low,
+  windowTokens,
+  baselineTokens,
+  marginRatio = 0.01,
+  min = 0.10,
+  max = 0.20,
+} = {}) {
+  const values = [low, windowTokens, baselineTokens, marginRatio, min, max];
+  if (values.some((value) => !Number.isFinite(value)) || windowTokens <= 0) return null;
+  const marginTokens = marginRatio * windowTokens;
+  const raw = (low * windowTokens - baselineTokens - marginTokens) / windowTokens;
+  const protect = Math.min(max, Math.max(min, raw));
+  return {
+    protect,
+    raw,
+    marginTokens,
+    baselineTokens,
+    clamped: protect !== raw,
+  };
+}
+
+/**
  * Plan one pass.
  *
  * @param {{ estTokens: number, windowTokens: number, policy?: object }} input

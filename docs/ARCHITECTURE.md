@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.128-safe.1
+# Continuity architecture — 4.9.129-safe.1
 
 ## 1. Shape
 
@@ -201,6 +201,22 @@ triggering request (`preBaselineTokens`); `afterBaselineTokens` describes the
 post-fold state and must not be used as the pass floor. The measured 0b pass
 closed at preBaseline 133,272 + .16W = 260,084, and afterTokens was 263,723
 (+3,639 from the tool-pair cut).
+
+`protect` is calibrated once, at the first band-high trigger, from that
+request's preBaseline:
+
+```text
+protect_eff = clamp((low*W - preBaseline - margin)/W, 0.10, 0.20)
+margin = 0.01*W
+```
+
+The same fold uses the calibrated value; it is then frozen for the session
+(protect_source=calibration, B0=preBaseline, margin recorded). If calibration
+is unavailable, the default .14 is used (`protect_source=default`). Later
+preBaselines are compared to B0; a drift over 10% W produces one suggestion,
+never an automatic policy change. If protect_eff clamps at .10 and
+floor >= low, both "low unreachable" and `low_min = floor + margin` are
+reported.
 
 Receipt:
 
