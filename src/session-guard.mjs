@@ -29,10 +29,11 @@ function isOperatorSession(sessionId) {
 const ROOT_MARK = '.dsh/continuity';
 const ROOT_TILDE = '~/.dsh/continuity';
 
-/** Root-level identity files are readable by any enabled persona. */
+/** Root-level diagnostic files are readable by any enabled persona. */
 const SHARED_READ_FILES = new Set([
   norm(path.join(continuityRoot(), 'session-persona.json')),
   norm(path.join(continuityRoot(), 'operator-sessions.json')),
+  norm(path.join(continuityRoot(), 'context-log.jsonl')),
 ]);
 
 function isSharedIdentityRead(toolName, hits) {

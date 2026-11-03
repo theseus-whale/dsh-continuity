@@ -138,13 +138,14 @@ preset 在第一个 turn 后固定。`agentPresets.select` 对已启动 session 
 
 `session-guard` 只对这份清单里的 session 放行；清单为空或不存在时，仍按
 persona + 本 session 的规则拦截。这个文件是维护入口，不是日常权限。
-## 根级身份文件
+## 根级身份/诊断文件
 
-`read` 工具可以读取这两个根级文件（只读）：
+`read` 工具可以读取这三个根级文件（只读）：
 
 ```text
 ~/.dsh/continuity/session-persona.json
 ~/.dsh/continuity/operator-sessions.json
+~/.dsh/continuity/context-log.jsonl
 ```
 
 写入仍被拦；shell 命令里的路径也仍被拦。用 `read`，不要用 `Get-Content`。

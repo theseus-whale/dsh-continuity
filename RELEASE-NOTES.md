@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.123-safe.1
+# 发行说明 — 4.9.124-safe.1
+
+## context-log 只读白名单（4.9.124）
+
+`read` 可以打开 ~/.dsh/continuity/context-log.jsonl；写入和 shell 仍被拦。用于核对 est/surface/baseline 的相位差。
 
 ## 平衡切边的 afterTokens（4.9.123）
 
