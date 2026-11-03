@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.115-safe.1
+# Continuity architecture — 4.9.116-safe.1
 
 ## 1. Shape
 
@@ -86,15 +86,15 @@ New records carry:
   "turn": 40,
   "seqStart": 2186,
   "seqEnd": 2186,
-  "generic": ["示例主题", "原文与上下文"],
-  "genericTopic": ["示例主题"],
+  "generic": ["跑团叙事", "原文与上下文"],
+  "genericTopic": ["跑团叙事"],
   "genericWorkflow": ["原文与上下文"],
   "topicScore": 0.71,
   "topicConfidence": "normal",
   "labelVersion": 2,
-  "terms": ["示例词"],
-  "keywords": ["example-name"],
-  "conceptScores": {"示例主题": 0.71, "原文与上下文": 0.66},
+  "terms": ["跑团"],
+  "keywords": ["coo"],
+  "conceptScores": {"跑团叙事": 0.71, "原文与上下文": 0.66},
   "vec": "...",
   "chatter": 0.42,
   "sessionId": "session-..."
@@ -169,14 +169,19 @@ measure
 Band:
 
 ```text
-high = 0.60 W       start a pass
-low  = 0.40 W       target request
-emergency = 0.65 W
-emergencyTo = 0.42 W
-protect = 0.30 W
-maxPerBatch = 190k
-minAction = 24k
+high = 0.45 W       start a pass
+low  = 0.35 W       target request
+emergency = 0.55 W
+emergencyTo = 0.38 W
+protect = 0.20 W
+maxPerBatch = 140k
+minAction = 16k
 ```
+
+The continuity preset uses this token-saver band from 4.9.116. The old
+0.60/0.40/0.30 band left the effective floor near 355k on the measured 0b
+window; this band starts at ~357k and aims toward the ~276k floor. The cost is
+a smaller protected verbatim tail: 20% instead of 30%.
 
 One pass folds one oldest contiguous range. `budget` is an upper bound, not a
 guarantee. Reachable floor:
