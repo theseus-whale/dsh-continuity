@@ -51,12 +51,18 @@ export function buildBCPanelState({ file = null, keywordsFile = null, cmapFile =
       if (knownConcepts.has(concept)) counts.set(concept, (counts.get(concept) ?? 0) + 1);
     }
     for (const term of cTerms) {
-      if ((record.terms ?? []).includes(term)) cCounts.set(term, (cCounts.get(term) ?? 0) + 1);
+      if ((record.terms ?? []).includes(term) || (record.keywords ?? []).includes(term)) {
+        cCounts.set(term, (cCounts.get(term) ?? 0) + 1);
+      }
     }
     const words = new Set((record.keywords ?? []).map((word) => String(word).toLowerCase()));
     for (const keyword of specialKeywords) {
       if (words.has(keyword.toLowerCase())) kCounts.set(keyword, (kCounts.get(keyword) ?? 0) + 1);
     }
+  }
+  // Configured C entries remain visible even before their first hit.
+  for (const entry of cFileEntries) {
+    if (!cCounts.has(entry.term)) cCounts.set(entry.term, 0);
   }
   const labels = [...counts.entries()]
     .map(([label, turns]) => ({ label, turns }))

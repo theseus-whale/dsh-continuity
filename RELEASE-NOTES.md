@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.131-safe.1
+# 发行说明 — 4.9.132-safe.1
+
+## 面板 C 计数 keywords fallback（4.9.132）
+
+bc-panel-state 的 C 计数改为 terms ∪ keywords，与 recall 对齐；cmap 里配置但暂时未命中的条目显示 turns:0，不再消失。
 
 ## C 表 keywords fallback（4.9.131）
 
