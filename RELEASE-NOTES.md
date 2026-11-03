@@ -1,8 +1,17 @@
-# 发行说明 — 4.9.110-safe.1
+# 发行说明 — 4.9.111-safe.1
 
 日期：2026-11-03
 
 这是第一个**可公开发布**的清理版。
+
+## 面板诊断
+
+```text
+PANEL.md              明确说明 A/B/C/K 是插件 UI
+bin/panel-check.mjs   检查 client.js、dsh.client 和 host route
+```
+
+包内已包含 client.js；看不到 tab 时先按 PANEL.md 判断是 client 未加载还是宿主缺少 sidebarRight。
 
 ## 稀疏索引审计（4.9.107）
 
