@@ -1,15 +1,18 @@
-# 发行说明 — 4.9.121-safe.1
+# 发行说明 — 4.9.122-safe.1
 
-## 平衡带 0.48/0.32（4.9.121）
+## 平衡带 0.48/0.32（4.9.122）
 
 ```text
 high 0.48 · low 0.32 · setpoint 0.48
 emergency 0.65 · emergencyTo 0.42
-protect 0.16 · maxPerBatch 190k · minAction 24k
+protect 0.14 · maxPerBatch 190k · minAction 24k
 ```
 
-0b 窗口：high 380k，low 254k，floor 约 248k（baseline 121k + protect .16），一次折约 127k，均值约 317k。  
+0b 窗口：high 380k，low 254k，floor 约 244k（baseline 133k + protect .14），一次折约 127k。  
 4.9.120 的 protect .30 会把 floor 顶到约 356k，low 到不了，已作废，不要安装。
+
+默认值是启发式，不是保证；真正的判据是每次 fold 的 `afterTokens` 对 `lowTargetTokens`。  
+baseline 在折叠前后可能大幅跳变（实测 133,272 → 71,450），所以“baseline 涨了”至少要两个采样点、且跨一次折叠才成立。
 
 ## 维护者访问（4.9.118）
 

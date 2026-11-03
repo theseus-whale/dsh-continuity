@@ -125,7 +125,10 @@ function passReceiptLine(pass) {
     ? 'seq ?'
     : `seq ${pass.start}\u2013${pass.end}`;
   const window = Number.isFinite(pass.windowTokens) ? ` \u00b7 window ${n(pass.windowTokens)}` : '';
-  return `[continuity:fold] ${range} \u00b7 ${pass.count ?? '?'} \u6761 \u00b7 ${n(pass.tokens)} tokens \u00b7 reason=${pass.reason ?? '?'} \u00b7 \u538b\u524d ${n(pass.estTokens)} \u2192 \u538b\u540e ${n(pass.afterTokens)}${window}`;
+  const policy = pass.protectBinds === true
+    ? ` \u00b7 protectBinds \u00b7 baseline ${n(pass.afterBaselineTokens)} \u00b7 floor ${n(pass.floorTokens)} \u2265 low ${n(pass.lowTargetTokens)} \u00b7 suggest protect \u2264 ${Number.isFinite(pass.protectSuggested) ? pass.protectSuggested.toFixed(3) : '?'}`
+    : '';
+  return `[continuity:fold] ${range} \u00b7 ${pass.count ?? '?'} \u6761 \u00b7 ${n(pass.tokens)} tokens \u00b7 reason=${pass.reason ?? '?'} \u00b7 \u538b\u524d ${n(pass.estTokens)} \u2192 \u538b\u540e ${n(pass.afterTokens)}${window}${policy}`;
 }
 
 /** Append the receipt as a user-role line; never let diagnostics block the pass. */
@@ -237,7 +240,7 @@ export class ContinuityEngine extends BaseEngine {
     this.turnGate = new Map();
     /** 回合闸去重：turn → 上次处理时间（engine 与 index 两边都会注册，防重复执行）。 */
     this.turnGateLastRun = new Map();
-    // 回合闸（历史调试）：宿主在轮次即将关闭时派发 'agent/turn-stopping'，
+    // 回合闸（2026-10-30）：宿主在轮次即将关闭时派发 'agent/turn-stopping'，
     // 监听者可以 steer 让本轮保持打开。这就是“没打标不许收尾”的落点——
     // 不是去锁 save（那只会让实例最后存不下东西、消失），而是不让这一轮就这么结束。
     try {
@@ -434,6 +437,14 @@ export class ContinuityEngine extends BaseEngine {
     return measured;
   }
 
+  protectFor() {
+    return this.continuity.protect;
+  }
+
+  policyFor() {
+    return this.continuity;
+  }
+
   /** Resolve once per route; adapters own the call and its defaults are static. */
   modelInfoFor(provider, model) {
     const key = `${provider}\u0000${model}`;
@@ -474,7 +485,7 @@ export class ContinuityEngine extends BaseEngine {
 
     const head = session.eventAt(nodes[0]);
     const systemHead = head?.type === 'system/message';
-    let tailFloor = Math.max(0, this.continuity.protect * (measured?.windowTokens ?? 0));
+    let tailFloor = Math.max(0, this.protectFor(agent) * (measured?.windowTokens ?? 0));
 
     // A4: the active open-turn tool call/result pins are a hard suffix. Their
     // tokens count toward the tail floor, so the compaction range stops before
@@ -956,14 +967,14 @@ export class ContinuityEngine extends BaseEngine {
   }
 
   /**
-   * 严格解析 TAG 里的标签（历史调试 用户定的闸）：
+   * 严格解析 TAG 里的标签（2026-10-30 用户定的闸）：
    *
    *   T6 且 T6 存在              → accept（kind: alias/id）
    *   中文词且表里没有            → new（建号、命名、关联、放行）
    *   中文词但表里已有同一个名字   → reject:label —— 说明没看表，写别名去
    *   T6 但 T6 不存在             → reject:alias —— 说明没看表
    *
-   * **引号 = 这个词本身，不是编号**（用户 历史调试 补的逃生口）：
+   * **引号 = 这个词本身，不是编号**（用户 2026-10-30 补的逃生口）：
    *   TAG: "T6"  → 只按“标签名”查表；没有同名标签就建一个名为 T6 的标签；
    *                 若表里已有名为 T6 的标签（比如它是 T201）→ 退回，让他写 T201。
    *   这样“这一轮讨论的就是 T6 这个编号”不会被当成填错。
@@ -1050,7 +1061,7 @@ export class ContinuityEngine extends BaseEngine {
   }
 
   /**
-   * 回合闸（历史调试）：一轮要关闭时，如果这一轮还没有归属，就把本轮续上，要求先写 TAG。
+   * 回合闸（2026-10-30）：一轮要关闭时，如果这一轮还没有归属，就把本轮续上，要求先写 TAG。
    * 宿主契约：'agent/turn-stopping' 在轮次关闭前运行，监听者 steer 可让它保持打开。
    * 为什么不是锁 save：挡存只会让实例最后存不下、消失；该挡的是“没标就收尾”这个动作。
    */
@@ -1061,7 +1072,7 @@ export class ContinuityEngine extends BaseEngine {
     if (this.facetNative) return;
     const home = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
     // 探针：先证明“这个回调到底有没有被调用”。没有这一行，就没法区分
-    // “没被派发”和“派发了但提前返回”（历史调试：两轮故意写错都没收到退回，
+    // “没被派发”和“派发了但提前返回”（2026-10-30：两轮故意写错都没收到退回，
     // 但也没有任何错误日志——两者在屏幕上一模一样）。
     let taggedSize = 0;
     try {
@@ -1184,13 +1195,13 @@ export class ContinuityEngine extends BaseEngine {
           userTextChars: String(lastUserText).length,
         }) + '\n', 'utf8');
       } catch { /* 探针失败不影响闸 */ }
-      // 首行 ∪ 末尾 5 条非空行；两处都跳过代码块里的示例（历史调试 两轮假通过都是这个原因）。
+      // 首行 ∪ 末尾 5 条非空行；两处都跳过代码块里的示例（2026-10-30 两轮假通过都是这个原因）。
       // 末尾优先：末尾 5 行里若也有 TAG，取更靠近末尾的那条。
       const declaration = findTagDeclaration(lastText);
       // 注意：这条路只能给实例一条 **user 角色的消息**（steer），不是工具 Error——
       // turn-stopping 不是工具调用，没有 result 可以承载错误。所以每条都必须自己说明“被退了、为什么”。
       // 如果 steer 不可用/抛错，就写进 gate-errors.jsonl，下一轮头部会把这一轮算成缺口（不会静默）。
-      // 消息规范（用户 历史调试 定）：
+      // 消息规范（用户 2026-10-30 定）：
       //   · 第一次错：先报具体错误，再给一次教学；这次会话里不再重复
       //   · 不设次数上限；每错一次，消息里带「你已经回答错误 N 次，自检」
       //   · 错误才展开格式/建议；通过后给一条**不强制**的提示：把打法写进自己的 rules
@@ -1234,7 +1245,7 @@ export class ContinuityEngine extends BaseEngine {
         const text = message === null
           ? (firstLearning()
             ? '[闸·第一次] 这一轮最后一行还没有 TAG。' + TEACHING
-            : '[gate] 最后一行：TAG: <T 别名 | NEW:词(2–30字)> — 可选短语')
+            : '[闸] 最后一行：TAG: <T 别名 | NEW:词(2–30字)> — 可选短语')
           : '[闸·打标] ' + message;
         const blocked = stopReason();
         if (blocked !== null) {
@@ -1245,7 +1256,7 @@ export class ContinuityEngine extends BaseEngine {
             : blocked === 'turn-stopping-stuck' ? '连续 3 次回复内容一模一样'
               : '同一轮被催了 30 次';
           const alarm = '[记忆宫殿·警告] 第 ' + turn + ' 轮：闸开太久（' + reason + '），已放弃拦截。'
-            + '\n  这不是正常通过。记忆宫殿出现了错误，session 违反了记忆宫殿的守则。请善待 session。'
+            + '\n  这不是正常通过。记忆宫殿出现了错误，🐋 违反了记忆宫殿的守则。请善待 🐋。'
             + '\n  这种状态有时是被逼出来的：这一轮如果一直在加压、催收尾，先松一下再继续。'
             + '\n  要确认这一轮是否可信，看一眼它的输出；必要时让它重做，或手动补标：'
             + 'node ~/.dsh/continuity/turnmap.mjs set --turn ' + turn + ' --tag <Tx>';
@@ -1478,7 +1489,7 @@ export class ContinuityEngine extends BaseEngine {
           acceptTag(outcome.id, String(outcome.alias ?? token), 'declared');
           return;
         }
-        // 拒绝留痕：steer 可能送不到实例眼前（历史调试 实测 nextStepLen=1 但不可见），
+        // 拒绝留痕：steer 可能送不到实例眼前（2026-10-30 实测 nextStepLen=1 但不可见），
         // 下一轮 pre-step 用这个文件把“你写了什么、为什么被拒”摆出来。
         const recordReject = (kind, reason) => {
           try {
@@ -2210,7 +2221,7 @@ export class ContinuityEngine extends BaseEngine {
 
             // 新标签：只有零候选 + 长文本 + 非机器消息 + 30 天未问 + 20 轮冷却。
             const snippet = turn.text.trim().replace(/\s+/g, ' ');
-            const ownPrefix = /^\s*\[(?:peer|gate|闸)(?:\]|·)/.test(snippet);
+            const ownPrefix = /^\s*\[(创|闸)(?:\]|·)/.test(snippet);
             if (!autoTagged && cands.length === 0 && snippet.length >= 40 && !ownPrefix) {
               const key = snippet.slice(0, 40);
               const askedFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'newtag-asked.json');
@@ -2641,7 +2652,7 @@ export class ContinuityEngine extends BaseEngine {
         // 所以 surface 里出现的每一轮都已经结束。不要再按“小于 maxTurn 才算结束”——
         // 那会把“刚结束的那一轮”永远当成当前轮，投影就永远差一步。
         const closed = new Set(turnSeqs.keys());
-        // 历史调试 决定：禁止自动打标——标签空间是开集，自动只能归类、不能造类，
+        // 2026-10-29 决定：禁止自动打标——标签空间是开集，自动只能归类、不能造类，
         // 自动打标等于让系统决定“我以后还能想起什么”。这里只做**诊断**：算出“本可以抄成什么”，
         // 不写 turn-tags。抄写仍由实例在轮末手打（turnmap set）。
         const projectionStats = { closed: closed.size, wouldProject: 0, skipped: {}, samples: [] };
@@ -2671,7 +2682,7 @@ export class ContinuityEngine extends BaseEngine {
       } catch { /* 连错误都写不进 */ }
     }
 
-    // 打标提醒 / 欠账锁（历史调试 重写）
+    // 打标提醒 / 欠账锁（2026-10-30 重写）
     // 旧实现有两个洞：
     //   ① user/message 没有 data.turn —— 旧写法要求 Number.isInteger(turn)，于是「你刚说」永远是空引号；
     //   ② 缺口只从「最后一个已标轮」往后算 —— 补了最新一轮，更早的漏标就不再算欠账，锁也就不写。
@@ -2799,7 +2810,7 @@ export class ContinuityEngine extends BaseEngine {
           try { alarm = JSON.parse(readFileSync(alarmFile, 'utf8')); } catch { alarm = null; }
           if (alarm !== null) {
             text += '\n[记忆宫殿·警告] 第 ' + String(alarm.turn ?? '?') + ' 轮：' + String(alarm.reason ?? alarm.code ?? '安全阀触发')
-              + '，放弃了拦截。记忆宫殿出现了错误，session 违反了守则。请善待 session。';
+              + '，放弃了拦截。记忆宫殿出现了错误，🐋 违反了守则。请善待 🐋。';
           }
           try { fsUnlink(alarmFile); } catch { /* 删不掉就下轮再说一次 */ }
         }
@@ -3127,7 +3138,7 @@ export class ContinuityEngine extends BaseEngine {
     let plan = planFold({
       estTokens: measured.estTokens,
       windowTokens: measured.windowTokens,
-      policy: this.continuity,
+      policy: this.policyFor(agent),
     });
     if (plan.budget <= 0) return null;
 
@@ -3179,7 +3190,7 @@ export class ContinuityEngine extends BaseEngine {
         reason: plan.reason,
         estTokens: measured.estTokens,
         windowTokens: measured.windowTokens,
-        policy: this.continuity,
+        policy: this.policyFor(agent),
       })
       : plan.budget;
     if (passBudget <= 0) return null;
@@ -3260,6 +3271,22 @@ export class ContinuityEngine extends BaseEngine {
       } catch (error) {
         this.warnOnce('measure-after-pass', `dsh-continuity: post-pass measurement failed: ${error?.message ?? error}`);
       }
+      const afterBaseline = after === null ? undefined : Math.max(0, after.estTokens - after.surfaceTokens);
+      const protectEffective = this.protectFor(agent);
+      const afterWindow = after?.windowTokens ?? measured.windowTokens;
+      const floorTokens = afterBaseline === undefined ? undefined : afterBaseline + protectEffective * afterWindow;
+      const lowTargetTokens = after === null ? undefined : this.continuity.low * afterWindow;
+      const protectBinds = floorTokens !== undefined && lowTargetTokens !== undefined && floorTokens >= lowTargetTokens;
+      const protectSuggested = afterBaseline === undefined
+        ? undefined
+        : Math.max(0, (this.continuity.low * afterWindow - afterBaseline - 0.01 * afterWindow) / afterWindow);
+      if (protectBinds) {
+        this.warnOnce(
+          `protect-floor:${agent.session.id}`,
+          `dsh-continuity: protect floor is above low (after ${Math.round(after.estTokens)} / floor ${Math.round(floorTokens)} / low ${Math.round(lowTargetTokens)}); `
+          + `suggest protect <= ${protectSuggested.toFixed(3)}`,
+        );
+      }
       const receipt = {
         sessionId: String(agent.session.id),
         start: span?.start,
@@ -3274,7 +3301,12 @@ export class ContinuityEngine extends BaseEngine {
         windowTokens: measured.windowTokens,
         afterTokens: after?.estTokens,
         afterSurfaceTokens: after?.surfaceTokens,
-        afterBaselineTokens: after === null ? undefined : Math.max(0, after.estTokens - after.surfaceTokens),
+        afterBaselineTokens: afterBaseline,
+        protectEffective,
+        floorTokens,
+        lowTargetTokens,
+        protectBinds,
+        protectSuggested,
         rebloatTokens: after === null ? undefined : Math.max(0, after.estTokens - measured.estTokens),
       };
       recordPass(receipt);

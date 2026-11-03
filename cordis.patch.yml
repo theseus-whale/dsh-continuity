@@ -262,20 +262,20 @@
               - id: continuity-engine
                 name: dsh-continuity/engine
                 config:
-                  # Continuity balanced band (4.9.121):
+                  # Continuity balanced band (4.9.122):
                   # setpoint = high = 0.48, low 0.32, emergency 0.65,
-                  # emergencyTo 0.42, protect 0.16, maxPerBatch 190000,
+                  # emergencyTo 0.42, protect 0.14, maxPerBatch 190000,
                   # minAction 24000.
                   #
-                  # On the measured 0b window (W 792,576, baseline 120,795):
-                  #   high 380,436 · low 253,624 · floor 247,607
+                  # On the measured 0b window (W 792,576, baseline 133,272):
+                  #   high 380,436 · low 253,624 · floor 244,233
                   #   band 126,812 < maxPerBatch 190k -> cap does not bite
                   #   emergencyTo is 182,292 below emergency; 140k would
                   #   leave emergency short of its target, so keep 190k.
-                  # protect .16 leaves ~6k of baseline headroom below low;
-                  # .17 is already on the boundary and would bind after a
-                  # baseline rise. This band folds ~127k once.
-                  # One pass per high crossing; no proportional-zone passes.
+                  # protect .14 leaves ~9.4k of baseline headroom below low;
+                  # it is a conservative default, not a guarantee. This band
+                  # folds ~127k once. One pass per high crossing; no
+                  # proportional-zone passes.
                   #
                   # 0.2.4 A4-safe: active open-turn tool calls are hard-pinned;
                   # old non-active tool results are previewed toward low 32%
@@ -298,7 +298,7 @@
                     low: 0.32
                     emergency: 0.65
                     emergencyTo: 0.42
-                    protect: 0.16
+                    protect: 0.14
                     maxPerBatch: 190000
                     minAction: 24000
                     k: 0.4
