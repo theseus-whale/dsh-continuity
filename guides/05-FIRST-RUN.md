@@ -25,7 +25,7 @@ A/C/K 空
 安装 tgz，重启 DSH，确认版本。
 
 ```text
-dsh-continuity-4.9.129-safe.1.tgz
+dsh-continuity-4.9.130-safe.1.tgz
 ```
 
 **比如这种情况：**

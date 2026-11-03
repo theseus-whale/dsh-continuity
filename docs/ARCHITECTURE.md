@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.129-safe.1
+# Continuity architecture — 4.9.130-safe.1
 
 ## 1. Shape
 
@@ -212,11 +212,17 @@ margin = 0.01*W
 
 The same fold uses the calibrated value; it is then frozen for the session
 (protect_source=calibration, B0=preBaseline, margin recorded). If calibration
-is unavailable, the default .14 is used (`protect_source=default`). Later
-preBaselines are compared to B0; a drift over 10% W produces one suggestion,
-never an automatic policy change. If protect_eff clamps at .10 and
+is unavailable, the default .14 is used (`protect_source=default`). Later folds
+compare the suggested protect against protect_eff; a gap >= 0.02 produces one
+suggestion, never an automatic policy change. If protect_eff clamps at .10 and
 floor >= low, both "low unreachable" and `low_min = floor + margin` are
 reported.
+
+Long-session data (5,498 measurements, baseline/surface median 0.519) shows
+that .14 is not a guarantee: floor = baseline + .14W is below low only while
+baseline < 142,663, and three of six sampled pre-fold baselines were above
+that. The drift criterion therefore watches protect distance, not just a
+baseline percentage.
 
 Receipt:
 

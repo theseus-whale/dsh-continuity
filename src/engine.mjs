@@ -131,7 +131,11 @@ function passReceiptLine(pass) {
       + (pass.lowUnreachable && Number.isFinite(pass.lowMinTokens) ? ` \u00b7 low must be \u2265 ${n(pass.lowMinTokens)}` : '')
       + (pass.driftReported ? ` \u00b7 baseline drifted from ${n(pass.protectB0)}` : '')
     : '';
-  return `[continuity:fold] ${range} \u00b7 ${pass.count ?? '?'} \u6761 \u00b7 ${n(pass.tokens)} tokens \u00b7 reason=${pass.reason ?? '?'} \u00b7 \u538b\u524d ${n(pass.estTokens)} \u2192 \u538b\u540e ${n(pass.afterTokens)}${window}${policy}`;
+  const drift = pass.driftReported
+    ? ` \u00b7 drift ${Number.isFinite(pass.driftDelta) ? pass.driftDelta.toFixed(3) : '?'} \u00b7 suggested protect \u2264 ${Number.isFinite(pass.protectSuggested) ? pass.protectSuggested.toFixed(3) : '?'}`
+      + (Number.isFinite(pass.lowMinTokens) ? ` \u00b7 low must be \u2265 ${n(pass.lowMinTokens)}` : '')
+    : '';
+  return `[continuity:fold] ${range} \u00b7 ${pass.count ?? '?'} \u6761 \u00b7 ${n(pass.tokens)} tokens \u00b7 reason=${pass.reason ?? '?'} \u00b7 \u538b\u524d ${n(pass.estTokens)} \u2192 \u538b\u540e ${n(pass.afterTokens)}${window}${policy}${drift}`;
 }
 
 /** Append the receipt as a user-role line; never let diagnostics block the pass. */
@@ -3335,18 +3339,20 @@ export class ContinuityEngine extends BaseEngine {
       const lowTargetTokens = this.continuity.low * floorWindow;
       const protectBinds = floorTokens >= lowTargetTokens;
       const lowUnreachable = protectEffective <= 0.1000001 && protectBinds;
-      const lowMinTokens = lowUnreachable ? floorTokens + protectMargin : undefined;
       const protectSuggested = Math.max(0, (lowTargetTokens - preBaseline - 0.01 * floorWindow) / floorWindow);
-      const drift = calibration !== null && Math.abs(preBaseline - protectB0) > 0.10 * floorWindow;
+      const drift = calibration !== null && Math.abs(protectSuggested - protectEffective) >= 0.02;
+      const driftDelta = protectSuggested - protectEffective;
       const driftReported = drift && !this.protectDriftWarned.has(agent);
       if (driftReported) this.protectDriftWarned.add(agent);
-      if (protectBinds) {
+      const lowMinTokens = lowUnreachable || (drift && protectSuggested <= 0.10)
+        ? floorTokens + protectMargin
+        : undefined;
+      if (protectBinds || driftReported) {
         this.warnOnce(
           `protect-floor:${agent.session.id}`,
-          `dsh-continuity: protect floor is above low (pre ${measured.estTokens} / floor ${Math.round(floorTokens)} / low ${Math.round(lowTargetTokens)}); `
+          `dsh-continuity: protect floor above low/pre drift (pre ${measured.estTokens} / floor ${Math.round(floorTokens)} / low ${Math.round(lowTargetTokens)}); `
           + `suggest protect <= ${protectSuggested.toFixed(3)}`
-          + (lowUnreachable ? `; low must be >= ${Math.round(lowMinTokens)}` : '')
-          + (driftReported ? `; baseline drifted from calibration ${Math.round(protectB0)}` : ''),
+          + (lowMinTokens !== undefined ? `; low must be >= ${Math.round(lowMinTokens)}` : ''),
         );
       }
       const receipt = {
@@ -3375,6 +3381,7 @@ export class ContinuityEngine extends BaseEngine {
         lowMinTokens,
         protectBinds,
         protectSuggested,
+        driftDelta,
         driftReported,
         rebloatTokens: after === null ? undefined : Math.max(0, after.estTokens - measured.estTokens),
       };

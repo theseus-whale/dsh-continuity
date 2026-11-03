@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.129-safe.1
+# 发行说明 — 4.9.130-safe.1
+
+## drift 判据 0.02（4.9.130）
+
+不再用 |preBaseline−B0|>10%W；改为 |protect_suggested − protect_eff| ≥ 0.02 时一次性 suggestion。长期数据：baseline/surface 中位 0.519；.14 只在 baseline < 142,663 时保证 floor < low，六次采样有三次超过。
 
 ## 首次 band-high 校准（4.9.129）
 
