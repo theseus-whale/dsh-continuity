@@ -1,13 +1,21 @@
-# 发行说明 — 4.9.116-safe.1
+# 发行说明 — 4.9.117-safe.1
+
+## 0.19 压缩带（4.9.117）
+
+```text
+high 0.455, low 0.34, protect 0.19, emergency 0.56, emergencyTo 0.36
+```
+
+0b 实测 363,543 tokens；新 floor 约 268k，目标约 269k。比 0.18/0.33 多保留约 8k 最近原文，比 0.20/0.35 少约 8k token。
 
 ## Token-saver 压缩带（4.9.116）
 
 ```text
-high 0.45, low 0.35, emergency 0.55, emergencyTo 0.38
-protect 0.20, maxPerBatch 140k, minAction 16k
+high 0.455, low 0.34, emergency 0.56, emergencyTo 0.36
+protect 0.19, maxPerBatch 140k, minAction 16k
 ```
 
-0b 实测 363,543 tokens、baseline 117,816；旧 floor 约 355k，新 floor 约 276k。新带宽在 ~357k 触发，一次可把每轮输入向 ~277k 拉。代价是最近原文保护从 30% 降到 20%。
+0b 实测 363,543 tokens、baseline 117,816；旧 floor 约 355k，新 floor 约 268k。新带宽在 ~361k 触发，一次可把每轮输入向 ~269k 拉。代价是最近原文保护从 30% 降到 19%。
 
 ## vec 自检（4.9.115）
 
