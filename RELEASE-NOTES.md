@@ -1,4 +1,14 @@
-# 发行说明 — 4.9.119-safe.1
+# 发行说明 — 4.9.120-safe.1
+
+## 平衡带 0.48/0.32（4.9.120）
+
+```text
+high 0.48 · low 0.32 · setpoint 0.48
+emergency 0.65 · emergencyTo 0.42
+protect 0.30 · maxPerBatch 190k · minAction 24k
+```
+
+0b 窗口：high 380k，low 254k，均值约 317k，折叠约 7.9 次/1M；4.9.117 是 321k / 12.8。band 127k < 190k，cap 不咬合；190k 是为 emergency 的 182k 排泄留的。protect .30 < low .32，常规惰性。
 
 ## 维护者访问（4.9.118）
 

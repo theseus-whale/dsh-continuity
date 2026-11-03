@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.119-safe.1
+# Continuity architecture — 4.9.120-safe.1
 
 ## 1. Shape
 
@@ -169,19 +169,19 @@ measure
 Band:
 
 ```text
-high = 0.455 W      start a pass
-low  = 0.34 W       target request
-emergency = 0.56 W
-emergencyTo = 0.36 W
-protect = 0.19 W
-maxPerBatch = 140k
-minAction = 16k
+high = 0.48 W       start a pass
+low  = 0.32 W       target request
+emergency = 0.65 W
+emergencyTo = 0.42 W
+protect = 0.30 W
+maxPerBatch = 190k
+minAction = 24k
 ```
 
-The continuity preset uses this 0.19 token-saver band from 4.9.117. The old
-0.60/0.40/0.30 band left the effective floor near 355k on the measured 0b
-window; this band starts at ~361k and aims toward the ~269k floor. The cost is
-a smaller protected verbatim tail: 19% instead of 30%.
+The continuity preset uses this balanced band from 4.9.120. On the measured
+0b window the mean is ~317k and the fold rate is ~7.9 per 1M tokens, versus
+~321k and ~12.8 for 4.9.117. `protect 0.30 < low 0.32` is intentionally inert
+in the normal band; it only binds when a target falls below it.
 
 One pass folds one oldest contiguous range. `budget` is an upper bound, not a
 guarantee. Reachable floor:

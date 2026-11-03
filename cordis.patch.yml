@@ -262,22 +262,25 @@
               - id: continuity-engine
                 name: dsh-continuity/engine
                 config:
-                  # Continuity token-saver band (4.9.117):
-                  # setpoint = high = 0.455, low 0.34, emergency 0.56,
-                  # emergencyTo 0.36, protect 0.18, maxPerBatch 140000,
-                  # minAction 16000. This is the 0.19 variant:
-                  # floor = 0.19*W + baseline. On the measured 0b window
-                  # (W 792,576, baseline 117,816) the floor is ~260k and the
-                  # pass target is ~269k, versus ~277k at 0.20/0.35.
-                  # high 0.46 is just above the measured 363.5k; the next
-                  # pre-step is expected to trigger. This protects less recent
-                  # verbatim text; use only when lower per-turn input matters
-                  # more than the extra recent tail.
+                  # Continuity balanced band (4.9.120):
+                  # setpoint = high = 0.48, low 0.32, emergency 0.65,
+                  # emergencyTo 0.42, protect 0.30, maxPerBatch 190000,
+                  # minAction 24000.
+                  #
+                  # On the measured 0b window (W 792,576):
+                  #   high 380,436 · low 253,624 · mean 317,030
+                  #   band 126,812 < maxPerBatch 190k -> cap does not bite
+                  #   emergencyTo is 182,292 below emergency; 140k would
+                  #   leave emergency short of its target, so keep 190k.
+                  # protect 0.30 < low 0.32 is intentionally inert in the
+                  # normal band; it only matters if a target goes below it.
+                  # Compared with 4.9.117 (.455/.34/140k):
+                  #   mean ~317k vs measured 321k, folds ~7.9 vs 12.8.
                   # One pass per high crossing; no proportional-zone passes.
                   #
                   # 0.2.4 A4-safe: active open-turn tool calls are hard-pinned;
-                  # old non-active tool results are previewed toward low 33%
-                  # (36% for emergency), and the same compression continues with
+                  # old non-active tool results are previewed toward low 32%
+                  # (42% for emergency), and the same compression continues with
                   # a pass to the target even if the preview drops below high.
                   # B previews tool results in the summarization input only.
                   # Non-text results become semantic handles; overflow may
@@ -285,20 +288,20 @@
                   # 0.2.5: handles/pauses/previews are never previewed again;
                   # pass records include a post-pass measurement; manual
                   # /compact gets a follow-up gist header and a manual record.
-                  # 0.2.6: the 515k cap policy above; 515k is 49.1% full / 65% of W.
-                  # 0.2.7: high/emergency ratio 82%: high 0.46, low 0.33.
+                  # 0.2.6: emergency 0.65 is 515,174 (49.1% full).
+                  # 0.2.7: high/emergency ratio 74%: high 0.48, low 0.32.
                   #
                   # All values are explicit so a hot preset reconciliation cannot
                   # fall back to an older cached module default.
                   policy:
-                    setpoint: 0.455
-                    high: 0.455
-                    low: 0.34
-                    emergency: 0.56
-                    emergencyTo: 0.36
-                    protect: 0.19
-                    maxPerBatch: 140000
-                    minAction: 16000
+                    setpoint: 0.48
+                    high: 0.48
+                    low: 0.32
+                    emergency: 0.65
+                    emergencyTo: 0.42
+                    protect: 0.30
+                    maxPerBatch: 190000
+                    minAction: 24000
                     k: 0.4
                   # Stage switches: stage 1 (save/load/active/list + state) is
                   # always on; stage 2 injects the per-turn [线] line + rules;
