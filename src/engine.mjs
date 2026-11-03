@@ -3492,12 +3492,14 @@ export class ContinuityEngine extends BaseEngine {
     return { ...base, summary: annotateSummary(base.summary, header) };
   }
 
-  /** Log only the first occurrence of a recurring diagnostic. */
+  /**
+   * Log only the first occurrence of a recurring diagnostic. Warnings are not
+   * errors: lastError is reserved for actual failures.
+   */
   warnOnce(key, message) {
     if (this.warned.has(key)) return;
     this.warned.add(key);
     this.ctx.logger?.warn?.(message);
-    recordError(message, key);
   }
 }
 
