@@ -87,11 +87,7 @@ A 表不会自动生成。新 session 的 A 为空，B 也会为空；这是正�
 
 折叠前把值得留下的结论写进文件（`rules.md` / `habits.md` / 工作区 log），不要指望上下文活过下一次 fold。三者的分工：硬规则进 rules，软偏好进 habits，项目状态进工作区文件。
 
-### 6.7 Creator 入口
-
-Creator 是一个 session，不是固定 UUID。查 `session-persona.json` 里 `value == "cordis"` 的 key；不要硬编码，不要猜。旧句“Creator 没有 session id”已废弃。查不到就明说，并退回 `for-chuang` 投递箱。
-
-### 6.8 指针不是缺全文
+### 6.7 指针不是缺全文
 
 上下文里的 `[规则]` / `[习惯]` 是设计上的指针，不是漏注入全文。需要具体条款时用 `read` 打开全文；不要把“看不到全文”当 bug 要求注入。
 
@@ -127,8 +123,8 @@ package.json / lockfile
 3. `/dsh-continuity/bc.json` 200。
 4. `/dsh-continuity/tags.json` 404。
 5. `continuity` 工具不存在；`recall` / `peer_message` 存在。
-6. “上次跑团”出现 `[追忆]` 上下文块，不是用户气泡。
-7. “创看看”不自动触发；“上次创…”才触发。
+6. “上次那个话题”出现 `[追忆]` 上下文块，不是用户气泡。
+7. 只有“追忆词 + 实词锚”同时出现才触发；单字不算锚。
 
 ## 10. fold 验收（K-04）
 

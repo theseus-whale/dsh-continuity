@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.133-safe.1
+# 发行说明 — 4.9.134-safe.1
+
+## base rules persona-neutral（4.9.134）
+
+撤回 6.7 Creator 入口；根版不再假设存在 Creator。rules-safe 的示例名/示例话题同步去个人化。其余六条与指针说明保留。
 
 ## base rules 补 8 条（4.9.133）
 
