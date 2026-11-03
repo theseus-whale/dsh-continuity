@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.120-safe.1
+# Continuity architecture — 4.9.121-safe.1
 
 ## 1. Shape
 
@@ -173,15 +173,17 @@ high = 0.48 W       start a pass
 low  = 0.32 W       target request
 emergency = 0.65 W
 emergencyTo = 0.42 W
-protect = 0.30 W
+protect = 0.16 W
 maxPerBatch = 190k
 minAction = 24k
 ```
 
-The continuity preset uses this balanced band from 4.9.120. On the measured
-0b window the mean is ~317k and the fold rate is ~7.9 per 1M tokens, versus
-~321k and ~12.8 for 4.9.117. `protect 0.30 < low 0.32` is intentionally inert
-in the normal band; it only binds when a target falls below it.
+The continuity preset uses this balanced band from 4.9.121. On the measured
+0b window (baseline 120,795) the floor is ~247.6k, so the 253.6k low target is
+reachable with ~6k headroom. `protect` .17 would already sit on the boundary;
+.16 is chosen so a baseline rise does not immediately bind. One pass removes
+~127k, below the 190k cap; emergency 0.65→0.42 is 182k, so the 190k cap is
+kept for emergency drainage.
 
 One pass folds one oldest contiguous range. `budget` is an upper bound, not a
 guarantee. Reachable floor:

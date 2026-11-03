@@ -262,20 +262,19 @@
               - id: continuity-engine
                 name: dsh-continuity/engine
                 config:
-                  # Continuity balanced band (4.9.120):
+                  # Continuity balanced band (4.9.121):
                   # setpoint = high = 0.48, low 0.32, emergency 0.65,
-                  # emergencyTo 0.42, protect 0.30, maxPerBatch 190000,
+                  # emergencyTo 0.42, protect 0.16, maxPerBatch 190000,
                   # minAction 24000.
                   #
-                  # On the measured 0b window (W 792,576):
-                  #   high 380,436 · low 253,624 · mean 317,030
+                  # On the measured 0b window (W 792,576, baseline 120,795):
+                  #   high 380,436 · low 253,624 · floor 247,607
                   #   band 126,812 < maxPerBatch 190k -> cap does not bite
                   #   emergencyTo is 182,292 below emergency; 140k would
                   #   leave emergency short of its target, so keep 190k.
-                  # protect 0.30 < low 0.32 is intentionally inert in the
-                  # normal band; it only matters if a target goes below it.
-                  # Compared with 4.9.117 (.455/.34/140k):
-                  #   mean ~317k vs measured 321k, folds ~7.9 vs 12.8.
+                  # protect .16 leaves ~6k of baseline headroom below low;
+                  # .17 is already on the boundary and would bind after a
+                  # baseline rise. This band folds ~127k once.
                   # One pass per high crossing; no proportional-zone passes.
                   #
                   # 0.2.4 A4-safe: active open-turn tool calls are hard-pinned;
@@ -299,7 +298,7 @@
                     low: 0.32
                     emergency: 0.65
                     emergencyTo: 0.42
-                    protect: 0.30
+                    protect: 0.16
                     maxPerBatch: 190000
                     minAction: 24000
                     k: 0.4
