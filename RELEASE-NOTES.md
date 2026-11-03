@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.134-safe.1
+# 发行说明 — 4.9.135-safe.1
+
+## 读数来源五处修正（4.9.135）
+
+rules.md：追忆点明 session_log get；K 立即生效、C/A 需 recall 工具重建；自检用当前 Web 端口；fold 稳定值读 state/context-log 的 context.estTokens；low/W 读 engine.policy.low 与 context.windowTokens。删除不存在的 nextRequest 字段。
 
 ## base rules persona-neutral（4.9.134）
 

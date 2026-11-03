@@ -20,7 +20,7 @@
 ```
 
 - `[追忆]` 是候选，不是结论。
-- 必须按 `turn` / `seq` 打开原文再引用。
+- 必须按 `turn` / `seq` 打开原文再引用：先用 `session_log index` / `grep` 定位，再 `session_log get seq=A-B`；不要靠回忆。
 - 没有候选/原文就明说没有，不编。
 - 不要求用户写 TAG；不每轮 recall。
 - `[追忆]` 是 runtime-context，不是用户输入。
@@ -42,6 +42,7 @@
 - 加完复验；没有命中就说没索引。
 - 一次加一条，有把握才加；加错删行。
 - 专名/人名进 K，不进 C。
+- 生效时机：K 下一次 `recall` 立即生效；C / A 要等 recall 工具重建（重启或插件重载）后才生效。
 
 ## 4. A 表（概念表）
 
@@ -120,8 +121,8 @@ package.json / lockfile
 
 1. 上下文只有 `[规则]` / `[习惯]` 指针。
 2. 没有 `[工作线]` / `[标签]` / TAG。
-3. `/dsh-continuity/bc.json` 200。
-4. `/dsh-continuity/tags.json` 404。
+3. 用当前 Web GUI 的端口请求 `/dsh-continuity/bc.json` -> 200。
+4. 同端口请求 `/dsh-continuity/tags.json` -> 404。
 5. `continuity` 工具不存在；`recall` / `peer_message` 存在。
 6. “上次那个话题”出现 `[追忆]` 上下文块，不是用户气泡。
 7. 只有“追忆词 + 实词锚”同时出现才触发；单字不算锚。
@@ -130,7 +131,8 @@ package.json / lockfile
 
 **折后瞬时值只是 provisional，不能用来验收。** 判据只用“下一次正常 pre-step”的稳定值。
 
-- 稳定值：`nextRequest.estTokens` 对 `low × W`，误差 ±3% 才算达成。
+- 稳定值：折后**下一次正常请求之后**的 `context.estTokens`（`state.json` 或 `context-log.jsonl` 最后一行）对 `low × W`，误差 ±3% 才算达成。
+- 读数来源：`state.json` 的 `engine.policy.low` 和 `context.windowTokens`；不要猜端口，用当前 Web GUI 的端口。
 - `protectBinds` 用**触发那一刻的 preBaseline**：`floor = preBaseline + protect × W`，不用折后 baseline。取 pass receipt 的 `preBaselineTokens`，不是 `afterBaselineTokens`。
 - 核对：`实际减少 = 折前 est − 稳定 est`；它可以大于 `budget`，因为 budget 只约束被折的 surface，关联的 non-surface 前缀会一并被带走。
 
