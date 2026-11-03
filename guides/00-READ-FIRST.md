@@ -1,75 +1,188 @@
 # 00 — 先读这个
 
-这是 dsh-continuity 的经典编号说明书，按顺序读：
+如果你刚拿到这个包，先不要急着安装。
+
+这一页不是操作步骤，而是告诉你：
 
 ```text
-01-INSTALL.md
-02-TABLES.md
-03-AUDIT.md
-04-REBUILD.md
-05-FIRST-RUN.md
+这套东西到底在管什么
+哪些事它不会替你做
+你最容易误会的地方在哪里
 ```
 
-版本：4.9.112-safe.1。
-
-## 这一版的前提
+读完再按 01–05 走。否则很容易出现一种情况：
 
 ```text
-每个 session 有自己的完整一套记忆
-A/C/K/rules/habits/index 都在 sessions/<sessionId>/ 下
-不继承另一个 session 的词表或规则
+插件装上了，面板也开了，
+但 A/B/C/K 全是空的，
+于是以为插件坏了。
 ```
 
-## 路径
+那通常不是坏了，而是它本来就不会自动替你长出一套记忆。
+
+## 1. 它不是什么
+
+它不是 DSH 自带的记忆系统，也不是一个“安装后自动理解你”的黑盒。
+
+它是给每个 session 准备的一套本地记忆文件：
 
 ```text
-~/.dsh/continuity/sessions/<sessionId>/
-  bc-index.jsonl
-  bc-index-state.json
-  audit-state.json
-  expand-hint.jsonl
-  concepts.md
-  cmap.md
-  keywords.md
-  aliases.md
-  rules.md
-  habits.md
-  rebuild.md
+sessions/<sessionId>/
+  bc-index.jsonl      这一轮轮的指针
+  concepts.md         A 表：话题
+  cmap.md             C 表：用户词
+  keywords.md         K 表：精确名
+  aliases.md          别名
+  rules.md            这个 session 的硬规则
+  habits.md           这个 session 的软偏好
 ```
 
-共享文件：
+它负责把这些文件组织起来、在上下文里放指针、在压缩时留下可回查的线索。
+
+它不负责替你想：
 
 ```text
-~/.dsh/continuity/
-  session-persona.json
-  personas/<pid>/persona.json
-  folds.json
-  passes.jsonl
-  dropped-ranges.json
-  context-log.jsonl
+哪些话题值得进 A
+哪些词应该进 K
+哪个用户词应该映射到哪个概念
 ```
 
-`personas/` 已弃用。`persona.json` 只是启用/禁用开关，不决定词表路径。
+这些需要这个 session 自己，或者你，明确写进去。
 
-## 边界
+## 2. 为什么每个 session 一套
+
+因为不同 session 本来就可能不是同一个“人”。
 
 ```text
-模型工具：workspace + 自己的 sessions/<id>/
-不能碰：别人的 continuity 文件
-引擎：自己的 session + 全局 folds/passes
-guard：best effort，不是 OS ACL
+session A 在聊跑团
+session B 在聊代码
+session C 只是临时问一句
 ```
 
-不要改 session header 来切 preset。已启动的 session 会返回
-`agent-preset/locked`；改 header 可能让 session 从列表消失。
+如果它们共用一套 A/C/K，B 会很容易把 A 的话题当成自己的记忆。
 
-## 新 session
+所以这套设计选择：
 
 ```text
+一个 session 一套 A/B/C/K
+新 session 从空表开始
+不继承另一个 session 的词表
+```
+
+代价是：
+
+```text
+新 session 不会一上来就“记得”任何概念
+B 标签一开始也是空的
+```
+
+这是设计后果，不是故障。
+
+## 3. 为什么 A 空，B 也空
+
+B 标签不是凭空生成的。它是用 A 表的概念去给每一轮打分。
+
+```text
+A 表为空
+-> 没有候选概念
+-> 每一轮都无法打 B 标签
+-> B 空
+```
+
+同样：
+
+```text
+A 表为空
+-> 审计没有可评分的概念
+-> 审计跳过
+```
+
+所以一个 500 轮的 session，如果 A 从来没被写过，看到的就是：
+
+```text
+B 空
 A/C/K 空
-rules.md   <- templates/rules.md
-habits.md  <- templates/habits.md
-index      <- 第一次 pre-step
+weak turns 很多
 ```
 
-不要复制别的 session 的 A/C/K 来“补齐全”。
+这并不矛盾。
+
+**比如这种情况：**
+
+```text
+如果 A 表是空的，而你以为“聊了 500 轮，B 应该自动有了”，
+则会看到 500 轮全是 weak、B 空、审计也一直不来。
+```
+
+这不是索引坏了，是 B 依赖的那张 A 表从未建立。
+
+## 4. 为什么 rules 这么重要
+
+每轮上下文里会有一个 `[规矩]` 指针，指向当前 session 的 `rules.md`。
+
+首轮、规则变更、承载消息被折叠后，还会注入 rules 全文。
+
+所以：
+
+```text
+rules 写了什么，实例就会看到什么
+rules 没写什么，实例通常就不会主动做
+```
+
+**比如这种情况：**
+
+```text
+如果 rules 只写了“K 放精确名，C 放用户词”，
+却没写“A 表要怎么维护”，
+则实例会认真维护 K/C，但完全不碰 A。
+```
+
+这不是实例懒，是规则里没有这条。
+
+## 5. 三条底线
+
+### 不继承
+
+```text
+不要把另一个 session 的 concepts.md 复制过来
+不要共用一份 A/C/K
+```
+
+### 不伪造
+
+```text
+没有原文就说没有
+没有候选就说没找到
+不要把 [gist] 当原文
+不要把 B 标签当事实
+```
+
+### 不越界
+
+```text
+只改自己的 sessions/<id>/
+不碰别的 session
+不改安装目录、package.json、lockfile、tgz
+```
+
+## 6. 阅读顺序
+
+```text
+01 安装：装进去，第一次启动看到什么
+02 四张表：A/B/C/K 各管什么，空表意味着什么
+03 审计：200 轮后提示什么，为什么有时不来
+04 重建：有历史但没表，怎么从旧对话里长出来
+05 第一次运行：从空表到第一次审计的路线
+```
+
+如果你只有一个新 session，先读 01、02、05。
+
+如果你要救一个已经聊了很久、但 A/B/C/K 空的 session，直接读 04。
+
+如果你发现“面板打开了但全是空表”，先问自己：
+
+```text
+这个 session 的 A 表，曾经被谁写过吗？
+```
+
+如果没有，空表就是答案。

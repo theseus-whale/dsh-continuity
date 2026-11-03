@@ -1,8 +1,17 @@
 # 02 — A / B / C / K
 
-四张表全部是 **每个 session 自己的**。任何一张都不回退到别的 session。
+这四张表不是四个同义词。它们回答的是四个不同问题：
 
-## A — 概念表
+```text
+A：这个话题叫什么？
+B：这一轮大概属于哪些 A？
+C：用户说这个词时，指的是哪个 A？
+K：这个精确名字是什么，不能被拆？
+```
+
+理解这个区别，比记住文件格式重要。
+
+## 1. A — 概念表
 
 文件：
 
@@ -14,45 +23,79 @@ sessions/<sessionId>/concepts.md
 
 ```text
 名字 | 描述词 | 参考覆盖 | kind
-kind = topic | workflow   （默认 topic）
 ```
 
-用途：
+例子：
 
 ```text
-面板展示
-B 打标签的候选
-C 的 minB 评分
-审计的 topicMax
+示例主题 | 项目、讨论、决定 | 12 | topic
+复盘流程 | 复盘、检查、收尾 | 5 | workflow
 ```
 
-A 不直接参与找回。真正找回靠 B/C/K/字面。
+A 的作用不是“直接回答问题”。
 
-## B — 每轮标签
+它的作用是：
 
-存在：
+```text
+给 B 提供候选概念
+给 C 提供映射目标
+给审计提供 topicMax
+给面板提供展示
+```
+
+**比如这种情况：**
+
+```text
+如果 A 为空，
+则 B labeler 没有候选，B 一定为空。
+```
+
+这不是 B 坏了，是 B 的上游没有概念。
+
+### kind
+
+```text
+topic     一个话题/领域
+workflow  一个流程/做法
+```
+
+不确定时写 `topic`。
+
+不要为了凑数把“人名、道具、英文标识”塞进 A；那些通常属于 K。
+
+## 2. B — 每轮标签
+
+B 不在单独的文件里。它写在：
 
 ```text
 sessions/<sessionId>/bc-index.jsonl
 ```
 
-新记录：
+每轮记录里可能有：
 
 ```text
-genericTopic      [top topic]
-topicScore        top topic 分数
-topicConfidence   normal | low | weak   （仅展示）
-genericWorkflow   [top1, top2]
-generic           topic + workflow 并集
-conceptScores     选中的候选分数
-labelVersion      2
+genericTopic
+genericWorkflow
+topicScore
+topicConfidence
+conceptScores
+labelVersion
 ```
 
-旧记录是 `labelVersion: 1`，没有 `topicScore`，不原地伪造。
+B 是“这一轮大概像哪个 A”，不是“这一轮就是那个话题”。
 
-B 是展示/特征材料，不是 A 浏览。“weak” 是置信度信号，不是索引失败。
+**比如这种情况：**
 
-## C — 用户词
+```text
+如果一轮同时在聊 A 和 B 两个话题，
+则 B 可能只取分数最高的那个，另一个留在 conceptScores 里。
+```
+
+所以 B 不是事实，只是标签。
+
+`weak` 也不等于“这轮没内容”，只表示标签置信度低。
+
+## 3. C — 用户词
 
 文件：
 
@@ -63,12 +106,31 @@ sessions/<sessionId>/cmap.md
 格式：
 
 ```text
-词 => B:概念 | K:关键词 | minB:1 | limit:20 | 摘要
+用户词 => B:概念 | K:关键词 | minB:1 | limit:20 | 摘要
 ```
 
-C 把用户说法映射到概念/关键词，只属于当前 session。
+C 解决的是：
 
-## K — 精确名
+```text
+用户说“那个事”，到底指哪个 A？
+```
+
+例子：
+
+```text
+换箍 => B:示例主题 | minB:1 | limit:20
+```
+
+**比如这种情况：**
+
+```text
+如果用户一直说“换箍”，但 C 里没有这个映射，
+则 recall("换箍") 只能靠字面碰运气，不能稳定找到 A。
+```
+
+C 是桥，不是概念本身。
+
+## 4. K — 精确名
 
 文件：
 
@@ -76,9 +138,35 @@ C 把用户说法映射到概念/关键词，只属于当前 session。
 sessions/<sessionId>/keywords.md
 ```
 
-一行一个精确名字。用于专名、标识符、游戏名、人名、必须字面命中的术语。
+一行一个名字。
 
-## 别名
+适合：
+
+```text
+项目名
+产品名
+人名
+代码标识符
+游戏名
+不能拆的专名
+```
+
+不适合：
+
+```text
+普通动词
+泛词
+“那个”“之前”
+```
+
+**比如这种情况：**
+
+```text
+如果把“昨天”写进 K，
+则每次出现“昨天”都可能被当成一个精确锚，反而噪声很大。
+```
+
+## 5. 别名
 
 文件：
 
@@ -86,13 +174,52 @@ sessions/<sessionId>/keywords.md
 sessions/<sessionId>/aliases.md
 ```
 
-只放跨语言标识符，不放同义词。
-
-## 空是合法状态
+只放跨语言/跨写法标识符：
 
 ```text
-A 空 -> B 空
-K/C 空 -> 没有 C/K 命中
+短信息 => sms
 ```
 
-不要用别的 session 的表来“修好”新 session。
+不要放同义词。同义词属于 C。
+
+## 6. 空表是合法的
+
+新 session：
+
+```text
+A 空
+C 空
+K 空
+B 空
+```
+
+这不是错误。
+
+**比如这种情况：**
+
+```text
+如果新 session 刚建立，A 空、B 空，
+则先聊，等有稳定话题再写 A；
+不要为了“看起来有东西”复制别人的表。
+```
+
+## 7. 加表之前先问三个问题
+
+```text
+1. 这个词是话题（A）、用户词（C）、还是精确名（K）？
+2. 它真的稳定出现吗，还是一次性说法？
+3. 加错之后能不能删掉/改回？
+```
+
+如果三个问题答不清，先不要加。
+
+## 8. 最小维护顺序
+
+```text
+先有稳定话题 -> 写 A
+再为常用说法 -> 写 C
+精确专名 -> 写 K
+最后才让 B 去用这些表打分
+```
+
+反过来做，通常会得到一堆看起来有表、但查不回来的数据。
