@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.124-safe.1
+# Continuity architecture — 4.9.125-safe.1
 
 ## 1. Shape
 
@@ -194,8 +194,11 @@ Reachable floor:
 floor(T) = (protect * W + baseline(T)) / W
 ```
 
-`baseline` is not constant. Current value: latest `context-log.jsonl`.
-Historical pass: that pass's `afterBaselineTokens`.
+`baseline` is not constant. For the pass decision, use the baseline at the
+triggering request (`preBaselineTokens`); `afterBaselineTokens` describes the
+post-fold state and must not be used as the pass floor. The measured 0b pass
+closed at preBaseline 133,272 + .16W = 260,084, and afterTokens was 263,723
+(+3,639 from the tool-pair cut).
 
 Receipt:
 

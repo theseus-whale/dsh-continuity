@@ -126,7 +126,7 @@ function passReceiptLine(pass) {
     : `seq ${pass.start}\u2013${pass.end}`;
   const window = Number.isFinite(pass.windowTokens) ? ` \u00b7 window ${n(pass.windowTokens)}` : '';
   const policy = pass.protectBinds === true
-    ? ` \u00b7 protectBinds \u00b7 baseline ${n(pass.afterBaselineTokens)} \u00b7 floor ${n(pass.floorTokens)} \u2265 low ${n(pass.lowTargetTokens)} \u00b7 suggest protect \u2264 ${Number.isFinite(pass.protectSuggested) ? pass.protectSuggested.toFixed(3) : '?'}`
+    ? ` \u00b7 protectBinds \u00b7 preBaseline ${n(pass.preBaselineTokens)} \u00b7 floor ${n(pass.floorTokens)} \u2265 low ${n(pass.lowTargetTokens)} \u00b7 after ${n(pass.afterTokens)} \u00b7 suggest protect \u2264 ${Number.isFinite(pass.protectSuggested) ? pass.protectSuggested.toFixed(3) : '?'}`
     : '';
   return `[continuity:fold] ${range} \u00b7 ${pass.count ?? '?'} \u6761 \u00b7 ${n(pass.tokens)} tokens \u00b7 reason=${pass.reason ?? '?'} \u00b7 \u538b\u524d ${n(pass.estTokens)} \u2192 \u538b\u540e ${n(pass.afterTokens)}${window}${policy}`;
 }
@@ -3272,18 +3272,17 @@ export class ContinuityEngine extends BaseEngine {
         this.warnOnce('measure-after-pass', `dsh-continuity: post-pass measurement failed: ${error?.message ?? error}`);
       }
       const afterBaseline = after === null ? undefined : Math.max(0, after.estTokens - after.surfaceTokens);
+      const preBaseline = Math.max(0, measured.estTokens - measured.surfaceTokens);
       const protectEffective = this.protectFor(agent);
-      const afterWindow = after?.windowTokens ?? measured.windowTokens;
-      const floorTokens = afterBaseline === undefined ? undefined : afterBaseline + protectEffective * afterWindow;
-      const lowTargetTokens = after === null ? undefined : this.continuity.low * afterWindow;
-      const protectBinds = floorTokens !== undefined && lowTargetTokens !== undefined && floorTokens >= lowTargetTokens;
-      const protectSuggested = afterBaseline === undefined
-        ? undefined
-        : Math.max(0, (this.continuity.low * afterWindow - afterBaseline - 0.01 * afterWindow) / afterWindow);
+      const floorWindow = measured.windowTokens;
+      const floorTokens = preBaseline + protectEffective * floorWindow;
+      const lowTargetTokens = this.continuity.low * floorWindow;
+      const protectBinds = floorTokens >= lowTargetTokens;
+      const protectSuggested = Math.max(0, (lowTargetTokens - preBaseline - 0.01 * floorWindow) / floorWindow);
       if (protectBinds) {
         this.warnOnce(
           `protect-floor:${agent.session.id}`,
-          `dsh-continuity: protect floor is above low (after ${Math.round(after.estTokens)} / floor ${Math.round(floorTokens)} / low ${Math.round(lowTargetTokens)}); `
+          `dsh-continuity: protect floor is above low (pre ${measured.estTokens} / floor ${Math.round(floorTokens)} / low ${Math.round(lowTargetTokens)}); `
           + `suggest protect <= ${protectSuggested.toFixed(3)}`,
         );
       }
@@ -3299,6 +3298,7 @@ export class ContinuityEngine extends BaseEngine {
         budget: Math.round(passBudget),
         estTokens: measured.estTokens,
         windowTokens: measured.windowTokens,
+        preBaselineTokens: preBaseline,
         afterTokens: after?.estTokens,
         afterSurfaceTokens: after?.surfaceTokens,
         afterBaselineTokens: afterBaseline,

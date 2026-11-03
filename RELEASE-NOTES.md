@@ -1,4 +1,13 @@
-# 发行说明 — 4.9.124-safe.1
+# 发行说明 — 4.9.125-safe.1
+
+## pre-fold baseline 判定（4.9.125）
+
+```text
+preBaselineTokens = 触发时 est − surface -> floor/protectBinds
+afterBaselineTokens = 折后描述，不参与判定
+```
+
+实测 0b：pre 133,272 + .16W 126,812 = floor 260,084；after 263,723 = floor+3,639（切边）。4.9.124 的 context-log 只读白名单仍在。
 
 ## context-log 只读白名单（4.9.124）
 
