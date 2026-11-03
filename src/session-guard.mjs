@@ -9,9 +9,22 @@
  * source text are never scanned — editing a document that merely mentions the
  * continuity path must not be blocked.
  */
-import { isPersonaEnabled, resolvePersona, sessionDir } from './memory/persona.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { continuityRoot, isPersonaEnabled, resolvePersona, sessionDir } from './memory/persona.mjs';
 
 const norm = (value) => String(value ?? '').replace(/\\/g, '/').toLowerCase();
+
+/** Explicit operator allowlist. This is the only sanctioned cross-session path. */
+function isOperatorSession(sessionId) {
+  try {
+    const file = path.join(continuityRoot(), 'operator-sessions.json');
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    return Array.isArray(parsed) && parsed.map(String).includes(String(sessionId));
+  } catch {
+    return false;
+  }
+}
 
 const ROOT_MARK = '.dsh/continuity';
 const ROOT_TILDE = '~/.dsh/continuity';
@@ -76,6 +89,10 @@ export function installSessionGuard(ctx) {
 
       const hits = targetPaths(toolName, exec?.arguments ?? {}).filter(isPathValue);
       if (!hits.length) return undefined;
+
+      // An explicit operator may cross session boundaries even when the
+      // operator's own persona is disabled. Keep this list small and auditable.
+      if (isOperatorSession(sessionId)) return undefined;
 
       // Only paths under the continuity root reach the persona gate: a disabled
       // persona loses continuity access, not every tool.

@@ -126,3 +126,15 @@ preset 在第一个 turn 后固定。`agentPresets.select` 对已启动 session 
 候选不是事实；必须打开 turn/seq。
 [gist] 是重建，不是原文。
 ```
+
+## 维护者访问（operator）
+
+默认没有跨 session 访问。需要人工维护另一个 session 时，在
+`~/.dsh/continuity/operator-sessions.json` 写一个显式 session id 数组：
+
+```json
+["session-..."]
+```
+
+`session-guard` 只对这份清单里的 session 放行；清单为空或不存在时，仍按
+persona + 本 session 的规则拦截。这个文件是维护入口，不是日常权限。
