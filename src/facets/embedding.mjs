@@ -26,7 +26,17 @@ export async function loadEmbedder(model = MODEL_ID) {
     env.allowRemoteModels = true;
     env.remoteHost = process.env.FACET_HF_ENDPOINT || 'https://hf-mirror.com';
   }
-  extractorPromise = pipeline('feature-extraction', model, { dtype: 'q8' });
+  try {
+    extractorPromise = await pipeline('feature-extraction', model, { dtype: 'q8' });
+  } catch (error) {
+    extractorPromise = null;
+    throw new Error(
+      'embedding runtime unavailable: '
+      + `${error?.message ?? error}. `
+      + 'If pnpm skipped onnxruntime-node, run "pnpm approve-builds" then '
+      + '"pnpm rebuild onnxruntime-node sharp" in the DSH profile, and retry.',
+    );
+  }
   return extractorPromise;
 }
 

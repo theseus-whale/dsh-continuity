@@ -1,4 +1,12 @@
-# 发行说明 — 4.9.114-safe.1
+# 发行说明 — 4.9.115-safe.1
+
+## vec 自检（4.9.115）
+
+```text
+guides/06-EMBEDDING.md  说明 pnpm 跳过 onnxruntime-node 时为什么 vec 为空
+bin/vec-check.mjs       直接测试本地 embedding 是否返回 512 维有限向量
+embedding.mjs           失败时给出 approve-builds/rebuild 提示
+```
 
 ## 入口指引（4.9.114）
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-continuity",
-  "version": "4.9.114-safe.1",
+  "version": "4.9.115-safe.1",
   "description": "Session-scoped long-term memory for DeepSeek Harness: band-controlled compaction, per-session A/B/C/K indexes, offline recall, and verifiable pass receipts.",
   "type": "module",
   "license": "MIT",
@@ -83,7 +83,8 @@
     "THIRD-PARTY-NOTICES.md",
     "CHANGELOG.md",
     "PANEL.md",
-    "bin/panel-check.mjs"
+    "bin/panel-check.mjs",
+    "bin/vec-check.mjs"
   ],
   "dsh": {
     "bundle": {
