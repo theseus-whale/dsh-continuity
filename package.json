@@ -82,7 +82,8 @@
     "SECURITY.md",
     "THIRD-PARTY-NOTICES.md",
     "CHANGELOG.md",
-    "PANEL.md"
+    "PANEL.md",
+    "bin/panel-check.mjs"
   ],
   "dsh": {
     "bundle": {
