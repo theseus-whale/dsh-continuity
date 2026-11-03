@@ -29,6 +29,17 @@ function isOperatorSession(sessionId) {
 const ROOT_MARK = '.dsh/continuity';
 const ROOT_TILDE = '~/.dsh/continuity';
 
+/** Root-level identity files are readable by any enabled persona. */
+const SHARED_READ_FILES = new Set([
+  norm(path.join(continuityRoot(), 'session-persona.json')),
+  norm(path.join(continuityRoot(), 'operator-sessions.json')),
+]);
+
+function isSharedIdentityRead(toolName, hits) {
+  if (toolName !== 'read' || hits.length === 0) return false;
+  return hits.every((hit) => SHARED_READ_FILES.has(norm(hit)));
+}
+
 /** Argument keys that actually carry a filesystem path. */
 const PATH_KEYS = new Set([
   'file_path', 'path', 'cwd', 'dir', 'directory', 'target', 'destination', 'source', 'file',
@@ -89,6 +100,10 @@ export function installSessionGuard(ctx) {
 
       const hits = targetPaths(toolName, exec?.arguments ?? {}).filter(isPathValue);
       if (!hits.length) return undefined;
+
+      // Reading the root identity map is explicitly part of the rules. It is
+      // read-only and safe for any enabled persona; writes stay blocked.
+      if (isSharedIdentityRead(toolName, hits)) return undefined;
 
       // An explicit operator may cross session boundaries even when the
       // operator's own persona is disabled. Keep this list small and auditable.
