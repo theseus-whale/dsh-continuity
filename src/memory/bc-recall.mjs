@@ -321,7 +321,11 @@ export function retrieve({ records = [], cmap = createCMap(), query = '', specia
     const minB = Number.isInteger(meta.minB) ? meta.minB : 0;
     const kWords = new Set((meta.keywords ?? []).map((word) => String(word).toLowerCase()));
     const hits = records
-      .filter((record) => (record.terms ?? []).includes(term))
+      .filter((record) => {
+        const inTerms = (record.terms ?? []).includes(term);
+        const inKeywords = (record.keywords ?? []).includes(term);
+        return inTerms || inKeywords;
+      })
       .map((record) => {
         const declared = meta.generic ?? concepts;
         const scoreOf = (concept) => {
@@ -334,11 +338,16 @@ export function retrieve({ records = [], cmap = createCMap(), query = '', specia
         const bCount = declared.filter((concept) => scoreOf(concept) >= 0.5).length;
         const lowB = bCount < minB;
         const kHits = (record.keywords ?? []).filter((word) => kWords.has(String(word).toLowerCase())).length;
-        return { ...record, hasAny, lowB, bCount, kHits };
+        const byTerm = (record.terms ?? []).includes(term);
+        const byKeyword = (record.keywords ?? []).includes(term);
+        return { ...record, hasAny, lowB, bCount, kHits, byTerm, byKeyword };
       })
-      .filter((record) => (minB === 0 ? record.hasAny : (record.bCount >= minB || record.terms.includes(term))))
+      .filter((record) => (minB === 0
+        ? (record.hasAny || record.byKeyword)
+        : (record.bCount >= minB || record.byTerm || record.byKeyword)))
       .sort((a, b) => (
-        Number(a.lowB) - Number(b.lowB)
+        Number(b.byTerm) - Number(a.byTerm)
+        || Number(a.lowB) - Number(b.lowB)
         || (b.bCount + (b.kHits > 0 ? 0.3 : 0)) - (a.bCount + (a.kHits > 0 ? 0.3 : 0))
         || b.kHits - a.kHits
         || (b.turn ?? 0) - (a.turn ?? 0)

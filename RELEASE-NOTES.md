@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.130-safe.1
+# 发行说明 — 4.9.131-safe.1
+
+## C 表 keywords fallback（4.9.131）
+
+C 分支不再只认 record.terms；候选集改为 terms ∪ keywords，terms 匹配排序靠前。cmap 写了但 terms 为空的用户词（折叠/流量/线头/重启等）现在能 via C 命中；literal fallback 保持不变。
 
 ## drift 判据 0.02（4.9.130）
 
