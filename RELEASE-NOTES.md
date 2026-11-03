@@ -1,4 +1,19 @@
-# 发行说明 — 4.9.136-safe.1
+# 发行说明 — 4.10.0
+
+## Stable 首版（4.10.0）
+
+相对 4.9.136：
+
+```text
+C 表 recall / 面板同时支持 terms ∪ keywords；turns:0 的 cmap 条目可见
+首次 band-high 做 protect 校准（protect_source=calibration / protect_eff / B0）
+drift 用 protect 距离 0.02 判定；afterTokens 只作 provisional
+K-04 用 preBaselineTokens；budget 只约束被折的 surface
+根版 rules 6.x：确认读取点 / 不可逆先停 / 探针 / 独立性 / 依据 / 存取 / 指针说明
+warnOnce 不再写 lastError；tags.json 缺失只记 warn
+```
+
+安装见 `INSTALL.md` 或 `guides/01-INSTALL.md`。
 
 ## 根版四处收口（4.9.136）
 
