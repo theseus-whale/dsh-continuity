@@ -36,6 +36,7 @@
 先试 K，再考虑 C
 ```
 
+- K / C 与 A 同路径：`sessions/<当前 session>/`；不要写全局 `~/.dsh/continuity/`。
 - 加之前量段数；加之后复量。
 - 变多/炸开 → 放错表，删掉或改 K。
 - C 超过 20 段会触发 `[宽命中]`。
@@ -97,7 +98,7 @@ A 表不会自动生成。新 session 的 A 为空，B 也会为空；这是正�
 
 ```text
 rules.md / habits.md / rules-archive.md /
-cmap.md / keywords.md
+concepts.md / cmap.md / keywords.md / aliases.md
 ```
 
 不得改：
@@ -123,7 +124,7 @@ package.json / lockfile
 2. 没有 `[工作线]` / `[标签]` / TAG。
 3. 用当前 Web GUI 的端口请求 `/dsh-continuity/bc.json` -> 200。
 4. 同端口请求 `/dsh-continuity/tags.json` -> 404。
-5. `continuity` 工具不存在；`recall` / `peer_message` 存在。
+5. `continuity` 工具不存在；`recall` 存在；`peer_message` 视安装而定，没有不算失败。
 6. “上次那个话题”出现 `[追忆]` 上下文块，不是用户气泡。
 7. 只有“追忆词 + 实词锚”同时出现才触发；单字不算锚。
 
@@ -131,15 +132,15 @@ package.json / lockfile
 
 **折后瞬时值只是 provisional，不能用来验收。** 判据只用“下一次正常 pre-step”的稳定值。
 
-- 稳定值：折后**下一次正常请求之后**的 `context.estTokens`（`state.json` 或 `context-log.jsonl` 最后一行）对 `low × W`，误差 ±3% 才算达成。
+- 稳定值：折后**下一次正常请求之后**的 `context.estTokens`（`state.json` 或 `context-log.jsonl` 最后一行）对 `low × W`，误差 ±3% × low×W 才算达成。
 - 读数来源：`state.json` 的 `engine.policy.low` 和 `context.windowTokens`；不要猜端口，用当前 Web GUI 的端口。
 - `protectBinds` 用**触发那一刻的 preBaseline**：`floor = preBaseline + protect × W`，不用折后 baseline。取 pass receipt 的 `preBaselineTokens`，不是 `afterBaselineTokens`。
 - 核对：`实际减少 = 折前 est − 稳定 est`；它可以大于 `budget`，因为 budget 只约束被折的 surface，关联的 non-surface 前缀会一并被带走。
 
 ```text
-稳定 est ≈ low×W (±3%)               → 达成
-稳定 est < low×W − 3%                → overshoot（折深了）
-稳定 est > low×W + 3% 且 protectBinds → 保护咬合，折不到 low
+稳定 est ≈ low×W（±3% × low×W，约 7.6k）→ 达成
+稳定 est < low×W − 3%×low×W          → overshoot（折深了）
+稳定 est > low×W + 3%×low×W 且 protectBinds → 保护咬合，折不到 low
 ```
 
 只看到瞬时值时，判“未验收”，不判通过或失败。
