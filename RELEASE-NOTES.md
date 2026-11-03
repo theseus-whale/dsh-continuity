@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.125-safe.1
+# 发行说明 — 4.9.126-safe.1
+
+## baseline nodeCount probe（4.9.126）
+
+context-log 增加 nodeCount / nodeTokenSum / measurementBaseline。若 nodeCount 不变而 baseline 涨，是估值/相位；若 nodeCount 也涨，是新增内容。
 
 ## pre-fold baseline 判定（4.9.125）
 

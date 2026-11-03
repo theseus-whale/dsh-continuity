@@ -403,10 +403,21 @@ export class ContinuityEngine extends BaseEngine {
       ? headerConfig.maxTokens
       : (defaultMaxTokens ?? 0);
     const windowTokens = contextWindow === null ? 0 : Math.max(0, contextWindow - reservedTokens);
+    const surfaceNodes = Array.isArray(measurement.nodes) ? measurement.nodes : [];
+    const nodeCount = surfaceNodes.length;
+    const nodeTokenSum = surfaceNodes.reduce(
+      (sum, node) => sum + (Number.isFinite(node?.tokens) ? node.tokens : 0),
+      0,
+    );
+    const measurementBaseline = Number.isFinite(measurement.baseline) ? measurement.baseline : null;
     const measured = {
       estTokens: measurement.totalTokens,
       windowTokens,
       surfaceTokens: measurement.surfaceTokens,
+      baselineTokens: Math.max(0, measurement.totalTokens - measurement.surfaceTokens),
+      nodeCount,
+      nodeTokenSum,
+      measurementBaseline,
       contextWindow,
       reservedTokens,
       provider,
@@ -419,7 +430,10 @@ export class ContinuityEngine extends BaseEngine {
       estTokens: measured.estTokens,
       windowTokens: measured.windowTokens,
       surfaceTokens: measured.surfaceTokens,
-      baselineTokens: Math.max(0, measured.estTokens - measured.surfaceTokens),
+      baselineTokens: measured.baselineTokens,
+      nodeCount: measured.nodeCount,
+      nodeTokenSum: measured.nodeTokenSum,
+      measurementBaseline: measured.measurementBaseline,
     });
     // 口径可验：把每次测量落盘，之后可用任何独立方法复核（不再依赖 /api/status）。
     try {
@@ -428,8 +442,11 @@ export class ContinuityEngine extends BaseEngine {
         at: new Date().toISOString(),
         estTokens: measured.estTokens,
         surfaceTokens: measured.surfaceTokens,
-        baselineTokens: Math.max(0, measured.estTokens - measured.surfaceTokens),
+        baselineTokens: measured.baselineTokens,
         windowTokens: measured.windowTokens,
+        nodeCount: measured.nodeCount,
+        nodeTokenSum: measured.nodeTokenSum,
+        measurementBaseline: measured.measurementBaseline,
         provider: measured.provider,
         model: measured.model,
       }) + '\n', 'utf8');
