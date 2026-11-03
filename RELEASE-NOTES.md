@@ -1,4 +1,13 @@
-# 发行说明 — 4.9.111-safe.1
+# 发行说明 — 4.9.112-safe.1
+
+## A 表维护（4.9.112）
+
+```text
+新 session 的 A 为空 -> B 也为空，这是正常初始状态
+A 不会自动生成；需要实例/用户按 rules 维护 concepts.md
+rules.md / rules-safe.md 已加入 A 表维护段
+已有 session 不会自动重写自己的 rules.md
+```
 
 日期：2026-11-03
 
