@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.126-safe.1
+# 发行说明 — 4.9.127-safe.1
+
+## baselinePerNode（4.9.127）
+
+context-log 增加 baselinePerNode = baseline / nodeCount。节点数不变而 baselinePerNode 变 -> 估值/固定开销；两者同步 -> 新节点。文档同时改明：budget 只约束被折的 surface，non-surface 前缀可被一并带走，实际请求减少量可大于 budget。
 
 ## baseline nodeCount probe（4.9.126）
 

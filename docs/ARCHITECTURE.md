@@ -1,4 +1,4 @@
-# Continuity architecture — 4.9.126-safe.1
+# Continuity architecture — 4.9.127-safe.1
 
 ## 1. Shape
 
@@ -184,11 +184,13 @@ reachable with ~9.4k headroom; .14 is a conservative default, not a guarantee. O
 ~127k, below the 190k cap; emergency 0.65→0.42 is 182k, so the 190k cap is
 kept for emergency drainage.
 
-One pass folds one oldest contiguous range. `budget` is an upper bound, not a
-guarantee. The selected end must be tool-pair balanced, so the actual fold can
-stop earlier and `afterTokens` can be above the floor. This is expected, not a
-measurement error: the measured 0b pass was +3,639 above its floor.
-Reachable floor:
+One pass folds one oldest contiguous range. `budget` caps the folded **surface**
+tokens only; the associated non-surface prefix can leave with it, so actual
+request reduction can exceed the budget. Measured: pre 375,803 → next request
+201,756 (174,047 gone) while budget was 122,179 and folded surface was 114,373.
+The selected end must also be tool-pair balanced, so `afterTokens` can be above
+the floor. This is expected, not a measurement error: the measured 0b pass was
++3,639 above its floor. Reachable floor:
 
 ```text
 floor(T) = (protect * W + baseline(T)) / W

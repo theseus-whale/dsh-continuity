@@ -273,9 +273,12 @@
                   #   emergencyTo is 182,292 below emergency; 140k would
                   #   leave emergency short of its target, so keep 190k.
                   # protect .14 leaves ~9.4k of baseline headroom below low;
-                  # it is a conservative default, not a guarantee. This band
-                  # folds ~127k once. One pass per high crossing; no
-                  # proportional-zone passes.
+                  # it is a conservative default, not a guarantee. budget caps
+                  # the folded surface only; the associated non-surface prefix
+                  # can leave with it, so actual request reduction can exceed
+                  # the budget. Use the next request measurement for that, not
+                  # budget. One pass per high crossing; no proportional-zone
+                  # passes.
                   #
                   # 0.2.4 A4-safe: active open-turn tool calls are hard-pinned;
                   # old non-active tool results are previewed toward low 32%

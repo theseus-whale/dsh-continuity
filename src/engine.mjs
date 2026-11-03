@@ -410,13 +410,16 @@ export class ContinuityEngine extends BaseEngine {
       0,
     );
     const measurementBaseline = Number.isFinite(measurement.baseline) ? measurement.baseline : null;
+    const baselineTokens = Math.max(0, measurement.totalTokens - measurement.surfaceTokens);
+    const baselinePerNode = nodeCount > 0 ? baselineTokens / nodeCount : null;
     const measured = {
       estTokens: measurement.totalTokens,
       windowTokens,
       surfaceTokens: measurement.surfaceTokens,
-      baselineTokens: Math.max(0, measurement.totalTokens - measurement.surfaceTokens),
+      baselineTokens,
       nodeCount,
       nodeTokenSum,
+      baselinePerNode,
       measurementBaseline,
       contextWindow,
       reservedTokens,
@@ -433,6 +436,7 @@ export class ContinuityEngine extends BaseEngine {
       baselineTokens: measured.baselineTokens,
       nodeCount: measured.nodeCount,
       nodeTokenSum: measured.nodeTokenSum,
+      baselinePerNode: measured.baselinePerNode,
       measurementBaseline: measured.measurementBaseline,
     });
     // 口径可验：把每次测量落盘，之后可用任何独立方法复核（不再依赖 /api/status）。
@@ -446,6 +450,7 @@ export class ContinuityEngine extends BaseEngine {
         windowTokens: measured.windowTokens,
         nodeCount: measured.nodeCount,
         nodeTokenSum: measured.nodeTokenSum,
+        baselinePerNode: measured.baselinePerNode,
         measurementBaseline: measured.measurementBaseline,
         provider: measured.provider,
         model: measured.model,
