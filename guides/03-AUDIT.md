@@ -181,3 +181,21 @@ kw
 
 如果 A/B/C/K 有，但 vec 为空，审计同样跑不起来。
 见 `06-EMBEDDING.md`。
+
+## 10. fold 验收（K-04）
+
+折后瞬时值只是 provisional，不能用来验收。判据只用下一次正常 pre-step 的稳定值：
+
+```text
+稳定 est ≈ low×W (±3%)               → 达成
+稳定 est < low×W − 3%                → overshoot
+稳定 est > low×W + 3% 且 protectBinds → 保护咬合
+```
+
+`protectBinds` 用触发时的 `preBaseline` 算：
+
+```text
+floor = preBaseline + protect × W
+```
+
+实际减少量可以大于 `budget`，因为 budget 只按被折的 surface 计价，关联的 non-surface 前缀会一并被带走。

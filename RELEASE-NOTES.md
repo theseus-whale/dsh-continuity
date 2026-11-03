@@ -1,4 +1,8 @@
-# 发行说明 — 4.9.127-safe.1
+# 发行说明 — 4.9.128-safe.1
+
+## K-04 验收条款（4.9.128）
+
+templates/rules.md 与 guides/03 增加 fold 验收：瞬时值是 provisional，判据用下一次正常 pre-step 的稳定值；protectBinds 用 preBaseline；实际减少量可大于 budget（non-surface 前缀被一并带走）。
 
 ## baselinePerNode（4.9.127）
 
