@@ -507,7 +507,7 @@ const FACETS_URL = '/dsh-continuity/facets.json';
       }
       return h('div', { style: box },
         h('div', { style: { marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid rgba(127,127,127,0.25)' } },
-          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'A 概念（展示）'),
+          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'A 概念（轮数=索引实算）'),
           ...(data?.aLabels ?? []).length > 0
             ? (data.aLabels ?? []).map((item) => h('div', {
               key: 'A:' + item.label,
@@ -515,7 +515,7 @@ const FACETS_URL = '/dsh-continuity/facets.json';
             },
             h('div', { style: { display: 'flex', justifyContent: 'space-between', gap: 6 } },
               h('span', null, item.label),
-              h('span', { style: count }, item.coverage == null ? '' : item.coverage + ' 轮')),
+              h('span', { style: count }, (item.turns ?? 0) + ' 轮')),
             h('div', { style: { opacity: 0.55, fontSize: 10 } }, item.description ?? '')))
             : [h('div', { style: { opacity: 0.6 } }, '空表 · 本 session 还没有 A 概念')]),
         h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'B 通用标签'),

@@ -32,8 +32,8 @@ export function buildBCPanelState({ file = null, keywordsFile = null, cmapFile =
   } else {
     specialKeywords = keywordsFile ? [] : loadSpecialKeywords();
   }
-  const aLabels = loadConcepts(conceptsFile ?? path.join(home, '.dsh', 'continuity', 'concepts.md'));
-  const knownConcepts = new Set(aLabels.map((row) => row.label));
+  const configuredALabels = loadConcepts(conceptsFile ?? path.join(home, '.dsh', 'continuity', 'concepts.md'));
+  const knownConcepts = new Set(configuredALabels.map((row) => row.label));
   const counts = new Map();
   const kCounts = new Map();
   const cCounts = new Map();
@@ -67,6 +67,10 @@ export function buildBCPanelState({ file = null, keywordsFile = null, cmapFile =
   const labels = [...counts.entries()]
     .map(([label, turns]) => ({ label, turns }))
     .sort((a, b) => b.turns - a.turns || a.label.localeCompare(b.label));
+  const aLabels = configuredALabels.map((row) => ({
+    ...row,
+    turns: counts.get(row.label) ?? 0,
+  }));
   const kLabels = [...kCounts.entries()]
     .map(([label, turns]) => ({ label, turns }))
     .sort((a, b) => b.turns - a.turns || a.label.localeCompare(b.label));
