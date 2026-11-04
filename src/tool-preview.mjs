@@ -265,6 +265,7 @@ export function toolCallMap(events) {
 }
 
 const NON_TEXT_TYPES = new Set(['image', 'file', 'audio', 'video']);
+export const MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /**
  * Describe non-text blocks without carrying their payload. Returns null for a
@@ -292,6 +293,12 @@ export function nonTextInfo(event) {
       if (typeof path === 'string' && path.length > 0 && !paths.includes(path)) paths.push(path);
       const size = block.attachment?.size ?? block.size ?? block.bytes;
       if (Number.isFinite(size)) bytes = (bytes ?? 0) + size;
+      else {
+        const data = block.source?.data ?? block.data ?? block.base64;
+        if (typeof data === 'string' && data.length > 0) {
+          bytes = (bytes ?? 0) + Math.floor((data.length * 3) / 4);
+        }
+      }
     }
   }
   if (types.length === 0) return null;
@@ -308,7 +315,10 @@ export function nonTextInfo(event) {
 /** Images stay in the model context; other non-text result types use handles. */
 export function isImageToolResult(event) {
   const info = nonTextInfo(event);
-  return info !== null && info.types.includes('image');
+  return info !== null
+    && info.types.includes('image')
+    && info.bytes !== null
+    && info.bytes <= MAX_INLINE_IMAGE_BYTES;
 }
 
 function argsPreview(args) {
