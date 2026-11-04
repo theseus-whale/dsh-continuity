@@ -296,8 +296,12 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
     // 失败后本进程恢复普通索引，marker 留着等下次启动或人工处理。
     const relabelAttempted = new Set();
 
-    const buildRelabelLabeler = () => {
-      const conceptRows = loadConcepts(conceptsPath);
+    // session 词表才是唯一来源（与 makeStep 同口径）；不能用 persona/global 回退，
+    // 否则迁移会拿另一份 concepts.md 去算 hash 与打标（实际踩过：hash 不符直接 abort）。
+    const relabelConceptsFile = (sessionId) => sessionFile(sessionId, 'concepts.md');
+
+    const buildRelabelLabeler = (sessionId) => {
+      const conceptRows = loadConcepts(relabelConceptsFile(sessionId));
       const labels = Object.fromEntries(conceptRows.map((row) => [row.label, row.description]));
       const kinds = Object.fromEntries(conceptRows.map((row) => [row.label, row.kind]));
       return createBLabeler({ embed: embedTexts, labels, concepts: Object.keys(labels), kinds });
@@ -348,9 +352,9 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
               const snapshot = await lazySessionQuery.readSession(sessionId);
               return Array.isArray(snapshot?.events) ? snapshot.events : [];
             },
-            conceptsFile: conceptsPath,
+            conceptsFile: relabelConceptsFile(sessionId),
             markerFile,
-            labeler: buildRelabelLabeler(),
+            labeler: buildRelabelLabeler(sessionId),
             eventText,
             log: (message) => {
               console.log(`[dsh-continuity][relabel] ${message}`);
