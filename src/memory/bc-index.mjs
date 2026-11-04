@@ -15,6 +15,7 @@ export function toPointer(record) {
     ...(Array.isArray(record.genericWorkflow) ? { genericWorkflow: record.genericWorkflow } : {}),
     ...(Number.isFinite(record.topicScore) ? { topicScore: record.topicScore } : {}),
     ...(typeof record.topicConfidence === 'string' && record.topicConfidence ? { topicConfidence: record.topicConfidence } : {}),
+    ...(Number.isFinite(record.topicMinScore) ? { topicMinScore: record.topicMinScore } : {}),
     labelVersion: Number.isInteger(record.labelVersion) ? record.labelVersion : 1,
     terms: record.terms ?? [],
     keywords: record.keywords ?? [],
