@@ -58,21 +58,30 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
     topK = 3,
     minScore = 0.25,
     topicMinScore = 0.33,
-    topicMargin = 0.03,
+    topicCenterMin = 0.02,
+    topicLead = 0.02,
     topicTopK = 1,
     workflowTopK = 2,
+    topicBaseline = null,
     vector = [],
     chunks = 1,
   } = {}) {
     if (split) {
       const topics = scored
         .filter((item) => kindOf(item.concept) === 'topic')
-        .sort((a, b) => b.score - a.score);
+        .map((item) => ({
+          concept: item.concept,
+          score: item.score,
+          rawScore: item.score,
+          centered: item.score - (Number.isFinite(topicBaseline?.[item.concept]) ? topicBaseline[item.concept] : 0),
+        }))
+        .sort((a, b) => b.centered - a.centered);
       const topTopic = topics[0];
       const secondTopic = topics[1];
       const topicPasses = topTopic !== undefined
-        && topTopic.score >= topicMinScore
-        && (secondTopic === undefined || topTopic.score - secondTopic.score >= topicMargin);
+        && topTopic.rawScore >= topicMinScore
+        && topTopic.centered >= topicCenterMin
+        && (secondTopic === undefined || topTopic.centered - secondTopic.centered >= topicLead);
       const topicCandidates = topicPasses
         ? topics.slice(0, Math.max(1, topicTopK))
         : [];
@@ -82,16 +91,21 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
       const candidates = [...topicCandidates, ...workflow]
         .sort((a, b) => b.score - a.score)
         .slice(0, topicCandidates.length + workflowTopK);
-      const scores = Object.fromEntries([...topicCandidates, ...workflow].map((item) => [item.concept, item.score]));
+      const scores = Object.fromEntries([...topicCandidates, ...workflow].map((item) => [item.concept, item.rawScore]));
       return {
         candidates,
         topic: topicCandidates,
         workflow,
         scores,
-        topicScore: topicCandidates.length > 0 ? topTopic.score : null,
-        topicConfidence: topicCandidates.length > 0 ? confidenceOf(topTopic.score) : null,
+        topicScores: Object.fromEntries(topics.map((item) => [item.concept, item.rawScore])),
+        topicCenteredScores: Object.fromEntries(topics.map((item) => [item.concept, item.centered])),
+        topicScore: topicCandidates.length > 0 ? topTopic.rawScore : null,
+        topicCenteredScore: topicCandidates.length > 0 ? topTopic.centered : null,
+        topicConfidence: topicCandidates.length > 0 ? confidenceOf(topTopic.rawScore) : null,
         topicMinScore,
-        topicMargin,
+        topicCenterMin,
+        topicLead,
+        topicBaseline,
         chunks,
         unknown: candidates.length === 0,
         top: topicCandidates[0] ?? workflow[0] ?? null,

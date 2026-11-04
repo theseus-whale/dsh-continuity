@@ -16,6 +16,49 @@ import { eventText } from '../session-log.mjs';
 
 const INJECTED = /^\[(?:抽取|工作线|标签|规则|习惯|技能|归位|候选|存\?|闸|回正|学习|追忆|记忆|continuity:[a-z-]+)\]/;
 const MACHINE = /^(?:Current runtime context|Current working directory|Current DSH file policy|Approval prompts|Time sampled)/;
+const BASELINE_WINDOW = 300;
+
+function emptyBaseline() {
+  return { version: 1, window: BASELINE_WINDOW, samples: {} };
+}
+
+function loadBaseline(file) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+    if (parsed && parsed.version === 1 && parsed.samples && typeof parsed.samples === 'object') return parsed;
+  } catch { /* first run */ }
+  return emptyBaseline();
+}
+
+function baselineMeans(state) {
+  const means = {};
+  for (const [concept, samples] of Object.entries(state?.samples ?? {})) {
+    if (!Array.isArray(samples) || samples.length === 0) continue;
+    means[concept] = samples.reduce((sum, value) => sum + Number(value || 0), 0) / samples.length;
+  }
+  return means;
+}
+
+function updateBaseline(state, scores) {
+  if (!scores || typeof scores !== 'object') return state;
+  for (const [concept, score] of Object.entries(scores)) {
+    if (!Number.isFinite(Number(score))) continue;
+    const samples = Array.isArray(state.samples[concept]) ? state.samples[concept] : [];
+    samples.push(Number(score));
+    if (samples.length > BASELINE_WINDOW) samples.shift();
+    state.samples[concept] = samples;
+  }
+  return state;
+}
+
+function saveBaseline(file, state) {
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const temp = `${file}.tmp-${process.pid}`;
+    fs.writeFileSync(temp, JSON.stringify(state), 'utf8');
+    fs.renameSync(temp, file);
+  } catch { /* baseline failure must not block indexing */ }
+}
 
 function isHuman(event) {
   const source = event?.data?.source ?? event?.source;
@@ -76,6 +119,7 @@ function turnsFromEvents(events, afterTurn, afterSeq = -1) {
 export function createIndexUpdater({
   file,
   stateFile = null,
+  baselineFile = null,
   sessionQuery = null,
   labeler = null,
   labels = null,
@@ -134,6 +178,10 @@ export function createIndexUpdater({
       const remaining = Math.max(0, missing.length - turns.length);
       if (turns.length === 0) return { added: 0, maxTurn, remaining: 0, mode, readMs, totalMs: Math.round(performance.now() - started) };
 
+      const resolvedBaselineFile = baselineFile ?? path.join(path.dirname(file), 'bc-topic-baseline.json');
+      const baseline = loadBaseline(resolvedBaselineFile);
+      const baselineMeansMap = baselineMeans(baseline);
+
       if (activeLabeler === null) activeLabeler = createBLabeler({
         embed: embedTexts,
         ...(labels ? { labels, concepts: Object.keys(labels) } : {}),
@@ -154,14 +202,17 @@ export function createIndexUpdater({
           topK: 3,
           minScore: 0.25,
           topicMinScore: 0.33,
-          topicMargin: 0.03,
+          topicCenterMin: 0.02,
+          topicLead: 0.02,
           topicTopK: 1,
+          topicBaseline: baselineMeansMap,
           chunkChars: 600,
           maxChunks: 12,
         };
         const label = typeof activeLabeler.labelChunked === 'function'
           ? await activeLabeler.labelChunked(text, labelOptions)
           : await activeLabeler.label(text, labelOptions);
+        updateBaseline(baseline, label.topicScores);
         const isV2 = label.version === 2;
         const generic = label.candidates.map((candidate) => candidate.concept);
         const conceptScores = Object.fromEntries(
@@ -199,6 +250,7 @@ export function createIndexUpdater({
       const labelMs = Math.round(performance.now() - labelStarted);
       const writeStarted = performance.now();
       saveIndexJsonl(file, [...records, ...added]);
+      saveBaseline(resolvedBaselineFile, baseline);
       const writeMs = Math.round(performance.now() - writeStarted);
       const lastSeq = added.at(-1)?.seqEnd ?? afterSeq;
       const lastTurnWritten = added.at(-1)?.turn ?? maxTurn;
