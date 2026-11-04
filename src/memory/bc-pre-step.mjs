@@ -16,6 +16,7 @@ import { loadCMapEntries } from './cmap-file.mjs';
 import { loadConcepts } from './concepts-file.mjs';
 import { appendCostLog, createIndexUpdater, defaultCostLogPath } from './bc-index-updater.mjs';
 import { createBLabeler } from './bc-label.mjs';
+import { runRelabelMigration } from './relabel-migrate.mjs';
 import { consumePendingHint, maybeRunAudit } from './bc-audit.mjs';
 import { ensureSessionScaffolds, maybeOnboard, bootstrapPaths } from './onboarding.mjs';
 import { isPersonaEnabled, resolvePersona, resolveVocabFile, sessionFile } from './persona.mjs';
@@ -191,7 +192,7 @@ export function createBCPreStep({ records = [], cmap, prefix = '', sessionQuery 
   };
 }
 
-export function installBCPreStep(ctx, { enabled = false, storePath = null, prefix = '', sessionQuery = null, sessionScoped = null } = {}) {
+export function installBCPreStep(ctx, { enabled = false, storePath = null, prefix = '', sessionQuery = null, sessionScoped = null, relabelRunner = runRelabelMigration } = {}) {
   if (enabled !== true) return { registered: false, reason: 'disabled' };
   if (!ctx || typeof ctx.on !== 'function') return { registered: false, reason: 'no-ctx' };
   const resolvedStore = storePath ?? defaultBCStorePath();
@@ -289,6 +290,51 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
 
   if (scoped) {
     const bySession = new Map();
+    // 迁移期间的 session 用这个哨兵返回：不建 entry、不写盘
+    const SKIP_DURING_RELABEL = Symbol('skip-during-relabel');
+    // 每个进程只自动尝试一次；abort 后不再反复重试（否则每轮都 abort 刷日志），
+    // 失败后本进程恢复普通索引，marker 留着等下次启动或人工处理。
+    const relabelAttempted = new Set();
+
+    const buildRelabelLabeler = () => {
+      const conceptRows = loadConcepts(conceptsPath);
+      const labels = Object.fromEntries(conceptRows.map((row) => [row.label, row.description]));
+      const kinds = Object.fromEntries(conceptRows.map((row) => [row.label, row.kind]));
+      return createBLabeler({ embed: embedTexts, labels, concepts: Object.keys(labels), kinds });
+    };
+
+    /**
+     * 后台启动一次历史重标。不 await、不阻塞 pre-step；
+     * 期间该 session 在 gate 里 → updater 不写盘、pre-step 直接 next()。
+     * 结束后重建 entry（从磁盘重读 records），updater 靠 stateFile 的 afterSeq 自动补齐。
+     */
+    const startRelabel = (sessionId, indexFile, markerFile) => {
+      relabelGate.relabelling.add(sessionId);
+      console.log(`[dsh-continuity][relabel] 检测到 marker，后台开始（session ${sessionId}）`);
+      void (async () => {
+        try {
+          const result = await relabelRunner({
+            indexFile,
+            events: async () => {
+              const snapshot = await lazySessionQuery.readSession(sessionId);
+              return Array.isArray(snapshot?.events) ? snapshot.events : [];
+            },
+            conceptsFile: conceptsPath,
+            markerFile,
+            labeler: buildRelabelLabeler(),
+            eventText,
+            log: (message) => console.log(`[dsh-continuity][relabel] ${message}`),
+          });
+          console.log(`[dsh-continuity][relabel] 结束：${result.status}${result.reason ? ' / ' + result.reason : ''}`);
+        } catch (error) {
+          console.error(`[dsh-continuity][relabel] 失败：${error?.message ?? error}`);
+        } finally {
+          relabelGate.relabelling.delete(sessionId);
+          bySession.delete(sessionId);
+        }
+      })();
+    };
+
     const getSession = (sessionId) => {
       if (!sessionId) return null;
       const personaId = resolvePersona(sessionId);
@@ -302,6 +348,14 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
       }
       if (entry === undefined) {
         const indexFile = join(sessionsDir, String(sessionId), 'bc-index.jsonl');
+        const markerFile = join(dirname(indexFile), 'bc-index.relabel-pending.json');
+        // 迁移只在"显式 marker"存在时发生；升级本身绝不触发。
+        // 每进程只尝试一次；abort 后本进程恢复普通索引（marker 保留待人工/下次启动）。
+        if (existsSync(markerFile) && !relabelAttempted.has(sessionId)) {
+          relabelAttempted.add(sessionId);
+          startRelabel(sessionId, indexFile, markerFile);
+        }
+        if (relabelGate.relabelling.has(sessionId)) return SKIP_DURING_RELABEL;
         entry = makeStep(indexFile, sessionId);
         bySession.set(sessionId, entry);
       }
@@ -309,7 +363,7 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
     };
     ctx.on('agent/pre-step', async (payload, next) => {
       const entry = getSession(payload?.agent?.session?.id);
-      if (entry === null) return next();
+      if (entry === null || entry === SKIP_DURING_RELABEL) return next();
       return entry.step(payload, next);
     });
     return {
@@ -320,6 +374,7 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
       sessionQuery: 'lazy',
       store: sessionsDir,
       sessionScoped: true,
+      relabel: { enabled: true },
     };
   }
 

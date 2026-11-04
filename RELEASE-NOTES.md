@@ -1,142 +1,146 @@
-# 发行说明 — 4.11.29
+# 发行说明 — 4.11.30
 
-## updater gate / labelStamp（4.11.29）
+## relabel 启动钩子（4.11.30）
+
+只接 marker 触发，不自动打 marker；无 marker 路径不变。每进程每 session 只尝试一次，abort 后恢复普通索引、marker 保留。
+
+## updater gate / labelStamp（4.11.30）
 
 仍不接线。updater 增加 whenIdle/isRunning/pendingCount、gate 命中不写盘不推进 state、pending 合并、labelStamp；pre-step 建共享 gate 与 conceptsFile；round-trip 守卫覆盖 labelStamp/terms/topicMinScore。
 
-## relabel 迁移模块（4.11.29）
+## relabel 迁移模块（4.11.30）
 
-只合模块与单测，不接线。relabel-migrate 支持 events provider、all-or-nothing、labelStamp、显式 LABELER_VERSION；启动钩子留 4.11.29/30。
+只合模块与单测，不接线。relabel-migrate 支持 events provider、all-or-nothing、labelStamp、显式 LABELER_VERSION；启动钩子留 4.11.30/30。
 
-## dry-run 支持 v2 baseline（4.11.29）
+## dry-run 支持 v2 baseline（4.11.30）
 
 relabel-dry-run 支持 {version:2,topics,workflows}，workflow 也建 baseline 并传入 labelChunked；不再对 v2 静默退回 LOO。
 
-## 面板 A 表实算 + 健康分布（4.11.29）
+## 面板 A 表实算 + 健康分布（4.11.30）
 
 bc-panel-state 给 aLabels 加 turns=index 实算；client A 概念区显示“轮数=索引实算”，不再把 concepts 第三列当轮数。rules 增加健康分布观察目标。
 
-## 混淆对加区分词（4.11.29）
+## 混淆对加区分词（4.11.30）
 
 根 rules 增加：只给混淆对加区分词，不整表加宽；人工非空标注 <30 条只比方向，不合并/重构。
 
-## workflow eval（4.11.29）
+## workflow eval（4.11.30）
 
 eval-label-rules 支持 workflowLabel，输出 workflow precision/recall/exact/any-hit/漏/多/top-2；baseline 支持 v2 topics/workflows。无 BOM。
 
-## workflow baseline 与 0 条出口（4.11.29）
+## workflow baseline 与 0 条出口（4.11.30）
 
 baseline v2 拆分 topics/workflows；workflow 用 centered>=.02 且 lead>=.02，不达标 workflow:[]，不再固定占两席；旧 v1 baseline 自动迁移 topics。
 
-## cmap 接线（4.11.29）
+## cmap 接线（4.11.30）
 
 bc-pre-step 两处 createIndexUpdater 都传 cmapFile: cmapPath；updater 不再默认读全局 ~/.dsh/continuity/cmap.md，缺 cmapFile 时跳过 terms 并记一次 cmap-file-missing。旧行不回填。
 
-## C map terms 写盘（4.11.29）
+## C map terms 写盘（4.11.30）
 
 bc-index-updater 从 cmap.md 读 term，text/keywords 命中即写入 record.terms；旧记录不回填。修复 C 清单恒空、C 高亮不亮。
 
-## topicMinScore 持久化（4.11.29）
+## topicMinScore 持久化（4.11.30）
 
 toPointer 之前漏了 topicMinScore，导致 labeler/updater 有值但写盘被过滤。现已加入 pointer，测试覆盖 roundtrip。旧行不回填，需 relabel 时补。
 
-## relabel 只读演练（4.11.29）
+## relabel 只读演练（4.11.30）
 
 bin/relabel-dry-run.mjs 进包；只读，不写 index/baseline/raw；LOO 样本 <100 时输出显式警告；raw 缺失轮记 unresolved。
 
-## eval baseline 缺失修复（4.11.29）
+## eval baseline 缺失修复（4.11.30）
 
 eval-label-rules 把缺失 baseline 记为 NaN 而非 0，再以已知 topic 全局均值回填；空 baseline 则 raw-bootstrap。输入与 baseline 读取去 BOM。避免缺失项 centered=raw 通吃。
 
-## baseline 缺失回退（4.11.29）
+## baseline 缺失回退（4.11.30）
 
 baseline 里没有的 topic 用 session 全局均值回退，不记 0；没有任何 baseline 样本时按 raw bootstrap、不做居中。避免新增 topic 因 0 基线获得偏置。eval-label-rules 同步。
 
-## 评估脚本与 concepts 模板（4.11.29）
+## 评估脚本与 concepts 模板（4.11.30）
 
 bin/eval-label-rules.mjs 随包发布；--baseline-file 同时接受扁平 {topic:mean} 和 {version,window,samples:{topic:[...]}}。private files 补 templates/concepts.md。
 
-## topic baseline 居中（4.11.29）
+## topic baseline 居中（4.11.30）
 
 bc-index-updater 新增 per-session bc-topic-baseline.json：记录最近 300 轮所有 topic raw score，centered=raw-滚动均值；判据 centered>=.02 且领先>=.02，否则 topic:[]；当前轮不参与自己的 baseline，标完再更新。D 方案。
 
-## A 表描述写法（4.11.29）
+## A 表描述写法（4.11.30）
 
 根 rules / rules-safe 增加：A 表描述用一句短句 + 4–6 个具体名词；具体名词优先于抽象词；改描述或加 topic 后用同一批 ≥30 轮固定样本复核 top-1/top-2/空值/margin，不达标回退。
 
-## 用户输入补 turn / 去 reasoning（4.11.29）
+## 用户输入补 turn / 去 reasoning（4.11.30）
 
 bc-index-updater 从 turn/start、step/start 建 seq→turn 映射，给没有 data.turn 的 user/message 补 turn；打标文本只用 includeReasoning:false；同 turn 内用户在前、助手在后。修复 31 条样本 userChars=0、reasoning 占正文的问题。
 
-## 分块打标 + 相对间隔（4.11.29）
+## 分块打标 + 相对间隔（4.11.30）
 
 bc-label 增加 labelChunked：600 字一块，最多 12 块，逐块算 concept 最高分；topic 需 >= topicMinScore 且领先第二名 >= topicMargin(.03)，否则 topic:[]。bc-index-updater 改用 labelChunked；长轮次不再只按开头打分。
 
-## topicMinScore（4.11.29）
+## topicMinScore（4.11.30）
 
 bc-label 增加 topicMinScore 默认 0.33；topic 低于阈值返回空数组，不再 score>0 必选。topicMinScore 写入记录，便于一致率统计。topic 为空时 recall A标签/面板安全。
 
-## workflow childSessionId 硬约束（4.11.29）
+## workflow childSessionId 硬约束（4.11.30）
 
 workflow 最终 return 不回传 childSessionId；必须让子读 DSH_SESSION_ID 并写入回执。subagent 至少给启动 agentId，workflow 连这个都没有。根规则、rules-safe、guide 07 已同步。
 
-## PTC unresolved 细节（4.11.29）
+## PTC unresolved 细节（4.11.30）
 
 guide 07 与根规则补上 unresolvedArtifacts 的实际形状 {source, reason:"not-a-file"}，以及 artifactsResolved=false；避免新鱼以为 unresolved 是字符串。
 
-## 指南编号修正（4.11.29）
+## 指南编号修正（4.11.30）
 
 06-EMBEDDING.md 已占用 06；PTC/子 agent/assets 指南改为 07-PTC-AND-ASSETS.md，README/00-READ-FIRST 同步。
 
-## PTC / 子 agent / assets 说明书（4.11.29）
+## PTC / 子 agent / assets 说明书（4.11.30）
 
 新增 guides/07-PTC-AND-ASSETS.md；根版 rules.md / rules-safe.md 增加 PTC/子 agent/assets 节：父 canonical、子用 DSH_SESSION_ID、ptc_handoff 回执与 artifact 复制、session_asset/child_asset 分工、大结果落 assets、旧 mime/seq 容忍、不要 backup→compact→restore 验资产。
 
-## artifactSources mime（4.11.29）
+## artifactSources mime（4.11.30）
 
 ptc_handoff 的 artifactSources 每条现在带 mime，离线读 handoff.json 就能知道 png=image/png、txt=text/plain。
 
-## PTC artifact mime/seq（4.11.29）
+## PTC artifact mime/seq（4.11.30）
 
 复制品按扩展名补 mime（png->image/png，txt->text/plain，json->application/json）。同一 handoff 内 handoff=baseSeq，artifacts=baseSeq+1..N，不再全部 seq=0，child_asset get 可按 seq 定位每个 artifact。
 
-## PTC artifact 实体化（4.11.29）
+## PTC artifact 实体化（4.11.30）
 
 ptc_handoff 不再只把 artifact 路径写进 envelope。存在的文件会复制到 assets/ptc/<run>/<child>/，带 sha256/bytes，envelope.artifacts 改为已注册相对路径；缺失文件记入 unresolvedArtifacts，artifactsResolved=false，不制造悬空指针。
 
-## attachmentId 解析与父图恢复（4.11.29）
+## attachmentId 解析与父图恢复（4.11.30）
 
 用户上传图片常以 attachmentId 存在，只有 name/mediaType/bytes，没有 path/data。assets 现在解析 .dsh/attachments/v1/objects/<sha>，写入 payload；session_asset get 对已折叠的 parent seq 也能从 raw session 现场恢复。已确认 seq 78456 的附件对象存在（422135 B）。
 
-## 路径图片 + header=false 资产指针（4.11.29）
+## 路径图片 + header=false 资产指针（4.11.30）
 
 materializeRangeAssets / nonTextInfo 识别 data.content、data.summary、data.message.content；用户上传图片不再漏扫。provenance.header=false 时仍写入 asset-only 指针，避免资产落盘但不可见。
 
-## 路径图片字节补全（4.11.29）
+## 路径图片字节补全（4.11.30）
 
 read_image 这类只给 name/path 的 image block，bytes 以前为 null，被 4MiB 闸当成非图片而换成 handle。现在 bytes 未知时用 fs.statSync(path).size 补全；仍超过 4MiB 才回 handle。
 
-## Assets + PTC handoff（4.11.29）
+## Assets + PTC handoff（4.11.30）
 
 新增 sessions/<id>/assets：fold 前把 image/file/audio/video 原样落盘，并写 index.jsonl。session_log 标记 [asset-parent ...]；session_asset 取父资产；child_asset 取 PTC child artifact，并在 child session 仍可读时现场恢复未注册图片；ptc_handoff 把 child envelope 写成父可见 artifact。工具当前返回路径与元数据，不直接返回 image block。
 
-## 图片尺寸闸（4.11.29）
+## 图片尺寸闸（4.11.30）
 
 MAX_INLINE_IMAGE_BYTES = 4 MiB。图片 bytes（attachment.size 或 base64 长度折算）≤4MiB 才保留；超过则回到 non-text handle 并保留原因。这样不依赖宿主 tokenMeter 对 image 的估算。
 
-## 图片结果保留（4.11.29）
+## 图片结果保留（4.11.30）
 
 handleNonTextResults 跳过 image 工具结果；图片不再被替换成 text handle，直接进入模型上下文。file/audio/video 仍走原来的 handle。图片会占 context token，可能触发更高水位或 overflow；这是保留图片的代价。
 
-## coo/peer 双角色兼容（4.11.29）
+## coo/peer 双角色兼容（4.11.30）
 
 load-gate / event-alias-ledger / referent-ledger 同时接受 role/source 的 coo 与 peer；public 版不再把 coo 替换成 peer。pet bridge 传 coo 时行为保留，公共包仍保持 peer 命名。special keywords 默认空是 public 的故意隐私默认，K 表不受影响。
 
-## 4.11.29 修正（4.10.0 作废）
+## 4.11.30 修正（4.10.0 作废）
 
-4.10.0 的 public 包从 `publish/dsh-continuity-public` 打出，但该树 `src/engine.mjs` 仍是旧的 `warnOnce`（仍写 lastError）。4.11.29 已把 dev 的 engine 同步进 public 并重新打包。逐文件哈希：engine `8081CF81B0EC` 两侧一致；其余 14 个 src 差异为既有的 public 去个人化差异，不是行为漂移。
+4.10.0 的 public 包从 `publish/dsh-continuity-public` 打出，但该树 `src/engine.mjs` 仍是旧的 `warnOnce`（仍写 lastError）。4.11.30 已把 dev 的 engine 同步进 public 并重新打包。逐文件哈希：engine `8081CF81B0EC` 两侧一致；其余 14 个 src 差异为既有的 public 去个人化差异，不是行为漂移。
 
-## Stable 首版（4.11.29）
+## Stable 首版（4.11.30）
 
 相对 4.9.136：
 
