@@ -269,6 +269,16 @@ export function toolCallMap(events) {
 const NON_TEXT_TYPES = new Set(['image', 'file', 'audio', 'video']);
 export const MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024;
 
+/** Content blocks in any of the event shapes used by DSH. */
+export function eventContentBlocks(event) {
+  const data = event?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  if (Array.isArray(data?.summary)) return data.summary;
+  if (Array.isArray(data?.message?.content)) return data.message.content;
+  return null;
+}
+
 /**
  * Describe non-text blocks without carrying their payload. Returns null for a
  * text-only tool result.
@@ -277,7 +287,7 @@ export const MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024;
  */
 export function nonTextInfo(event) {
   if (event?.type !== 'tool/result') return null;
-  const content = event.data?.message?.content;
+  const content = eventContentBlocks(event);
   if (!Array.isArray(content)) return null;
   const types = [];
   const names = [];

@@ -90,6 +90,7 @@ import {
   activeCallIds,
   activePinSeqs,
   compressionBudget,
+  eventContentBlocks,
   handleNonTextToolResult,
   isImageToolResult,
   nonTextInfo,
@@ -695,7 +696,7 @@ export class ContinuityEngine extends BaseEngine {
     const bySeq = new Map((Array.isArray(raw) ? raw : []).map((entry) => [Number(entry?.seq), entry]));
     for (let seq = start; seq <= end; seq += 1) {
       const event = bySeq.get(Number(seq)) ?? session.eventAt?.(seq);
-      const blocks = event?.data?.message?.content;
+      const blocks = eventContentBlocks(event);
       if (!Array.isArray(blocks)) continue;
       for (const block of blocks) {
         if (block === null || typeof block !== 'object') continue;
@@ -3355,7 +3356,7 @@ export class ContinuityEngine extends BaseEngine {
         }),
         ...assetRows.map((row) => assetMarker(row)),
       ].join('\n')
-      : null;
+      : (assetRows.length > 0 ? assetRows.map((row) => assetMarker(row)).join('\n') : null);
     if (header !== null) this.headers.set(agent, header);
 
     try {
@@ -3474,7 +3475,7 @@ export class ContinuityEngine extends BaseEngine {
         }),
         ...assetRows.map((row) => assetMarker(row)),
       ].join('\n')
-      : null;
+      : (assetRows.length > 0 ? assetRows.map((row) => assetMarker(row)).join('\n') : null);
     if (header !== null) {
       try {
         agent.session.append('user/message', contextMessage(
