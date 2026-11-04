@@ -3,7 +3,7 @@
  *
  * Pure: no LLM, no network, no writes. The caller owns C and the record store.
  */
-import { appendFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { contextMessage } from '../threads.mjs';
 import { lastUserText } from './extraction-pre-step.mjs';
@@ -314,8 +314,8 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
     const appendRelabelLog = (sessionId, entry) => {
       try {
         const dir = join(sessionsDir, String(sessionId));
-        fs.mkdirSync(dir, { recursive: true });
-        fs.appendFileSync(join(dir, 'relabel-log.jsonl'), JSON.stringify({
+        mkdirSync(dir, { recursive: true });
+        appendFileSync(join(dir, 'relabel-log.jsonl'), JSON.stringify({
           at: new Date().toISOString(),
           sessionId,
           ...entry,
@@ -331,13 +331,13 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
       // 失败写回 marker：没有终端可看时，下一次启动能从 marker 直接读到原因
       const noteMarkerFailure = (reason, detail = '') => {
         try {
-          const marker = JSON.parse(fs.readFileSync(markerFile, 'utf8').replace(/^\uFEFF/, ''));
+          const marker = JSON.parse(readFileSync(markerFile, 'utf8').replace(/^\uFEFF/, ''));
           const next = {
             ...marker,
             attempts: (Number(marker.attempts) || 0) + 1,
             lastError: { at: new Date().toISOString(), reason, detail: String(detail).slice(0, 500) },
           };
-          fs.writeFileSync(markerFile, JSON.stringify(next, null, 2) + '\n', 'utf8');
+          writeFileSync(markerFile, JSON.stringify(next, null, 2) + '\n', 'utf8');
         } catch { /* marker 写不进去也不能影响主流程 */ }
       };
       void (async () => {

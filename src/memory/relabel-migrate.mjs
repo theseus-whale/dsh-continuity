@@ -219,6 +219,26 @@ export async function runRelabelMigration({ indexFile, rawFile, events: eventsPr
   const records = fs.readFileSync(indexFile, 'utf8').replace(/^\uFEFF/, '')
     .split(/\r?\n/).filter((line) => line.trim() !== '').map((line) => JSON.parse(line));
 
+  // 覆盖前置检查：**先验证事件能不能覆盖 index 的全部 turn，再开始打标**。
+  // 若宿主给的是有界快照，原来的流程会先白烧几秒到几分钟 CPU（风扇先转一下），
+  // 打标完才发现大量行重建不出来。宁可在 0.1 秒内失败。
+  const indexTurns = records
+    .map((record) => Number(record.turn))
+    .filter((turn) => Number.isInteger(turn));
+  const missingTurns = indexTurns.filter((turn) => !turns.has(turn));
+  if (missingTurns.length > 0) {
+    log(`[relabel] abort：事件覆盖不足（事件 ${events.length} · 推出轮次 ${turns.size} · index ${indexTurns.length} 轮 · 缺 ${missingTurns.length} 轮）`);
+    return {
+      status: 'abort',
+      reason: 'read-not-covering',
+      events: events.length,
+      turnsFromEvents: turns.size,
+      indexTurns: indexTurns.length,
+      missing: missingTurns.length,
+      missingSample: missingTurns.slice(0, 10),
+    };
+  }
+
   // 第一遍：每个可重打轮次拿全部 topic 的 raw 分（居中/领先都不设限，只取分）
   const scored = new Map();
   let done = 0;
