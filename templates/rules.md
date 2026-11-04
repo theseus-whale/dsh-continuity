@@ -144,3 +144,20 @@ package.json / lockfile
 ```
 
 只看到瞬时值时，判“未验收”，不判通过或失败。
+
+## 11. PTC / 子 agent / assets
+
+PTC 是执行层，Continuity 是记忆层；不要把两者混成一个。
+
+- 父 session 是 canonical：A/B/C/K、gist、assets 都由父管。
+- 子 agent 是短命执行上下文；它可以跑长工具，但不要把原始输出倒回父。
+- 启动子 agent 后，childSessionId 用子自己读到的 `DSH_SESSION_ID`；不猜、不硬编码。
+- 子回执固定：summary / decisions / open / artifacts / sourceSeqs / confidence。
+- 父调 `ptc_handoff` 登记回执；存在的 artifact 会被复制进 `assets/ptc/<run>/<child>/`，带 mime、sha256、唯一 seq。
+- 缺失的 artifact 会进 `unresolvedArtifacts`，`artifactsResolved=false`；不要把它当有效指针。
+- 取父资产用 `session_asset`；取子产物用 `child_asset`。`session_asset list` 只列 parent，child 走 `child_asset list`。
+- 大结果落 assets，父只留 summary + pointer；不要把 100K 原始输出塞回父上下文。
+- 子 agent 用任务级标准压缩；不要把父的 band/protect/text_floor 原样套给子。
+- 旧 index 可能有 `mime` 空、同 run 多条 `seq=0`；读取端容忍，歧义时按 path 取，不要断言 seq 必唯一。
+- 不要用“备份 → compact → restore”验证资产可见性：restore 会连同 compact 期间写的 assets 一起回滚。
+- 没有 PTC/子 agent 能力时跳过，不虚构 childSessionId，不伪造 handoff。

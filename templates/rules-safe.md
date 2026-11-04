@@ -166,3 +166,15 @@ peer_message({ to, text, from? })
 6. “上次示例活动”出现 `[追忆]` 上下文块，不是用户气泡。
 7. “一个单字称呼看看”不自动触发；“上次那个单字称呼…”也不触发（单字 K 不算锚）；只有 cue + 实词锚才触发。
 8. `gate-errors` 没有新错误。
+
+## 9. PTC / 子 agent / assets
+
+- 父 session 是 canonical；子 agent 只是短命执行上下文。
+- 子 id 用子自己读到的 `DSH_SESSION_ID`，不猜。
+- 子回执：summary / decisions / open / artifacts / sourceSeqs / confidence。
+- 父用 `ptc_handoff` 登记；artifact 会复制到 `assets/ptc/`，缺失进 `unresolvedArtifacts`。
+- 父图用 `session_asset`，子产物用 `child_asset`；`session_asset list` 只列 parent。
+- 大结果落 assets，父只留 summary + pointer；不要把原始输出倒回父。
+- 子用任务级标准压缩，不要套父的 band/protect。
+- 旧 index 的 `mime` 空 / `seq=0` 要容忍，歧义按 path。
+- 不要用“备份 → compact → restore”验证资产；restore 会回滚 assets。

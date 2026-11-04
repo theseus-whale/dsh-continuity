@@ -1,4 +1,4 @@
-# dsh-continuity 4.11.6
+# dsh-continuity 4.11.7
 
 给 DSH 的长上下文连续性插件。每个 session 拥有自己完整的一套记忆；
 persona 只是身份/启用标签。
@@ -62,7 +62,7 @@ peer_message    明确投递给另一个 live session
 ## 安装
 
 ```text
-dsh-continuity-4.11.6.tgz
+dsh-continuity-4.11.7.tgz
 ```
 
 装进目标 profile，备份 `~/.dsh/continuity`，重启 DSH。  
@@ -189,12 +189,13 @@ docs/README.md                文档索引
 docs/SESSION-LAYOUT.md        权威路径、角色、权限
 docs/ARCHITECTURE.md          当前架构
 docs/NEW-INSTANCE-HANDOFF.md  新实例交接
-guides/00-READ-FIRST.md       经典 00–05 说明书
+guides/00-READ-FIRST.md       经典 00–06 说明书
 guides/01-INSTALL.md
 guides/02-TABLES.md
 guides/03-AUDIT.md
 guides/04-REBUILD.md          九步重建
 guides/05-FIRST-RUN.md
+guides/06-PTC-AND-ASSETS.md  PTC / 子 agent / assets
 templates/rebuild.md          当前布局的重建流程
 ```
 
