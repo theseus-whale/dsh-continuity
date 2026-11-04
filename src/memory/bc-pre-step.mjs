@@ -3,7 +3,7 @@
  *
  * Pure: no LLM, no network, no writes. The caller owns C and the record store.
  */
-import { appendFileSync, existsSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { contextMessage } from '../threads.mjs';
 import { lastUserText } from './extraction-pre-step.mjs';
@@ -307,10 +307,39 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
      * 后台启动一次历史重标。不 await、不阻塞 pre-step；
      * 期间该 session 在 gate 里 → updater 不写盘、pre-step 直接 next()。
      * 结束后重建 entry（从磁盘重读 records），updater 靠 stateFile 的 afterSeq 自动补齐。
+     *
+     * 所有结果/异常都落一行到 `<sessionDir>/relabel-log.jsonl`：
+     * 迁移可能发生在没有任何终端可见的地方，"失败必须留痕"是硬要求。
      */
+    const appendRelabelLog = (sessionId, entry) => {
+      try {
+        const dir = join(sessionsDir, String(sessionId));
+        fs.mkdirSync(dir, { recursive: true });
+        fs.appendFileSync(join(dir, 'relabel-log.jsonl'), JSON.stringify({
+          at: new Date().toISOString(),
+          sessionId,
+          ...entry,
+        }) + '\n', 'utf8');
+      } catch { /* 日志失败不能影响主流程 */ }
+    };
+
     const startRelabel = (sessionId, indexFile, markerFile) => {
       relabelGate.relabelling.add(sessionId);
+      const startedAt = new Date().toISOString();
+      appendRelabelLog(sessionId, { event: 'start', markerFile, indexFile });
       console.log(`[dsh-continuity][relabel] 检测到 marker，后台开始（session ${sessionId}）`);
+      // 失败写回 marker：没有终端可看时，下一次启动能从 marker 直接读到原因
+      const noteMarkerFailure = (reason, detail = '') => {
+        try {
+          const marker = JSON.parse(fs.readFileSync(markerFile, 'utf8').replace(/^\uFEFF/, ''));
+          const next = {
+            ...marker,
+            attempts: (Number(marker.attempts) || 0) + 1,
+            lastError: { at: new Date().toISOString(), reason, detail: String(detail).slice(0, 500) },
+          };
+          fs.writeFileSync(markerFile, JSON.stringify(next, null, 2) + '\n', 'utf8');
+        } catch { /* marker 写不进去也不能影响主流程 */ }
+      };
       void (async () => {
         try {
           const result = await relabelRunner({
@@ -323,11 +352,32 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
             markerFile,
             labeler: buildRelabelLabeler(),
             eventText,
-            log: (message) => console.log(`[dsh-continuity][relabel] ${message}`),
+            log: (message) => {
+              console.log(`[dsh-continuity][relabel] ${message}`);
+              appendRelabelLog(sessionId, { event: 'log', message: String(message) });
+            },
           });
           console.log(`[dsh-continuity][relabel] 结束：${result.status}${result.reason ? ' / ' + result.reason : ''}`);
+          if (result.status === 'abort' || result.status === 'skip') {
+            noteMarkerFailure(result.status + (result.reason ? ':' + result.reason : ''), JSON.stringify(result.unresolved ?? result.stats ?? {}));
+          }
+          appendRelabelLog(sessionId, {
+            event: 'result',
+            status: result.status,
+            reason: result.reason ?? null,
+            unresolved: result.unresolved ?? null,
+            stats: result.stats ?? null,
+            startedAt,
+          });
         } catch (error) {
           console.error(`[dsh-continuity][relabel] 失败：${error?.message ?? error}`);
+          appendRelabelLog(sessionId, {
+            event: 'error',
+            message: String(error?.message ?? error),
+            stack: String(error?.stack ?? '').split('\n').slice(0, 5).join(' | '),
+            startedAt,
+          });
+          noteMarkerFailure('error', String(error?.message ?? error));
         } finally {
           relabelGate.relabelling.delete(sessionId);
           bySession.delete(sessionId);
