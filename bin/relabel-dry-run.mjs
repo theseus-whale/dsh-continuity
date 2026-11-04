@@ -85,6 +85,7 @@ const labels = Object.fromEntries(conceptRows.map((r) => [r.label, r.description
 const kinds = Object.fromEntries(conceptRows.map((r) => [r.label, r.kind]));
 const concepts = conceptRows.map((r) => r.label);
 const topics = conceptRows.filter((r) => r.kind === 'topic').map((r) => r.label);
+const workflowNames = conceptRows.filter((r) => r.kind === 'workflow').map((r) => r.label);
 
 // ---------- raw 读取：支持纯 jsonl 与"一串 zstd 帧" ----------
 function readRawLines(file) {
@@ -188,30 +189,44 @@ const scoreOfRecord = (record, concept) => {
 };
 
 // ---------- baseline ----------
+// v2 文件形如 {version:2, topics:{...}, workflows:{...}}；v1 只有 samples（当作 topics）
 let explicitBaseline = null;
+let workflowBaseline = null;
 let baselineSource = 'leave-one-out(演练用)';
 if (baselineFile && baselineFile !== true) {
   const raw = JSON.parse(fs.readFileSync(baselineFile, 'utf8').replace(/^\uFEFF/, ''));
-  const source = raw?.samples && typeof raw.samples === 'object' ? raw.samples : raw;
-  explicitBaseline = Object.fromEntries(topics.map((t) => {
-    const value = source?.[t];
+  const topicSource = raw?.topics && typeof raw.topics === 'object'
+    ? raw.topics
+    : (raw?.samples && typeof raw.samples === 'object' ? raw.samples : raw);
+  const workflowSource = raw?.workflows && typeof raw.workflows === 'object' ? raw.workflows : null;
+
+  const buildMap = (source, names) => Object.fromEntries(names.map((name) => {
+    const value = source?.[name];
     if (Array.isArray(value)) {
       const nums = value.map((x) => Number(x)).filter((x) => Number.isFinite(x));
-      return [t, nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : Number.NaN];
+      return [name, nums.length > 0 ? nums.reduce((a, b) => a + b, 0) / nums.length : Number.NaN];
     }
-    if (value === undefined || value === null || value === '') return [t, Number.NaN];
+    if (value === undefined || value === null || value === '') return [name, Number.NaN];
     const n = Number(value);
-    return [t, Number.isFinite(n) ? n : Number.NaN];
+    return [name, Number.isFinite(n) ? n : Number.NaN];
   }));
-  const known = Object.values(explicitBaseline).filter((v) => Number.isFinite(v));
-  if (known.length > 0) {
+
+  const fill = (map, names) => {
+    const known = Object.values(map).filter((v) => Number.isFinite(v));
+    if (known.length === 0) return null;
     const fallback = known.reduce((a, b) => a + b, 0) / known.length;
-    for (const t of topics) if (!Number.isFinite(explicitBaseline[t])) explicitBaseline[t] = fallback;
-  } else {
-    explicitBaseline = null;
+    for (const name of names) if (!Number.isFinite(map[name])) map[name] = fallback;
+    return map;
+  };
+
+  explicitBaseline = fill(buildMap(topicSource, topics), topics);
+  if (workflowSource) workflowBaseline = fill(buildMap(workflowSource, workflowNames), workflowNames);
+
+  if (!explicitBaseline && !workflowBaseline) {
     baselineSource = 'raw-bootstrap(文件无样本)';
+  } else if (explicitBaseline) {
+    baselineSource = `file:${baselineFile}`;
   }
-  if (explicitBaseline) baselineSource = `file:${baselineFile}`;
 }
 
 // ---------- 逐轮重打（只读） ----------
@@ -288,6 +303,7 @@ for (const item of evaluated) {
     maxChunks,
     topicTopK: 1,
     topicBaseline: baseline ?? undefined,
+    workflowBaseline: workflowBaseline ?? undefined,
   });
 
   const oldTopic = topicOfRecord(item.record);
