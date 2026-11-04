@@ -94,6 +94,7 @@ export async function writeHandoff({ home, parentSessionId, envelope }) {
         source,
         path: written.row.path,
         seq: artifactSeq,
+        mime: written.row.mime,
         sha256: written.row.sha256,
         bytes: written.row.bytes,
       });
