@@ -56,7 +56,7 @@ function liveNote(events, query, { beforeTurn = Infinity } = {}) {
 }
 
 function autoSpecialKeywords(words) {
-  // One-character Chinese names/emoji are too common as vocatives ("单字称呼看看").
+  // One-character Chinese names/emoji are too common as vocatives ("创看看").
   // They remain available through manual recall(), but do not auto-trigger.
   return words.filter((word) => [...String(word)].length >= 2);
 }
@@ -263,6 +263,7 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
       labels,
       kinds,
       keywordsFile: keywordsPath,
+      cmapFile: cmapPath,
       onError: logIndexError,
       onCost: (cost) => appendCostLog(defaultCostLogPath(), cost),
     });
@@ -321,6 +322,7 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
     labels: initialLabels,
     kinds: initialKinds,
     keywordsFile: keywordsPath,
+    cmapFile: cmapPath,
     onError: logIndexError,
     onCost: (cost) => appendCostLog(defaultCostLogPath(), cost),
   }) : null;

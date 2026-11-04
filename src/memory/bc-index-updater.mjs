@@ -11,7 +11,7 @@ import { createBLabeler } from './bc-label.mjs';
 import { extractKeywords, makeRecord } from './bc-recall.mjs';
 import { loadIndexJsonl, saveIndexJsonl } from './bc-index.mjs';
 import { loadSpecialKeywords, matchSpecialKeywords } from './special-keywords.mjs';
-import { defaultCMapPath, loadCMapEntries } from './cmap-file.mjs';
+import { loadCMapEntries } from './cmap-file.mjs';
 import { buildDf, chatterScore } from './chatter.mjs';
 import { eventText } from '../session-log.mjs';
 
@@ -139,6 +139,7 @@ export function createIndexUpdater({
 } = {}) {
   let activeLabeler = labeler;
   let running = false;
+  let warnedMissingCmap = false;
 
   const readState = () => {
     if (stateFile === null) return {};
@@ -199,9 +200,17 @@ export function createIndexUpdater({
       const specialKeywords = keywordsFile && !fs.existsSync(keywordsFile)
         ? []
         : loadSpecialKeywords(keywordsFile ?? undefined);
-      const cmapTerms = loadCMapEntries(cmapFile ?? defaultCMapPath())
-        .map((entry) => entry.term)
-        .filter((term) => typeof term === 'string' && term.length > 0);
+      const cmapTerms = cmapFile === null
+        ? []
+        : loadCMapEntries(cmapFile)
+          .map((entry) => entry.term)
+          .filter((term) => typeof term === 'string' && term.length > 0);
+      if (cmapFile === null && !warnedMissingCmap) {
+        warnedMissingCmap = true;
+        const error = new Error('cmapFile not provided; C terms skipped');
+        error.code = 'cmap-file-missing';
+        onError?.(error);
+      }
       const df = buildDf([
         ...records.map((record) => (record.keywords ?? []).join(' ')),
         ...turns.map((entry) => entry.texts.join('\n')),
