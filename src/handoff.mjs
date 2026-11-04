@@ -64,12 +64,15 @@ export async function writeHandoff({ home, parentSessionId, envelope }) {
   const artifacts = [];
   const artifactSources = [];
   const unresolvedArtifacts = [];
-  for (const source of normalized.artifacts) {
+  const baseSeq = normalized.sourceSeqs[0] ?? 0;
+  for (let index = 0; index < normalized.artifacts.length; index += 1) {
+    const source = normalized.artifacts[index];
     try {
       if (!fs.existsSync(source) || !fs.statSync(source).isFile()) {
         unresolvedArtifacts.push({ source, reason: 'not-a-file' });
         continue;
       }
+      const artifactSeq = baseSeq + index + 1;
       const written = await writeChildAsset({
         home,
         parentSessionId,
@@ -80,7 +83,7 @@ export async function writeHandoff({ home, parentSessionId, envelope }) {
           path: source,
           name: path.basename(source),
         },
-        seq: normalized.sourceSeqs[0] ?? 0,
+        seq: artifactSeq,
       });
       if (!written.ok) {
         unresolvedArtifacts.push({ source, reason: written.reason ?? 'no-payload' });
@@ -90,6 +93,7 @@ export async function writeHandoff({ home, parentSessionId, envelope }) {
       artifactSources.push({
         source,
         path: written.row.path,
+        seq: artifactSeq,
         sha256: written.row.sha256,
         bytes: written.row.bytes,
       });

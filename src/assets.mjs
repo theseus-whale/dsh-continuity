@@ -19,6 +19,15 @@ const MIME_EXT = Object.freeze({
   'text/plain': '.txt',
 });
 
+const EXT_MIME = Object.freeze(Object.fromEntries(
+  Object.entries(MIME_EXT).map(([mime, ext]) => [ext, mime]),
+));
+
+function mimeFromPath(value) {
+  const ext = path.extname(String(value ?? '')).toLowerCase();
+  return EXT_MIME[ext] ?? null;
+}
+
 function safeId(value, fallback) {
   const text = String(value ?? '').replace(/[^a-zA-Z0-9._-]/g, '');
   return text.length > 0 ? text.slice(0, 160) : fallback;
@@ -77,11 +86,11 @@ export function blockPayload(block) {
   }
   const sourcePath = block.attachment?.path ?? block.path ?? block.source?.path;
   if (typeof sourcePath === 'string' && sourcePath.length > 0 && fs.existsSync(sourcePath)) {
-    return { buffer: fs.readFileSync(sourcePath), sourcePath, mime };
+    return { buffer: fs.readFileSync(sourcePath), sourcePath, mime: mime ?? mimeFromPath(sourcePath) };
   }
   const stored = attachmentObjectPath(block.attachment?.attachmentId ?? block.attachmentId);
   if (stored !== null && fs.existsSync(stored)) {
-    return { buffer: fs.readFileSync(stored), sourcePath: stored, mime };
+    return { buffer: fs.readFileSync(stored), sourcePath: stored, mime: mime ?? mimeFromPath(stored) };
   }
   return null;
 }
@@ -101,7 +110,8 @@ export function blockMeta(block) {
   return {
     kind,
     name,
-    mime: payload?.mime ?? block?.mimeType ?? block?.mime ?? null,
+    mime: payload?.mime ?? block?.mimeType ?? block?.mime
+      ?? mimeFromPath(block?.attachment?.path ?? block?.path ?? block?.source?.path ?? name),
     bytes: Number.isFinite(size) ? size : (payload?.buffer.length ?? null),
     sourcePath: payload?.sourcePath ?? null,
   };

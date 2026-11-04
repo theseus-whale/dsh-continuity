@@ -1,4 +1,4 @@
-# Continuity architecture — 4.11.4
+# Continuity architecture — 4.11.5
 
 ## 1. Shape
 
