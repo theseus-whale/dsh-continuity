@@ -30,6 +30,16 @@ function cosine(a, b) {
   return dot;
 }
 
+function chunkText(text, { chunkChars = 600, maxChunks = 12 } = {}) {
+  const value = String(text ?? '');
+  if (value.length <= chunkChars) return [value];
+  const chunks = [];
+  for (let start = 0; start < value.length && chunks.length < maxChunks; start += chunkChars) {
+    chunks.push(value.slice(start, start + chunkChars));
+  }
+  return chunks;
+}
+
 export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labels = GENERIC_LABELS, kinds = null } = {}) {
   if (typeof embed !== 'function') throw new Error('B labeler needs an embed function');
   let ready = null;
@@ -44,8 +54,61 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
     ready = { labels: names, vectors: vectors.map(normalizeVector) };
     return ready;
   }
+  function decide(scored, {
+    topK = 3,
+    minScore = 0.25,
+    topicMinScore = 0.33,
+    topicMargin = 0.03,
+    topicTopK = 1,
+    workflowTopK = 2,
+    vector = [],
+    chunks = 1,
+  } = {}) {
+    if (split) {
+      const topics = scored
+        .filter((item) => kindOf(item.concept) === 'topic')
+        .sort((a, b) => b.score - a.score);
+      const topTopic = topics[0];
+      const secondTopic = topics[1];
+      const topicPasses = topTopic !== undefined
+        && topTopic.score >= topicMinScore
+        && (secondTopic === undefined || topTopic.score - secondTopic.score >= topicMargin);
+      const topicCandidates = topicPasses
+        ? topics.slice(0, Math.max(1, topicTopK))
+        : [];
+      const workflow = scored
+        .filter((item) => kindOf(item.concept) === 'workflow' && item.score >= minScore)
+        .slice(0, workflowTopK);
+      const candidates = [...topicCandidates, ...workflow]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, topicCandidates.length + workflowTopK);
+      const scores = Object.fromEntries([...topicCandidates, ...workflow].map((item) => [item.concept, item.score]));
+      return {
+        candidates,
+        topic: topicCandidates,
+        workflow,
+        scores,
+        topicScore: topicCandidates.length > 0 ? topTopic.score : null,
+        topicConfidence: topicCandidates.length > 0 ? confidenceOf(topTopic.score) : null,
+        topicMinScore,
+        topicMargin,
+        chunks,
+        unknown: candidates.length === 0,
+        top: topicCandidates[0] ?? workflow[0] ?? null,
+        vector,
+        version: 2,
+      };
+    }
+    const candidates = scored.filter((item) => item.score >= minScore).slice(0, topK);
+    return {
+      candidates,
+      unknown: candidates.length === 0 || candidates[0].score < minScore,
+      top: candidates[0] ?? null,
+      vector,
+    };
+  }
   return {
-    async label(text, { topK = 3, minScore = 0.25, topicMinScore = 0.33, topicTopK = 1, workflowTopK = 2 } = {}) {
+    async label(text, options = {}) {
       const prepared = await prepare();
       const [rawVector] = await embed([String(text ?? '')]);
       const vector = normalizeVector(rawVector);
@@ -56,37 +119,35 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
         concept,
         score: cosine(vector, prepared.vectors[index]),
       })).sort((a, b) => b.score - a.score);
-
-      if (split) {
-        const topic = scored.find((item) => kindOf(item.concept) === 'topic' && item.score >= topicMinScore);
-        const topicCandidates = topic === undefined ? [] : [topic];
-        const workflow = scored
-          .filter((item) => kindOf(item.concept) === 'workflow' && item.score >= minScore)
-          .slice(0, workflowTopK);
-        const candidates = [...topicCandidates, ...workflow].sort((a, b) => b.score - a.score).slice(0, 1 + workflowTopK);
-        const scores = Object.fromEntries([...topicCandidates, ...workflow].map((item) => [item.concept, item.score]));
-        return {
-          candidates,
-          topic: topicCandidates,
-          workflow,
-          scores,
-          topicScore: topic?.score ?? null,
-          topicConfidence: topic ? confidenceOf(topic.score) : null,
-          topicMinScore,
-          unknown: candidates.length === 0,
-          top: topic ?? workflow[0] ?? null,
-          vector,
-          version: 2,
-        };
+      return decide(scored, { ...options, vector, chunks: 1 });
+    },
+    async labelChunked(text, options = {}) {
+      const prepared = await prepare();
+      const chunks = chunkText(text, options);
+      if (prepared.labels.length === 0) {
+        return { candidates: [], unknown: true, top: null, vector: [], ...(split ? { version: 2, topic: [], workflow: [], scores: {} } : {}) };
       }
-
-      const candidates = scored.filter((item) => item.score >= minScore).slice(0, topK);
-      return {
-        candidates,
-        unknown: candidates.length === 0 || candidates[0].score < minScore,
-        top: candidates[0] ?? null,
-        vector,
-      };
+      const best = new Map();
+      const vectors = [];
+      for (const chunk of chunks) {
+        const [rawVector] = await embed([chunk]);
+        const vector = normalizeVector(rawVector);
+        vectors.push(vector);
+        for (let index = 0; index < prepared.labels.length; index += 1) {
+          const concept = prepared.labels[index];
+          const score = cosine(vector, prepared.vectors[index]);
+          if (!best.has(concept) || score > best.get(concept)) best.set(concept, score);
+        }
+      }
+      const summed = new Array(vectors[0]?.length ?? 0).fill(0);
+      for (const vector of vectors) {
+        for (let index = 0; index < summed.length; index += 1) summed[index] += vector[index] ?? 0;
+      }
+      const vector = normalizeVector(summed);
+      const scored = [...best.entries()]
+        .map(([concept, score]) => ({ concept, score }))
+        .sort((a, b) => b.score - a.score);
+      return decide(scored, { ...options, vector, chunks: chunks.length });
     },
   };
 }

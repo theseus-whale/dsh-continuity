@@ -123,7 +123,18 @@ export function createIndexUpdater({
       const labelStarted = performance.now();
       for (const entry of turns) {
         const text = entry.texts.join('\n');
-        const label = await activeLabeler.label(text, { topK: 3, minScore: 0.25, topicMinScore: 0.33 });
+        const labelOptions = {
+          topK: 3,
+          minScore: 0.25,
+          topicMinScore: 0.33,
+          topicMargin: 0.03,
+          topicTopK: 1,
+          chunkChars: 600,
+          maxChunks: 12,
+        };
+        const label = typeof activeLabeler.labelChunked === 'function'
+          ? await activeLabeler.labelChunked(text, labelOptions)
+          : await activeLabeler.label(text, labelOptions);
         const isV2 = label.version === 2;
         const generic = label.candidates.map((candidate) => candidate.concept);
         const conceptScores = Object.fromEntries(
