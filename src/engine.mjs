@@ -90,6 +90,7 @@ import {
   activePinSeqs,
   compressionBudget,
   handleNonTextToolResult,
+  isImageToolResult,
   nonTextInfo,
   oldestPinIndex,
   pauseActiveToolResult,
@@ -622,9 +623,9 @@ export class ContinuityEngine extends BaseEngine {
   }
 
   /**
-   * D: replace every non-text tool result with a small semantic handle before
-   * the next request. The raw event is untouched; the handle is a normal
-   * tool/result with the same call id.
+   * D: replace non-text tool results with a small semantic handle before the
+   * next request, except images, which stay in the model context. The raw event
+   * is untouched; the handle is a normal tool/result with the same call id.
    */
   async handleNonTextResults(agent, signal) {
     const session = agent.session;
@@ -636,6 +637,7 @@ export class ContinuityEngine extends BaseEngine {
     for (const seq of [...session.surface.nodes]) {
       const event = session.eventAt(seq);
       if (nonTextInfo(event) === null) continue;
+      if (isImageToolResult(event)) continue;
       const callId = event.data?.message?.source?.callId ?? event.data?.message?.toolCallId;
       const meta = callId === undefined || callId === null ? undefined : calls.get(String(callId));
       let semantic = null;

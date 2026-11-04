@@ -305,6 +305,12 @@ export function nonTextInfo(event) {
   };
 }
 
+/** Images stay in the model context; other non-text result types use handles. */
+export function isImageToolResult(event) {
+  const info = nonTextInfo(event);
+  return info !== null && info.types.includes('image');
+}
+
 function argsPreview(args) {
   return String(args ?? '').replace(/\s+/g, ' ').trim().slice(0, 160);
 }
