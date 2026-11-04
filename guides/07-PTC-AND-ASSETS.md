@@ -1,4 +1,4 @@
-# 06 · PTC / 子 agent / assets
+# 07 · PTC / 子 agent / assets
 
 这一节解决一个具体问题：
 

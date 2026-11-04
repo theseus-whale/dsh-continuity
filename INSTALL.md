@@ -1,7 +1,7 @@
 # 安装
 
 ```text
-dsh plugin add ./dsh-continuity-4.11.7.tgz
+dsh plugin add ./dsh-continuity-4.11.8.tgz
 ```
 
 装完重启 DSH。
