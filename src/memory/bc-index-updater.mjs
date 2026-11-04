@@ -20,20 +20,23 @@ const MACHINE = /^(?:Current runtime context|Current working directory|Current D
 const BASELINE_WINDOW = 300;
 
 function emptyBaseline() {
-  return { version: 1, window: BASELINE_WINDOW, samples: {} };
+  return { version: 2, window: BASELINE_WINDOW, topics: {}, workflows: {} };
 }
 
 function loadBaseline(file) {
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
-    if (parsed && parsed.version === 1 && parsed.samples && typeof parsed.samples === 'object') return parsed;
+    if (parsed && parsed.version === 2 && parsed.topics && parsed.workflows) return parsed;
+    if (parsed && parsed.version === 1 && parsed.samples && typeof parsed.samples === 'object') {
+      return { version: 2, window: BASELINE_WINDOW, topics: parsed.samples, workflows: {} };
+    }
   } catch { /* first run */ }
   return emptyBaseline();
 }
 
-function baselineMeans(state) {
+function baselineMeans(state, group = 'topics') {
   const means = {};
-  for (const [concept, samples] of Object.entries(state?.samples ?? {})) {
+  for (const [concept, samples] of Object.entries(state?.[group] ?? {})) {
     if (!Array.isArray(samples) || samples.length === 0) continue;
     means[concept] = samples.reduce((sum, value) => sum + Number(value || 0), 0) / samples.length;
   }
@@ -46,14 +49,15 @@ function baselineGlobalMean(means) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function updateBaseline(state, scores) {
+function updateBaseline(state, scores, group = 'topics') {
   if (!scores || typeof scores !== 'object') return state;
+  if (!state[group] || typeof state[group] !== 'object') state[group] = {};
   for (const [concept, score] of Object.entries(scores)) {
     if (!Number.isFinite(Number(score))) continue;
-    const samples = Array.isArray(state.samples[concept]) ? state.samples[concept] : [];
+    const samples = Array.isArray(state[group][concept]) ? state[group][concept] : [];
     samples.push(Number(score));
     if (samples.length > BASELINE_WINDOW) samples.shift();
-    state.samples[concept] = samples;
+    state[group][concept] = samples;
   }
   return state;
 }
@@ -189,8 +193,10 @@ export function createIndexUpdater({
 
       const resolvedBaselineFile = baselineFile ?? path.join(path.dirname(file), 'bc-topic-baseline.json');
       const baseline = loadBaseline(resolvedBaselineFile);
-      const baselineMeansMap = baselineMeans(baseline);
-      const baselineFallback = baselineGlobalMean(baselineMeansMap);
+      const topicMeans = baselineMeans(baseline, 'topics');
+      const topicFallback = baselineGlobalMean(topicMeans);
+      const workflowMeans = baselineMeans(baseline, 'workflows');
+      const workflowFallback = baselineGlobalMean(workflowMeans);
 
       if (activeLabeler === null) activeLabeler = createBLabeler({
         embed: embedTexts,
@@ -226,15 +232,21 @@ export function createIndexUpdater({
           topicCenterMin: 0.02,
           topicLead: 0.02,
           topicTopK: 1,
-          topicBaseline: baselineMeansMap,
-          topicBaselineFallback: baselineFallback,
+          workflowTopK: 2,
+          workflowCenterMin: 0.02,
+          workflowLead: 0.02,
+          topicBaseline: topicMeans,
+          topicBaselineFallback: topicFallback,
+          workflowBaseline: workflowMeans,
+          workflowBaselineFallback: workflowFallback,
           chunkChars: 600,
           maxChunks: 12,
         };
         const label = typeof activeLabeler.labelChunked === 'function'
           ? await activeLabeler.labelChunked(text, labelOptions)
           : await activeLabeler.label(text, labelOptions);
-        updateBaseline(baseline, label.topicScores);
+        updateBaseline(baseline, label.topicScores, 'topics');
+        updateBaseline(baseline, label.workflowScores, 'workflows');
         const isV2 = label.version === 2;
         const generic = label.candidates.map((candidate) => candidate.concept);
         const conceptScores = Object.fromEntries(

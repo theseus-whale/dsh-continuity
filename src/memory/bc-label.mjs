@@ -62,8 +62,12 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
     topicLead = 0.02,
     topicTopK = 1,
     workflowTopK = 2,
+    workflowCenterMin = 0.02,
+    workflowLead = 0.02,
     topicBaseline = null,
     topicBaselineFallback = null,
+    workflowBaseline = null,
+    workflowBaselineFallback = null,
     vector = [],
     chunks = 1,
   } = {}) {
@@ -91,11 +95,33 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
       const topicCandidates = topicPasses
         ? topics.slice(0, Math.max(1, topicTopK))
         : [];
-      const workflow = scored
-        .filter((item) => kindOf(item.concept) === 'workflow' && item.score >= minScore)
-        .slice(0, workflowTopK);
+      const workflows = scored
+        .filter((item) => kindOf(item.concept) === 'workflow')
+        .map((item) => {
+          const center = Number.isFinite(workflowBaseline?.[item.concept])
+            ? workflowBaseline[item.concept]
+            : (Number.isFinite(workflowBaselineFallback) ? workflowBaselineFallback : 0);
+          return {
+            concept: item.concept,
+            score: item.score,
+            rawScore: item.score,
+            centered: item.score - center,
+          };
+        })
+        .sort((a, b) => b.centered - a.centered);
+      const topWorkflow = workflows[0];
+      const secondWorkflow = workflows[1];
+      const workflowPasses = topWorkflow !== undefined
+        && topWorkflow.rawScore >= minScore
+        && topWorkflow.centered >= workflowCenterMin
+        && (secondWorkflow === undefined || topWorkflow.centered - secondWorkflow.centered >= workflowLead);
+      const workflow = workflowPasses
+        ? workflows
+          .slice(0, Math.max(0, workflowTopK))
+          .filter((item) => item.rawScore >= minScore && item.centered >= workflowCenterMin)
+        : [];
       const candidates = [...topicCandidates, ...workflow]
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => b.rawScore - a.rawScore)
         .slice(0, topicCandidates.length + workflowTopK);
       const scores = Object.fromEntries([...topicCandidates, ...workflow].map((item) => [item.concept, item.rawScore]));
       return {
@@ -105,14 +131,20 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
         scores,
         topicScores: Object.fromEntries(topics.map((item) => [item.concept, item.rawScore])),
         topicCenteredScores: Object.fromEntries(topics.map((item) => [item.concept, item.centered])),
+        workflowScores: Object.fromEntries(workflows.map((item) => [item.concept, item.rawScore])),
+        workflowCenteredScores: Object.fromEntries(workflows.map((item) => [item.concept, item.centered])),
         topicScore: topicCandidates.length > 0 ? topTopic.rawScore : null,
         topicCenteredScore: topicCandidates.length > 0 ? topTopic.centered : null,
         topicConfidence: topicCandidates.length > 0 ? confidenceOf(topTopic.rawScore) : null,
         topicMinScore,
         topicCenterMin,
         topicLead,
+        workflowCenterMin,
+        workflowLead,
         topicBaseline,
         topicBaselineFallback,
+        workflowBaseline,
+        workflowBaselineFallback,
         chunks,
         unknown: candidates.length === 0,
         top: topicCandidates[0] ?? workflow[0] ?? null,
