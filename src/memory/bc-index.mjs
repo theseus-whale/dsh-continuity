@@ -16,6 +16,7 @@ export function toPointer(record) {
     ...(Number.isFinite(record.topicScore) ? { topicScore: record.topicScore } : {}),
     ...(typeof record.topicConfidence === 'string' && record.topicConfidence ? { topicConfidence: record.topicConfidence } : {}),
     ...(Number.isFinite(record.topicMinScore) ? { topicMinScore: record.topicMinScore } : {}),
+    ...(typeof record.labelStamp === 'string' && record.labelStamp ? { labelStamp: record.labelStamp } : {}),
     labelVersion: Number.isInteger(record.labelVersion) ? record.labelVersion : 1,
     terms: record.terms ?? [],
     keywords: record.keywords ?? [],

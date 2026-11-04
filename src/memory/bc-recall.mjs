@@ -157,7 +157,7 @@ export function learnFromReference(cmap, term, evidence, records = [], { backgro
   return { ok: true, term: normalizeTerm(term), allOf, anyOf, generic, records: learnedRecords };
 }
 
-export function makeRecord({ turn, seqStart, seqEnd, text, generic = [], genericTopic = null, genericWorkflow = null, topicScore = null, topicConfidence = null, topicMinScore = null, labelVersion = 1, terms = [], confidence = 1, status = 'confirmed', conceptScores = {}, keywords = [], backfilled = [], vec = null, chatter = null, sessionId = null }) {
+export function makeRecord({ turn, seqStart, seqEnd, text, generic = [], genericTopic = null, genericWorkflow = null, topicScore = null, topicConfidence = null, topicMinScore = null, labelStamp = null, labelVersion = 1, terms = [], confidence = 1, status = 'confirmed', conceptScores = {}, keywords = [], backfilled = [], vec = null, chatter = null, sessionId = null }) {
   return {
     turn: Number.isInteger(turn) ? turn : null,
     seqStart: Number.isInteger(seqStart) ? seqStart : null,
@@ -169,6 +169,7 @@ export function makeRecord({ turn, seqStart, seqEnd, text, generic = [], generic
     ...(Number.isFinite(topicScore) ? { topicScore: Number(topicScore) } : {}),
     ...(typeof topicConfidence === 'string' && topicConfidence ? { topicConfidence } : {}),
     ...(Number.isFinite(topicMinScore) ? { topicMinScore: Number(topicMinScore) } : {}),
+    ...(typeof labelStamp === 'string' && labelStamp ? { labelStamp } : {}),
     ...(Number.isInteger(labelVersion) ? { labelVersion } : {}),
     terms: [...new Set(terms.map(normalizeTerm).filter(Boolean))],
     keywords: [...new Set(keywords.map(normalizeTerm).filter(Boolean))],

@@ -198,6 +198,15 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
   const isJsonl = /\.jsonl$/i.test(resolvedStore);
   const scoped = sessionScoped === null ? (storePath === null && isJsonl) : sessionScoped === true;
   const sessionsDir = join(dirname(resolvedStore), 'sessions');
+  // 迁移互斥用的共享 gate：迁移期间（本 session 在 relabelling 里，或本进程持有文件锁）
+  // updater 一律不写盘、不推进 state；被挡的行进 pending 队列（updater 内部）。
+  const relabelGate = {
+    relabelling: new Set(),
+    lockOwned: false,
+    isBlocked(sessionId) {
+      return this.lockOwned === true || (sessionId !== undefined && this.relabelling.has(sessionId));
+    },
+  };
   const resolveSessionQuery = () => {
     if (sessionQuery && typeof sessionQuery.readSession === 'function') return sessionQuery;
     if (typeof ctx.get === 'function') return ctx.get('sessionQuery');
@@ -264,6 +273,8 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
       kinds,
       keywordsFile: keywordsPath,
       cmapFile: cmapPath,
+      conceptsFile: conceptsPath,
+      gate: relabelGate,
       onError: logIndexError,
       onCost: (cost) => appendCostLog(defaultCostLogPath(), cost),
     });
@@ -323,6 +334,8 @@ export function installBCPreStep(ctx, { enabled = false, storePath = null, prefi
     kinds: initialKinds,
     keywordsFile: keywordsPath,
     cmapFile: cmapPath,
+    conceptsFile: conceptsPath,
+    gate: relabelGate,
     onError: logIndexError,
     onCost: (cost) => appendCostLog(defaultCostLogPath(), cost),
   }) : null;

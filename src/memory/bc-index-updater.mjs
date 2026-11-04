@@ -6,8 +6,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { embedTexts } from '../facets/embedding.mjs';
-import { createBLabeler } from './bc-label.mjs';
+import { createBLabeler, LABELER_VERSION } from './bc-label.mjs';
 import { extractKeywords, makeRecord } from './bc-recall.mjs';
 import { loadIndexJsonl, saveIndexJsonl } from './bc-index.mjs';
 import { loadSpecialKeywords, matchSpecialKeywords } from './special-keywords.mjs';
@@ -18,6 +19,20 @@ import { eventText } from '../session-log.mjs';
 const INJECTED = /^\[(?:抽取|工作线|标签|规则|习惯|技能|归位|候选|存\?|闸|回正|学习|追忆|记忆|continuity:[a-z-]+)\]/;
 const MACHINE = /^(?:Current runtime context|Current working directory|Current DSH file policy|Approval prompts|Time sampled)/;
 const BASELINE_WINDOW = 300;
+// 打标阈值：既喂给 labeler，也参与 labelStamp 的计算（改这里等于改依据）
+export const TOPIC_THRESHOLDS = Object.freeze({ topicMinScore: 0.33, centerMin: 0.02, lead: 0.02 });
+
+/**
+ * labelStamp：这一行是"用哪套依据"标的。
+ * stamp = sha256(concepts.md 内容 | 阈值 | LABELER_VERSION)[:12]
+ * 表没变、阈值没变、判定逻辑没变 → stamp 不变 → 增量迁移时这行不需要重标。
+ */
+export function computeLabelStamp({ conceptsText = '', thresholds = TOPIC_THRESHOLDS, labelerVersion = LABELER_VERSION } = {}) {
+  return createHash('sha256')
+    .update(`${conceptsText}|${thresholds.topicMinScore}|${thresholds.centerMin}|${thresholds.lead}|${labelerVersion}`)
+    .digest('hex')
+    .slice(0, 12);
+}
 
 function emptyBaseline() {
   return { version: 2, window: BASELINE_WINDOW, topics: {}, workflows: {} };
@@ -137,6 +152,8 @@ export function createIndexUpdater({
   kinds = null,
   keywordsFile = null,
   cmapFile = null,
+  conceptsFile = null,
+  gate = null,
   maxPerRun = 8,
   onError = null,
   onCost = null,
@@ -144,6 +161,10 @@ export function createIndexUpdater({
   let activeLabeler = labeler;
   let running = false;
   let warnedMissingCmap = false;
+  // 保存的是 promise 而不是 bool：bool 在"刚结束但尚未置回"的窗口里不可靠
+  let runningPromise = null;
+  // gate 命中时被挡下的行留在这里，下一轮先合并再写（不丢数据）
+  const pendingBySession = new Map();
 
   const readState = () => {
     if (stateFile === null) return {};
@@ -156,14 +177,30 @@ export function createIndexUpdater({
       fs.writeFileSync(stateFile, JSON.stringify(value, null, 2), 'utf8');
     } catch { /* state failure must not block indexing */ }
   };
+  const takePending = (sessionId) => {
+    const rows = pendingBySession.get(sessionId) ?? [];
+    pendingBySession.delete(sessionId);
+    return rows;
+  };
+  const pushPending = (sessionId, rows) => {
+    if (!rows || rows.length === 0) return;
+    const existing = pendingBySession.get(sessionId) ?? [];
+    const byTurn = new Map(existing.map((row) => [row.turn, row]));
+    for (const row of rows) byTurn.set(row.turn, row);
+    pendingBySession.set(sessionId, [...byTurn.values()]);
+  };
 
-  return async function updateIndex({ agent = null, lastTurn = null } = {}) {
-    if (running || !sessionQuery || typeof sessionQuery.readSession !== 'function') return { added: 0, skipped: 'no-session' };
-    running = true;
+  const runOnce = async ({ agent = null, lastTurn = null } = {}) => {
     const started = performance.now();
     try {
       const sessionId = agent?.session?.id;
       if (sessionId === undefined || sessionId === null) return { added: 0, skipped: 'no-session-id' };
+      // labelStamp：本 session 的 concepts.md 内容 + 阈值 + LABELER_VERSION。
+      // 拿不到 concepts.md 就不写 stamp（宁缺勿假，后续迁移会补）。
+      const conceptsText = conceptsFile && fs.existsSync(conceptsFile)
+        ? fs.readFileSync(conceptsFile, 'utf8')
+        : '';
+      const labelStamp = conceptsText ? computeLabelStamp({ conceptsText }) : null;
       const records = loadIndexJsonl(file);
       const maxTurn = records.reduce((max, record) => Number.isInteger(record.turn) ? Math.max(max, record.turn) : max, -1);
       const maxSeq = records.reduce((max, record) => Number.isInteger(record.seqEnd) ? Math.max(max, record.seqEnd) : max, -1);
@@ -273,6 +310,7 @@ export function createIndexUpdater({
             topicMinScore: label.topicMinScore,
           } : {}),
           labelVersion: isV2 ? 2 : 1,
+          ...(labelStamp ? { labelStamp } : {}),
           terms,
           keywords,
           conceptScores,
@@ -284,6 +322,25 @@ export function createIndexUpdater({
         }));
       }
       const labelMs = Math.round(performance.now() - labelStarted);
+      // 先把上一轮被 gate 挡下的行并回来（按 turn 去重），再决定这次能不能写
+      const carried = takePending(sessionId);
+      if (carried.length > 0) {
+        const byTurn = new Map(carried.map((row) => [row.turn, row]));
+        for (const row of added) byTurn.set(row.turn, row);
+        added.splice(0, added.length, ...[...byTurn.values()].sort((a, b) => Number(a.turn) - Number(b.turn)));
+      }
+      // 互斥 B：正在迁移期间不写盘，且**不推进 state / 不写 baseline**
+      // 被挡的行进 pendingBySession，下一轮先合并再写——否则这些轮次会永久丢失
+      if (gate && typeof gate.isBlocked === 'function' && gate.isBlocked(sessionId)) {
+        pushPending(sessionId, added);
+        return {
+          added: 0,
+          skipped: 'relabel',
+          blocked: true,
+          pending: (pendingBySession.get(sessionId) ?? []).length,
+          maxTurn,
+        };
+      }
       const writeStarted = performance.now();
       saveIndexJsonl(file, [...records, ...added]);
       saveBaseline(resolvedBaselineFile, baseline);
@@ -311,10 +368,28 @@ export function createIndexUpdater({
         onError?.(error);
       } catch { /* ignore */ }
       return { added: 0, error: String(error?.message ?? error) };
-    } finally {
-      running = false;
     }
   };
+
+  const updateIndex = async (payload = {}) => {
+    if (!sessionQuery || typeof sessionQuery.readSession !== 'function') return { added: 0, skipped: 'no-session' };
+    if (runningPromise) return { added: 0, skipped: 'busy' };
+    running = true;
+    runningPromise = runOnce(payload).finally(() => {
+      running = false;
+      runningPromise = null;
+    });
+    return runningPromise;
+  };
+
+  /** 等当前这一次写盘结束（迁移开始前必须 await）。 */
+  updateIndex.whenIdle = () => runningPromise ?? Promise.resolve();
+  /** 是否正有一次写盘在跑。 */
+  updateIndex.isRunning = () => runningPromise !== null;
+  /** 被 gate 挡下的行数（观测用）。 */
+  updateIndex.pendingCount = (sessionId) => (pendingBySession.get(sessionId) ?? []).length;
+
+  return updateIndex;
 }
 
 export function defaultCostLogPath(home = process.env.USERPROFILE ?? process.env.HOME ?? '') {
