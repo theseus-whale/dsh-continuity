@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { writeChildAsset } from './assets.mjs';
 
 const CONFIDENCE = new Set(['high', 'medium', 'low']);
@@ -49,6 +51,9 @@ export function handoffText(envelope) {
     ...(envelope.decisions.length ? [`decisions: ${envelope.decisions.join(' | ')}`] : []),
     ...(envelope.open.length ? [`open: ${envelope.open.join(' | ')}`] : []),
     ...(envelope.artifacts.length ? [`artifacts: ${envelope.artifacts.join(', ')}`] : []),
+    ...(envelope.unresolvedArtifacts?.length
+      ? [`unresolved artifacts: ${envelope.unresolvedArtifacts.map((item) => item.source).join(', ')}`]
+      : []),
     ...(envelope.sourceSeqs.length ? [`sourceSeqs: ${envelope.sourceSeqs.join(',')}`] : []),
   ].join('\n');
 }
@@ -56,19 +61,62 @@ export function handoffText(envelope) {
 /** Persist the full envelope as a child artifact; the parent gets a pointer. */
 export async function writeHandoff({ home, parentSessionId, envelope }) {
   const normalized = normalizeHandoff(envelope);
-  const payload = Buffer.from(JSON.stringify(normalized, null, 2), 'utf8');
+  const artifacts = [];
+  const artifactSources = [];
+  const unresolvedArtifacts = [];
+  for (const source of normalized.artifacts) {
+    try {
+      if (!fs.existsSync(source) || !fs.statSync(source).isFile()) {
+        unresolvedArtifacts.push({ source, reason: 'not-a-file' });
+        continue;
+      }
+      const written = await writeChildAsset({
+        home,
+        parentSessionId,
+        childSessionId: normalized.childSessionId,
+        runId: normalized.runId,
+        block: {
+          type: 'file',
+          path: source,
+          name: path.basename(source),
+        },
+        seq: normalized.sourceSeqs[0] ?? 0,
+      });
+      if (!written.ok) {
+        unresolvedArtifacts.push({ source, reason: written.reason ?? 'no-payload' });
+        continue;
+      }
+      artifacts.push(written.row.path);
+      artifactSources.push({
+        source,
+        path: written.row.path,
+        sha256: written.row.sha256,
+        bytes: written.row.bytes,
+      });
+    } catch (error) {
+      unresolvedArtifacts.push({ source, reason: String(error?.message ?? error) });
+    }
+  }
+  const result = {
+    ...normalized,
+    artifacts,
+    artifactSources,
+    artifactsResolved: unresolvedArtifacts.length === 0,
+    unresolvedArtifacts,
+  };
+  const payload = Buffer.from(JSON.stringify(result, null, 2), 'utf8');
   const written = await writeChildAsset({
     home,
     parentSessionId,
-    childSessionId: normalized.childSessionId,
-    runId: normalized.runId,
+    childSessionId: result.childSessionId,
+    runId: result.runId,
     block: {
       type: 'file',
       name: 'handoff.json',
       mimeType: 'application/json',
       source: { data: payload.toString('base64'), media_type: 'application/json' },
     },
-    seq: normalized.sourceSeqs[0] ?? 0,
+    seq: result.sourceSeqs[0] ?? 0,
   });
-  return { envelope: normalized, written };
+  return { envelope: result, written };
 }
