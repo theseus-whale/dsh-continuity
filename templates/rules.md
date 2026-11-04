@@ -151,7 +151,7 @@ PTC 是执行层，Continuity 是记忆层；不要把两者混成一个。
 
 - 父 session 是 canonical：A/B/C/K、gist、assets 都由父管。
 - 子 agent 是短命执行上下文；它可以跑长工具，但不要把原始输出倒回父。
-- 启动子 agent 后，childSessionId 用子自己读到的 `DSH_SESSION_ID`；不猜、不硬编码。
+- 启动子 agent 后，childSessionId 用子自己读到的 `DSH_SESSION_ID`；不猜、不硬编码。**workflow 不在最终 return 里回传 childSessionId，必须让子自己写进回执**；subagent 至少给启动 agentId，workflow 连这个都没有。
 - 子回执固定：summary / decisions / open / artifacts / sourceSeqs / confidence。
 - 父调 `ptc_handoff` 登记回执；存在的 artifact 会被复制进 `assets/ptc/<run>/<child>/`，带 mime、sha256、唯一 seq。
 - 缺失的 artifact 会进 `unresolvedArtifacts`（`{source, reason}`，例如 `reason:"not-a-file"`），`artifactsResolved=false`；不要把它当有效指针。

@@ -42,6 +42,9 @@ $env:DSH_SESSION_ID
 
 不要猜、不要硬编码、不要用进程路径推。
 
+**workflow 不在最终 return 里回传 childSessionId**；子必须自己把 `DSH_SESSION_ID` 写进回执。  
+subagent 至少给启动 agentId；workflow 连这个都没有。
+
 ### 3. 子产出
 
 子可以：

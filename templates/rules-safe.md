@@ -170,7 +170,7 @@ peer_message({ to, text, from? })
 ## 9. PTC / 子 agent / assets
 
 - 父 session 是 canonical；子 agent 只是短命执行上下文。
-- 子 id 用子自己读到的 `DSH_SESSION_ID`，不猜。
+- 子 id 用子自己读到的 `DSH_SESSION_ID`，不猜。**workflow 不回传 childSessionId，必须让子写进回执**。
 - 子回执：summary / decisions / open / artifacts / sourceSeqs / confidence。
 - 父用 `ptc_handoff` 登记；artifact 会复制到 `assets/ptc/`，缺失进 `unresolvedArtifacts`（`{source, reason}`），`artifactsResolved=false`。
 - 父图用 `session_asset`，子产物用 `child_asset`；`session_asset list` 只列 parent。
