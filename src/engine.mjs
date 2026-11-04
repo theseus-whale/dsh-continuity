@@ -49,6 +49,7 @@ import { loadAnswered, filterAnswered } from './learning.mjs';
 import { pathToFileURL } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { eventText } from './session-log.mjs';
+import { assetMarker, writeAsset } from './assets.mjs';
 import { planFold, resolvePolicy, calibrateProtect } from './policy.mjs';
 import { annotateSummary, gistHeader, SYSTEM_CONVENTION } from './provenance.mjs';
 import { selectOldestRange } from './range.mjs';
@@ -679,6 +680,38 @@ export class ContinuityEngine extends BaseEngine {
       });
     }
     return { count, chars, tokens };
+  }
+
+  /**
+   * Preserve non-text payloads before their surface range is folded. The
+   * payload lands under sessions/<id>/assets and the gist gets a pointer.
+   */
+  async materializeRangeAssets(agent, start, end) {
+    const session = agent?.session;
+    if (session === undefined || session === null) return [];
+    const home = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
+    const rows = [];
+    for (let seq = start; seq <= end; seq += 1) {
+      const event = session.eventAt?.(seq);
+      const blocks = event?.data?.message?.content;
+      if (!Array.isArray(blocks)) continue;
+      for (const block of blocks) {
+        if (block === null || typeof block !== 'object') continue;
+        if (!['image', 'file', 'audio', 'video'].includes(block.type)) continue;
+        try {
+          const result = await writeAsset({
+            home,
+            sessionId: String(session.id),
+            block,
+            seq,
+          });
+          if (result.ok) rows.push(result.row);
+        } catch (error) {
+          recordError(error?.message ?? String(error), 'asset-write');
+        }
+      }
+    }
+    return rows;
   }
 
   /**
@@ -1608,7 +1641,10 @@ export class ContinuityEngine extends BaseEngine {
       }
     }
     try { this.sweepLoadedCopies(agent); } catch { /* 清扫失败不阻断存段 */ }
-    const threadText = threadGistText(draft);
+    const assetRows = await this.materializeRangeAssets(agent, segment.fromSeq, segment.toSeq);
+    const threadText = [threadGistText(draft), ...assetRows.map((row) => assetMarker(row))]
+      .filter((line) => line.length > 0)
+      .join('\n');
     this.threadGist.set(agent, threadText);
     let result;
     try {
@@ -3305,14 +3341,18 @@ export class ContinuityEngine extends BaseEngine {
     }
 
     const t = await this.tagsForRange(agent, range.start, range.end);
+    const assetRows = await this.materializeRangeAssets(agent, range.start, range.end);
     const header = this.provenance.header
-      ? gistHeader({
-        sessionId: agent.session.id,
-        startSeq: range.start,
-        endSeq: range.end,
-        count: range.count,
-        t,
-      })
+      ? [
+        gistHeader({
+          sessionId: agent.session.id,
+          startSeq: range.start,
+          endSeq: range.end,
+          count: range.count,
+          t,
+        }),
+        ...assetRows.map((row) => assetMarker(row)),
+      ].join('\n')
       : null;
     if (header !== null) this.headers.set(agent, header);
 
@@ -3419,15 +3459,19 @@ export class ContinuityEngine extends BaseEngine {
     await this.recordFolded(agent, result);
     const span = shadowedSpan(result);
 
+    const assetRows = await this.materializeRangeAssets(agent, span.start, span.end);
     const t = await this.tagsForRange(agent, span.start, span.end);
     const header = this.provenance.header
-      ? gistHeader({
-        sessionId: agent.session.id,
-        startSeq: span.start,
-        endSeq: span.end,
-        count: result.shadowedSeqs.length,
-        t,
-      })
+      ? [
+        gistHeader({
+          sessionId: agent.session.id,
+          startSeq: span.start,
+          endSeq: span.end,
+          count: result.shadowedSeqs.length,
+          t,
+        }),
+        ...assetRows.map((row) => assetMarker(row)),
+      ].join('\n')
       : null;
     if (header !== null) {
       try {

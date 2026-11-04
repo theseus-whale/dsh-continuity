@@ -18,6 +18,10 @@ import {
   SessionLogError,
   tailSeqs,
 } from './session-log.mjs';
+import { readAssetIndex, assetMarker } from './assets.mjs';
+import { createSessionAssetTool, createChildAssetTool } from './asset-tool.mjs';
+import { createHandoffTool } from './handoff-tool.mjs';
+import { join } from 'node:path';
 import { continuityState, markSessionLogTool } from './state.mjs';
 
 export const name = 'dsh-continuity/session-log-tool';
@@ -250,9 +254,26 @@ export function createSessionLogTool({ sessionQuery, tokenMeter }) {
 
       try {
         if (action === 'index') {
-          return buildIndex({ sessionId, events, limit: input.limit }).text;
+          const text = buildIndex({ sessionId, events, limit: input.limit }).text;
+          let childRows = [];
+          try {
+            const home = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
+            childRows = (await readAssetIndex({ home, sessionId }))
+              .filter((row) => row.owner === 'child')
+              .slice(-20)
+              .reverse();
+          } catch { /* child assets are optional */ }
+          return childRows.length === 0
+            ? text
+            : [text, 'child assets (use child_asset):', ...childRows.map((row) => assetMarker(row, 'child'))].join('\n');
         }
         if (action === 'get') {
+          let assets = [];
+          try {
+            const home = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
+            assets = (await readAssetIndex({ home, sessionId }))
+              .filter((row) => row.owner === 'parent');
+          } catch { /* markers are optional */ }
           return getRange({
             sessionId,
             events,
@@ -261,6 +282,7 @@ export function createSessionLogTool({ sessionQuery, tokenMeter }) {
             end,
             context: input.context,
             limit: input.limit,
+            assets,
           }).text;
         }
         return grepRange({
@@ -291,4 +313,10 @@ export function apply(ctx) {
     markSessionLogTool({ name: tool.name, scope: 'continuity preset' });
     return dispose;
   });
+  const assetTool = createSessionAssetTool();
+  ctx.effect(() => ctx.tools.register(assetTool));
+  const childAssetTool = createChildAssetTool({ sessionQuery: ctx.sessionQuery });
+  ctx.effect(() => ctx.tools.register(childAssetTool));
+  const handoffTool = createHandoffTool();
+  ctx.effect(() => ctx.tools.register(handoffTool));
 }

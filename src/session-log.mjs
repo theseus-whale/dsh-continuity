@@ -12,6 +12,8 @@
  * through that compaction's `shadowedSeqs` instead of a numeric filter.
  */
 
+import { assetMarker } from './assets.mjs';
+
 export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 100;
 export const DEFAULT_MAX_CHARS = 16_000;
@@ -189,10 +191,14 @@ function findGist(events, start, end) {
     .at(-1) ?? null;
 }
 
-function formatEventForGet(event) {
+function formatEventForGet(event, assetRows = []) {
   const text = eventText(event);
   const body = text.trim().length > 0 ? text : eventSummary(event);
-  return `seq=${event.seq} [${eventRole(event)}] ${formatTime(event.time)}\n${truncate(body, MAX_EVENT_CHARS)}`;
+  const markers = assetRows
+    .map((row) => assetMarker(row, row.owner === 'child' ? 'child' : 'parent'))
+    .join('\n');
+  return `seq=${event.seq} [${eventRole(event)}] ${formatTime(event.time)}\n${truncate(body, MAX_EVENT_CHARS)}`
+    + (markers.length > 0 ? `\n${markers}` : '');
 }
 
 /**
@@ -255,8 +261,16 @@ export function getRange({
   context = 0,
   limit = DEFAULT_LIMIT,
   maxChars = DEFAULT_MAX_CHARS,
+  assets = [],
 }) {
   const list = Array.isArray(events) ? events : [];
+  const assetsBySeq = new Map();
+  for (const row of Array.isArray(assets) ? assets : []) {
+    const key = Number(row?.seq);
+    if (!Number.isInteger(key)) continue;
+    if (!assetsBySeq.has(key)) assetsBySeq.set(key, []);
+    assetsBySeq.get(key).push(row);
+  }
   const bounds = seqBounds(list);
   const hasSeq = seq !== undefined && seq !== null && seq !== '';
   const hasStart = start !== undefined && start !== null && start !== '';
@@ -335,7 +349,7 @@ export function getRange({
   let used = manifest.join('\n').length;
   let returned = 0;
   for (const event of selected.slice(0, take)) {
-    const text = formatEventForGet(event);
+    const text = formatEventForGet(event, assetsBySeq.get(Number(event.seq)) ?? []);
     if (used + text.length > maxChars) {
       if (returned === 0) {
         body.push(truncate(text, maxChars));
