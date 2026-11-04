@@ -21,29 +21,56 @@ function isHuman(event) {
   const source = event?.data?.source ?? event?.source;
   if (source && typeof source.kind === 'string' && source.kind !== 'user') return false;
   if (source && source.peer === true) return false;
-  const text = eventText(event).trim();
+  const text = eventText(event, { includeReasoning: false }).trim();
   return Boolean(text) && !INJECTED.test(text) && !MACHINE.test(text);
 }
 
 function turnsFromEvents(events, afterTurn, afterSeq = -1) {
+  const list = Array.isArray(events) ? events : [];
+  const markers = list
+    .map((event) => ({ seq: Number(event?.seq), turn: Number(event?.data?.turn) }))
+    .filter((item) => Number.isInteger(item.seq) && Number.isInteger(item.turn))
+    .sort((a, b) => a.seq - b.seq);
+  const turnAt = (seq) => {
+    let found = null;
+    for (const marker of markers) {
+      if (marker.seq > seq) break;
+      found = marker.turn;
+    }
+    if (found !== null) return found;
+    const next = markers.find((marker) => marker.seq >= seq);
+    return next?.turn ?? null;
+  };
   const byTurn = new Map();
-  for (const event of events ?? []) {
+  for (const event of list) {
     const type = event?.type;
     if (type !== 'user/message' && type !== 'assistant/message') continue;
     if (type === 'user/message' && !isHuman(event)) continue;
-    const text = eventText(event).trim();
+    const text = eventText(event, { includeReasoning: false }).trim();
     if (!text || INJECTED.test(text) || MACHINE.test(text)) continue;
-    const turn = Number(event?.data?.turn ?? event?.turn);
     const seq = Number(event?.seq);
+    const turn = Number.isInteger(Number(event?.data?.turn))
+      ? Number(event.data.turn)
+      : turnAt(seq);
     if (!Number.isInteger(turn) || !Number.isInteger(seq)) continue;
     if (turn <= afterTurn || seq <= afterSeq) continue;
-    const item = byTurn.get(turn) ?? { turn, seqStart: seq, seqEnd: seq, texts: [] };
+    const item = byTurn.get(turn) ?? {
+      turn,
+      seqStart: seq,
+      seqEnd: seq,
+      userTexts: [],
+      assistantTexts: [],
+      texts: [],
+    };
     item.seqStart = Math.min(item.seqStart, seq);
     item.seqEnd = Math.max(item.seqEnd, seq);
-    item.texts.push(text);
+    if (type === 'user/message') item.userTexts.push(text);
+    else item.assistantTexts.push(text);
     byTurn.set(turn, item);
   }
-  return [...byTurn.values()].sort((a, b) => a.turn - b.turn);
+  return [...byTurn.values()]
+    .map((item) => ({ ...item, texts: [...item.userTexts, ...item.assistantTexts] }))
+    .sort((a, b) => a.turn - b.turn);
 }
 
 export function createIndexUpdater({
