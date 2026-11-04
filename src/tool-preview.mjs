@@ -10,6 +10,8 @@
  * No DSH imports: the engine supplies live events and the token meter.
  */
 
+import fs from 'node:fs';
+
 const DEFAULTS = Object.freeze({
   maxChars: 1280,
   headChars: 900,
@@ -291,7 +293,12 @@ export function nonTextInfo(event) {
       if (typeof name === 'string' && name.length > 0 && !names.includes(name)) names.push(name);
       const path = block.attachment?.path ?? block.path ?? block.source?.path;
       if (typeof path === 'string' && path.length > 0 && !paths.includes(path)) paths.push(path);
-      const size = block.attachment?.size ?? block.size ?? block.bytes;
+      let size = block.attachment?.size ?? block.size ?? block.bytes;
+      if (!Number.isFinite(size) && typeof path === 'string' && path.length > 0) {
+        try {
+          size = fs.statSync(path).size;
+        } catch { /* unknown size remains null */ }
+      }
       if (Number.isFinite(size)) bytes = (bytes ?? 0) + size;
       else {
         const data = block.source?.data ?? block.data ?? block.base64;

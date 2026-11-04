@@ -1,26 +1,30 @@
-# 发行说明 — 4.11.0
+# 发行说明 — 4.11.1
 
-## Assets + PTC handoff（4.11.0）
+## 路径图片字节补全（4.11.1）
+
+read_image 这类只给 name/path 的 image block，bytes 以前为 null，被 4MiB 闸当成非图片而换成 handle。现在 bytes 未知时用 fs.statSync(path).size 补全；仍超过 4MiB 才回 handle。
+
+## Assets + PTC handoff（4.11.1）
 
 新增 sessions/<id>/assets：fold 前把 image/file/audio/video 原样落盘，并写 index.jsonl。session_log 标记 [asset-parent ...]；session_asset 取父资产；child_asset 取 PTC child artifact，并在 child session 仍可读时现场恢复未注册图片；ptc_handoff 把 child envelope 写成父可见 artifact。工具当前返回路径与元数据，不直接返回 image block。
 
-## 图片尺寸闸（4.11.0）
+## 图片尺寸闸（4.11.1）
 
 MAX_INLINE_IMAGE_BYTES = 4 MiB。图片 bytes（attachment.size 或 base64 长度折算）≤4MiB 才保留；超过则回到 non-text handle 并保留原因。这样不依赖宿主 tokenMeter 对 image 的估算。
 
-## 图片结果保留（4.11.0）
+## 图片结果保留（4.11.1）
 
 handleNonTextResults 跳过 image 工具结果；图片不再被替换成 text handle，直接进入模型上下文。file/audio/video 仍走原来的 handle。图片会占 context token，可能触发更高水位或 overflow；这是保留图片的代价。
 
-## coo/peer 双角色兼容（4.11.0）
+## coo/peer 双角色兼容（4.11.1）
 
 load-gate / event-alias-ledger / referent-ledger 同时接受 role/source 的 coo 与 peer；public 版不再把 coo 替换成 peer。pet bridge 传 coo 时行为保留，公共包仍保持 peer 命名。special keywords 默认空是 public 的故意隐私默认，K 表不受影响。
 
-## 4.11.0 修正（4.10.0 作废）
+## 4.11.1 修正（4.10.0 作废）
 
-4.10.0 的 public 包从 `publish/dsh-continuity-public` 打出，但该树 `src/engine.mjs` 仍是旧的 `warnOnce`（仍写 lastError）。4.11.0 已把 dev 的 engine 同步进 public 并重新打包。逐文件哈希：engine `8081CF81B0EC` 两侧一致；其余 14 个 src 差异为既有的 public 去个人化差异，不是行为漂移。
+4.10.0 的 public 包从 `publish/dsh-continuity-public` 打出，但该树 `src/engine.mjs` 仍是旧的 `warnOnce`（仍写 lastError）。4.11.1 已把 dev 的 engine 同步进 public 并重新打包。逐文件哈希：engine `8081CF81B0EC` 两侧一致；其余 14 个 src 差异为既有的 public 去个人化差异，不是行为漂移。
 
-## Stable 首版（4.11.0）
+## Stable 首版（4.11.1）
 
 相对 4.9.136：
 
