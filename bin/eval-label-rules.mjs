@@ -85,6 +85,7 @@ const labels = Object.fromEntries(rows.map((r) => [r.label, r.description]));
 const kinds = Object.fromEntries(rows.map((r) => [r.label, r.kind]));
 const concepts = rows.map((r) => r.label);
 const topics = rows.filter((r) => r.kind === 'topic').map((r) => r.label);
+const workflowNames = rows.filter((r) => r.kind === 'workflow').map((r) => r.label);
 
 const samples = fs.readFileSync(inputPath, 'utf8').replace(/^\uFEFF/, '')
   .split(/\r?\n/)
@@ -96,6 +97,12 @@ const samples = fs.readFileSync(inputPath, 'utf8').replace(/^\uFEFF/, '')
         turn: row.turn ?? index + 1,
         text: String(row.text ?? ''),
         label: String(row.label ?? ''),
+        // 给了 workflowLabel 才评 workflow：数组=人工标签（[] 表示该判空）；不写=不参与
+        workflowLabel: Array.isArray(row.workflowLabel)
+          ? row.workflowLabel.map((name) => String(name))
+          : (typeof row.workflowLabel === 'string'
+            ? row.workflowLabel.split(/[\/,，、]/).map((name) => name.trim()).filter(Boolean)
+            : undefined),
       };
     } catch (error) {
       console.error(`第 ${index + 1} 行 JSON 解析失败：${error.message}`);
@@ -110,32 +117,46 @@ if (samples.length === 0) {
 const labeler = createBLabeler({ embed: embedTexts, labels, concepts, kinds });
 
 // baseline：生产文件优先；否则用输入集 leave-one-out 均值（仅评估用）
+// v2 文件形如 {version:2, topics:{...}, workflows:{...}}；v1 只有 samples（当作 topics）
 let baseline = null;
+let workflowBaseline = null;
 let baselineSource = 'leave-one-out';
 if (baselineFile && baselineFile !== true) {
   const raw = JSON.parse(fs.readFileSync(baselineFile, 'utf8').replace(/^\uFEFF/, ''));
-  const source = raw?.samples && typeof raw.samples === 'object' ? raw.samples : raw;
+  const topicSource = raw?.topics && typeof raw.topics === 'object'
+    ? raw.topics
+    : (raw?.samples && typeof raw.samples === 'object' ? raw.samples : raw);
+  const workflowSource = raw?.workflows && typeof raw.workflows === 'object' ? raw.workflows : null;
+
   // 缺失必须进 NaN，不能进 0：0 会被当成有效 baseline（等于该项不居中），缺失项就会通吃
-  baseline = Object.fromEntries(topics.map((t) => {
-    const value = source?.[t];
+  const buildMap = (source, names) => Object.fromEntries(names.map((name) => {
+    const value = source?.[name];
     if (Array.isArray(value)) {
       const nums = value.map((item) => Number(item)).filter((item) => Number.isFinite(item));
-      return [t, nums.length > 0 ? nums.reduce((sum, item) => sum + item, 0) / nums.length : Number.NaN];
+      return [name, nums.length > 0 ? nums.reduce((sum, item) => sum + item, 0) / nums.length : Number.NaN];
     }
-    if (value === undefined || value === null || value === '') return [t, Number.NaN];
+    if (value === undefined || value === null || value === '') return [name, Number.NaN];
     const numeric = Number(value);
-    return [t, Number.isFinite(numeric) ? numeric : Number.NaN];
+    return [name, Number.isFinite(numeric) ? numeric : Number.NaN];
   }));
-  baselineSource = baselineFile;
-  const known = Object.values(baseline).filter((value) => Number.isFinite(value));
-  if (known.length > 0) {
+
+  const fill = (map, names) => {
+    const known = Object.values(map).filter((value) => Number.isFinite(value));
+    if (known.length === 0) return null;
     const fallback = known.reduce((sum, value) => sum + value, 0) / known.length;
-    for (const topic of topics) {
-      if (!Number.isFinite(baseline[topic])) baseline[topic] = fallback;
+    for (const name of names) {
+      if (!Number.isFinite(map[name])) map[name] = fallback;
     }
-  } else {
+    return map;
+  };
+
+  baseline = fill(buildMap(topicSource, topics), topics);
+  if (workflowSource) {
+    workflowBaseline = fill(buildMap(workflowSource, workflowNames), workflowNames);
+  }
+  baselineSource = baselineFile;
+  if (!baseline && !workflowBaseline) {
     // 一个样本都没有：按 raw bootstrap，不居中
-    baseline = null;
     baselineSource = 'raw-bootstrap';
   }
 }
@@ -151,6 +172,7 @@ for (const sample of samples) {
     topicLead: lead,
     topicTopK: topk,
     topicBaseline: baseline ?? undefined,
+    workflowBaseline: workflowBaseline ?? undefined,
   });
   results.push({ sample, res });
 }
@@ -184,6 +206,7 @@ if (!baseline) {
         topicLead: lead,
         topicTopK: topk,
         topicBaseline: loo,
+        workflowBaseline: workflowBaseline ?? undefined,
       });
     }
   }
@@ -198,6 +221,18 @@ let labelled = 0;
 const mistakes = [];
 const perRow = [];
 
+// workflow 侧统计（只统计给了 workflowLabel 的行；label=[] 表示"人工认为该判空"）
+let wfLabelled = 0;
+let wfNonEmpty = 0;
+let wfExact = 0;
+let wfAnyHit = 0;
+let wfMissing = 0;
+let wfSpurious = 0;
+let wfPrecisionSum = 0;
+let wfRecallSum = 0;
+let wfTop2Hit = 0;
+const wfMistakes = [];
+
 for (const { sample, res } of results) {
   const picked = (res.topic ?? []).map((item) => item.concept);
   const got = picked[0] ?? null;
@@ -211,7 +246,26 @@ for (const { sample, res } of results) {
   if (ok) correct += 1;
   if (got !== null && hasHuman && !ok) { wrong += 1; mistakes.push({ turn: sample.turn, got, want }); }
   if (inTop2) top2Hit += 1;
-  perRow.push({ turn: sample.turn, got, want, ok, top: picked });
+
+  const wfGot = (res.workflow ?? []).map((item) => item.concept);
+  const wfWant = sample.workflowLabel; // undefined = 未标注；[] = 人工认为该空
+  const wfHasHuman = Array.isArray(wfWant);
+  if (wfHasHuman) {
+    wfLabelled += 1;
+    if (wfGot.length > 0) wfNonEmpty += 1;
+    const inter = wfGot.filter((name) => wfWant.includes(name));
+    const sameSet = wfGot.length === wfWant.length && inter.length === wfGot.length;
+    if (sameSet) wfExact += 1;
+    if (inter.length > 0) wfAnyHit += 1;
+    if (wfWant.length > 0 && wfGot.length === 0) wfMissing += 1;
+    if (wfWant.length === 0 && wfGot.length > 0) wfSpurious += 1;
+    wfPrecisionSum += wfGot.length > 0 ? inter.length / wfGot.length : (wfWant.length === 0 ? 1 : 0);
+    wfRecallSum += wfWant.length > 0 ? inter.length / wfWant.length : (wfGot.length === 0 ? 1 : 0);
+    if (wfGot.slice(0, 2).some((name) => wfWant.includes(name))) wfTop2Hit += 1;
+    if (!sameSet) wfMistakes.push({ turn: sample.turn, got: wfGot, want: wfWant });
+  }
+
+  perRow.push({ turn: sample.turn, got, want, ok, top: picked, wfGot, wfWant: wfWant ?? null });
 }
 
 const total = results.length;
@@ -219,6 +273,12 @@ const precision = nonEmpty > 0 ? correct / nonEmpty : 0;
 const coverage = total > 0 ? nonEmpty / total : 0;
 const mislabelRate = total > 0 ? wrong / total : 0;
 const top2Rate = labelled > 0 ? top2Hit / labelled : 0;
+
+const wfPrecision = wfLabelled > 0 ? wfPrecisionSum / wfLabelled : 0;
+const wfRecall = wfLabelled > 0 ? wfRecallSum / wfLabelled : 0;
+const wfExactRate = wfLabelled > 0 ? wfExact / wfLabelled : 0;
+const wfAnyRate = wfLabelled > 0 ? wfAnyHit / wfLabelled : 0;
+const wfTop2Rate = wfLabelled > 0 ? wfTop2Hit / wfLabelled : 0;
 
 const summary = {
   rows: total,
@@ -236,6 +296,20 @@ const summary = {
   topicMinScore,
   baselineSource,
   mistakes,
+  workflow: {
+    labelled: wfLabelled,
+    nonEmpty: wfNonEmpty,
+    exact: wfExact,
+    anyHit: wfAnyHit,
+    missing: wfMissing,
+    spurious: wfSpurious,
+    precision: Number(wfPrecision.toFixed(3)),
+    recall: Number(wfRecall.toFixed(3)),
+    exactRate: Number(wfExactRate.toFixed(3)),
+    anyRate: Number(wfAnyRate.toFixed(3)),
+    top2Rate: Number(wfTop2Rate.toFixed(3)),
+    mistakes: wfMistakes,
+  },
 };
 
 if (asJson) {
@@ -250,6 +324,16 @@ if (asJson) {
     console.log('');
     console.log('  误标：');
     for (const m of mistakes) console.log(`    turn ${m.turn}: 机器 ${m.got} / 人工 ${m.want}`);
+  }
+  if (wfLabelled > 0) {
+    console.log('');
+    console.log(`  —— workflow（人工标注 ${wfLabelled} 行）——`);
+    console.log(`  机器非空 ${wfNonEmpty} · 集合完全一致 ${wfExact} · 至少一条命中 ${wfAnyHit} · 漏（人工有机器空）${wfMissing} · 多（人工空机器有）${wfSpurious}`);
+    console.log(`  平均精度 ${(wfPrecision * 100).toFixed(0)}% · 平均召回 ${(wfRecall * 100).toFixed(0)}% · 完全一致率 ${(wfExactRate * 100).toFixed(0)}% · 至少一条命中率 ${(wfAnyRate * 100).toFixed(0)}% · top-2 ${(wfTop2Rate * 100).toFixed(0)}%`);
+    if (wfMistakes.length > 0) {
+      console.log('  不一致：');
+      for (const m of wfMistakes) console.log(`    turn ${m.turn}: 机器 [${m.got.join('/')}] / 人工 [${m.want.join('/')}]`);
+    }
   }
 }
 
