@@ -313,7 +313,7 @@ export function apply(ctx) {
     markSessionLogTool({ name: tool.name, scope: 'continuity preset' });
     return dispose;
   });
-  const assetTool = createSessionAssetTool();
+  const assetTool = createSessionAssetTool({ sessionQuery: ctx.sessionQuery });
   ctx.effect(() => ctx.tools.register(assetTool));
   const childAssetTool = createChildAssetTool({ sessionQuery: ctx.sessionQuery });
   ctx.effect(() => ctx.tools.register(childAssetTool));

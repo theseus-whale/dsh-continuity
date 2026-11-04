@@ -303,7 +303,8 @@ export function nonTextInfo(event) {
       if (typeof name === 'string' && name.length > 0 && !names.includes(name)) names.push(name);
       const path = block.attachment?.path ?? block.path ?? block.source?.path;
       if (typeof path === 'string' && path.length > 0 && !paths.includes(path)) paths.push(path);
-      let size = block.attachment?.size ?? block.size ?? block.bytes;
+      let size = block.attachment?.size ?? block.attachment?.bytes
+        ?? block.size ?? block.bytes;
       if (!Number.isFinite(size) && typeof path === 'string' && path.length > 0) {
         try {
           size = fs.statSync(path).size;

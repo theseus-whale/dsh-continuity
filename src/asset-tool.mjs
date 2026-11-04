@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { assetMarker, readAssetIndex, writeChildAsset } from './assets.mjs';
+import { assetMarker, readAssetIndex, writeAsset, writeChildAsset } from './assets.mjs';
+import { eventContentBlocks } from './tool-preview.mjs';
 
 export const name = 'dsh-continuity/asset-tool';
 
@@ -73,7 +74,7 @@ function formatChildRow(row) {
   return `${assetMarker(row, 'child')} sha256=${row.sha256 ?? '?'} name=${row.name ?? '?'}`;
 }
 
-export function createSessionAssetTool({ home = defaultHome() } = {}) {
+export function createSessionAssetTool({ home = defaultHome(), sessionQuery = null } = {}) {
   return {
     name: 'session_asset',
     description: 'Retrieve a folded non-text payload from the current session assets. '
@@ -112,6 +113,33 @@ export function createSessionAssetTool({ home = defaultHome() } = {}) {
       const row = input.path !== undefined
         ? rows.find((entry) => entry.path === input.path)
         : rows.find((entry) => Number(entry.seq) === Number(input.seq));
+      if (row === undefined && input.path === undefined && input.seq !== undefined
+        && typeof sessionQuery?.readSession === 'function') {
+        try {
+          const snapshot = await sessionQuery.readSession(String(sessionId));
+          const event = (Array.isArray(snapshot?.events) ? snapshot.events : [])
+            .find((entry) => Number(entry?.seq) === Number(input.seq));
+          const recovered = [];
+          for (const block of eventContentBlocks(event) ?? []) {
+            if (block === null || typeof block !== 'object') continue;
+            if (!['image', 'file', 'audio', 'video'].includes(block.type)) continue;
+            const written = await writeAsset({
+              home,
+              sessionId: String(sessionId),
+              block,
+              seq: input.seq,
+            });
+            if (written.ok) recovered.push(written.row);
+          }
+          if (recovered.length > 0) {
+            return [
+              `session_asset get · session=${sessionId} · recovered from raw seq=${input.seq}`,
+              ...recovered.map(formatRow),
+              `absolute=${join(home, 'sessions', String(sessionId), recovered[0].path)}`,
+            ].join('\n');
+          }
+        } catch { /* fall through to missing */ }
+      }
       if (row === undefined) {
         return `session_asset get · session=${sessionId} · no registered asset for ${input.path ?? `seq=${input.seq}`}`;
       }

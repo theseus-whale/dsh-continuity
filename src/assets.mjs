@@ -43,6 +43,21 @@ function decodeDataUrl(value) {
   };
 }
 
+function attachmentObjectPath(attachmentId) {
+  const match = /^sha256:([a-f0-9]{64})$/i.exec(String(attachmentId ?? ''));
+  if (match === null) return null;
+  const digest = match[1].toLowerCase();
+  return path.join(
+    process.env.USERPROFILE ?? process.env.HOME ?? '',
+    '.dsh',
+    'attachments',
+    'v1',
+    'objects',
+    digest.slice(0, 2),
+    digest,
+  );
+}
+
 /**
  * Return a local payload for a non-text content block, without fetching URLs.
  * @returns {{ buffer: Buffer, sourcePath: string|null, mime: string|null }|null}
@@ -50,7 +65,7 @@ function decodeDataUrl(value) {
 export function blockPayload(block) {
   if (block === null || typeof block !== 'object') return null;
   const mime = block.mimeType ?? block.mime ?? block.attachment?.mimeType
-    ?? block.attachment?.mime ?? block.source?.media_type ?? null;
+    ?? block.attachment?.mediaType ?? block.attachment?.mime ?? block.source?.media_type ?? null;
   const raw = block.source?.data ?? block.data ?? block.base64;
   if (typeof raw === 'string' && raw.length > 0) {
     const decoded = decodeDataUrl(raw);
@@ -63,6 +78,10 @@ export function blockPayload(block) {
   const sourcePath = block.attachment?.path ?? block.path ?? block.source?.path;
   if (typeof sourcePath === 'string' && sourcePath.length > 0 && fs.existsSync(sourcePath)) {
     return { buffer: fs.readFileSync(sourcePath), sourcePath, mime };
+  }
+  const stored = attachmentObjectPath(block.attachment?.attachmentId ?? block.attachmentId);
+  if (stored !== null && fs.existsSync(stored)) {
+    return { buffer: fs.readFileSync(stored), sourcePath: stored, mime };
   }
   return null;
 }
@@ -78,7 +97,7 @@ export function blockMeta(block) {
     block?.attachment?.name ?? block?.name ?? block?.fileName ?? block?.source?.name,
     `${kind}-asset`,
   );
-  const size = block?.attachment?.size ?? block?.size ?? block?.bytes;
+  const size = block?.attachment?.size ?? block?.attachment?.bytes ?? block?.size ?? block?.bytes;
   return {
     kind,
     name,
