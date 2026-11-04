@@ -45,7 +45,7 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
     return ready;
   }
   return {
-    async label(text, { topK = 3, minScore = 0.25, topicTopK = 1, workflowTopK = 2 } = {}) {
+    async label(text, { topK = 3, minScore = 0.25, topicMinScore = 0.33, topicTopK = 1, workflowTopK = 2 } = {}) {
       const prepared = await prepare();
       const [rawVector] = await embed([String(text ?? '')]);
       const vector = normalizeVector(rawVector);
@@ -58,7 +58,7 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
       })).sort((a, b) => b.score - a.score);
 
       if (split) {
-        const topic = scored.find((item) => kindOf(item.concept) === 'topic' && item.score > 0);
+        const topic = scored.find((item) => kindOf(item.concept) === 'topic' && item.score >= topicMinScore);
         const topicCandidates = topic === undefined ? [] : [topic];
         const workflow = scored
           .filter((item) => kindOf(item.concept) === 'workflow' && item.score >= minScore)
@@ -72,6 +72,7 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
           scores,
           topicScore: topic?.score ?? null,
           topicConfidence: topic ? confidenceOf(topic.score) : null,
+          topicMinScore,
           unknown: candidates.length === 0,
           top: topic ?? workflow[0] ?? null,
           vector,

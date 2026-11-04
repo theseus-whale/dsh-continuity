@@ -123,7 +123,7 @@ export function createIndexUpdater({
       const labelStarted = performance.now();
       for (const entry of turns) {
         const text = entry.texts.join('\n');
-        const label = await activeLabeler.label(text, { topK: 3, minScore: 0.25 });
+        const label = await activeLabeler.label(text, { topK: 3, minScore: 0.25, topicMinScore: 0.33 });
         const isV2 = label.version === 2;
         const generic = label.candidates.map((candidate) => candidate.concept);
         const conceptScores = Object.fromEntries(
@@ -146,6 +146,7 @@ export function createIndexUpdater({
             genericWorkflow,
             topicScore: label.topicScore,
             topicConfidence: label.topicConfidence,
+            topicMinScore: label.topicMinScore,
           } : {}),
           labelVersion: isV2 ? 2 : 1,
           keywords,

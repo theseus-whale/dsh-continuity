@@ -1,4 +1,4 @@
-# dsh-continuity 4.11.10
+# dsh-continuity 4.11.11
 
 给 DSH 的长上下文连续性插件。每个 session 拥有自己完整的一套记忆；
 persona 只是身份/启用标签。
@@ -62,7 +62,7 @@ peer_message    明确投递给另一个 live session
 ## 安装
 
 ```text
-dsh-continuity-4.11.10.tgz
+dsh-continuity-4.11.11.tgz
 ```
 
 装进目标 profile，备份 `~/.dsh/continuity`，重启 DSH。  
