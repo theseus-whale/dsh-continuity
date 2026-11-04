@@ -11,6 +11,7 @@ import { createBLabeler } from './bc-label.mjs';
 import { extractKeywords, makeRecord } from './bc-recall.mjs';
 import { loadIndexJsonl, saveIndexJsonl } from './bc-index.mjs';
 import { loadSpecialKeywords, matchSpecialKeywords } from './special-keywords.mjs';
+import { defaultCMapPath, loadCMapEntries } from './cmap-file.mjs';
 import { buildDf, chatterScore } from './chatter.mjs';
 import { eventText } from '../session-log.mjs';
 
@@ -131,6 +132,7 @@ export function createIndexUpdater({
   labels = null,
   kinds = null,
   keywordsFile = null,
+  cmapFile = null,
   maxPerRun = 8,
   onError = null,
   onCost = null,
@@ -197,6 +199,9 @@ export function createIndexUpdater({
       const specialKeywords = keywordsFile && !fs.existsSync(keywordsFile)
         ? []
         : loadSpecialKeywords(keywordsFile ?? undefined);
+      const cmapTerms = loadCMapEntries(cmapFile ?? defaultCMapPath())
+        .map((entry) => entry.term)
+        .filter((term) => typeof term === 'string' && term.length > 0);
       const df = buildDf([
         ...records.map((record) => (record.keywords ?? []).join(' ')),
         ...turns.map((entry) => entry.texts.join('\n')),
@@ -232,6 +237,7 @@ export function createIndexUpdater({
           ...extractKeywords(text, { limit: 12 }),
           ...matchSpecialKeywords(text, specialKeywords),
         ])];
+        const terms = [...new Set(cmapTerms.filter((term) => text.includes(term) || keywords.includes(term)))];
         added.push(makeRecord({
           turn: entry.turn,
           seqStart: entry.seqStart,
@@ -246,6 +252,7 @@ export function createIndexUpdater({
             topicMinScore: label.topicMinScore,
           } : {}),
           labelVersion: isV2 ? 2 : 1,
+          terms,
           keywords,
           conceptScores,
           confidence: label.top?.score ?? 0,
