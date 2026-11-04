@@ -691,8 +691,10 @@ export class ContinuityEngine extends BaseEngine {
     if (session === undefined || session === null) return [];
     const home = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
     const rows = [];
+    const raw = typeof session.snapshotEvents === 'function' ? session.snapshotEvents() : [];
+    const bySeq = new Map((Array.isArray(raw) ? raw : []).map((entry) => [Number(entry?.seq), entry]));
     for (let seq = start; seq <= end; seq += 1) {
-      const event = session.eventAt?.(seq);
+      const event = bySeq.get(Number(seq)) ?? session.eventAt?.(seq);
       const blocks = event?.data?.message?.content;
       if (!Array.isArray(blocks)) continue;
       for (const block of blocks) {
