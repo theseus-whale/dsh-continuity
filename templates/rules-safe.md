@@ -172,7 +172,7 @@ peer_message({ to, text, from? })
 - 父 session 是 canonical；子 agent 只是短命执行上下文。
 - 子 id 用子自己读到的 `DSH_SESSION_ID`，不猜。
 - 子回执：summary / decisions / open / artifacts / sourceSeqs / confidence。
-- 父用 `ptc_handoff` 登记；artifact 会复制到 `assets/ptc/`，缺失进 `unresolvedArtifacts`。
+- 父用 `ptc_handoff` 登记；artifact 会复制到 `assets/ptc/`，缺失进 `unresolvedArtifacts`（`{source, reason}`），`artifactsResolved=false`。
 - 父图用 `session_asset`，子产物用 `child_asset`；`session_asset list` 只列 parent。
 - 大结果落 assets，父只留 summary + pointer；不要把原始输出倒回父。
 - 子用任务级标准压缩，不要套父的 band/protect。

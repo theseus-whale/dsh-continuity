@@ -154,7 +154,7 @@ PTC 是执行层，Continuity 是记忆层；不要把两者混成一个。
 - 启动子 agent 后，childSessionId 用子自己读到的 `DSH_SESSION_ID`；不猜、不硬编码。
 - 子回执固定：summary / decisions / open / artifacts / sourceSeqs / confidence。
 - 父调 `ptc_handoff` 登记回执；存在的 artifact 会被复制进 `assets/ptc/<run>/<child>/`，带 mime、sha256、唯一 seq。
-- 缺失的 artifact 会进 `unresolvedArtifacts`，`artifactsResolved=false`；不要把它当有效指针。
+- 缺失的 artifact 会进 `unresolvedArtifacts`（`{source, reason}`，例如 `reason:"not-a-file"`），`artifactsResolved=false`；不要把它当有效指针。
 - 取父资产用 `session_asset`；取子产物用 `child_asset`。`session_asset list` 只列 parent，child 走 `child_asset list`。
 - 大结果落 assets，父只留 summary + pointer；不要把 100K 原始输出塞回父上下文。
 - 子 agent 用任务级标准压缩；不要把父的 band/protect/text_floor 原样套给子。

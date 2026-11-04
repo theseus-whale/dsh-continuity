@@ -95,7 +95,7 @@ mime / bytes / sha256 / 唯一 seq
 缺失的文件进入：
 
 ```text
-unresolvedArtifacts
+unresolvedArtifacts: [{ source, reason: "not-a-file" }]
 artifactsResolved = false
 ```
 
