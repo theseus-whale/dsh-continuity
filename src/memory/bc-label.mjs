@@ -5,6 +5,20 @@
  */
 import { GENERIC_CONCEPTS } from './bc-recall.mjs';
 
+/**
+ * labeler 判定语义的版本号（手工维护）。
+ *
+ * 只有"会改变打标结果"的改动才 bump：
+ *   · 分块规则 / 阈值默认值 / center 与 lead 判据
+ *   · 概念描述的相似度计算方式
+ *   · 文本拼接规则（user 在前、去 reasoning 等）
+ * 纯文档、纯日志、纯 UI 改动**不要** bump——否则 labelStamp 全员失效，
+ * 触发一次 30 分钟的全量重扫，与"增量/不扫"的目标冲突（创 2026-11-04 定）。
+ *
+ * marker.labelerVersion 只在回归测试时显式覆盖它，默认用本常量。
+ */
+export const LABELER_VERSION = 1;
+
 export const GENERIC_LABELS = Object.freeze({
   游戏: '游戏、桌游、跑团、角色扮演、掷骰、回合制',
   故事: '故事、剧情、叙事、角色、对白、场景',
