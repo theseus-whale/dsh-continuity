@@ -86,7 +86,7 @@ const kinds = Object.fromEntries(rows.map((r) => [r.label, r.kind]));
 const concepts = rows.map((r) => r.label);
 const topics = rows.filter((r) => r.kind === 'topic').map((r) => r.label);
 
-const samples = fs.readFileSync(inputPath, 'utf8')
+const samples = fs.readFileSync(inputPath, 'utf8').replace(/^\uFEFF/, '')
   .split(/\r?\n/)
   .filter((line) => line.trim() !== '')
   .map((line, index) => {
@@ -113,14 +113,18 @@ const labeler = createBLabeler({ embed: embedTexts, labels, concepts, kinds });
 let baseline = null;
 let baselineSource = 'leave-one-out';
 if (baselineFile && baselineFile !== true) {
-  const raw = JSON.parse(fs.readFileSync(baselineFile, 'utf8'));
+  const raw = JSON.parse(fs.readFileSync(baselineFile, 'utf8').replace(/^\uFEFF/, ''));
   const source = raw?.samples && typeof raw.samples === 'object' ? raw.samples : raw;
+  // 缺失必须进 NaN，不能进 0：0 会被当成有效 baseline（等于该项不居中），缺失项就会通吃
   baseline = Object.fromEntries(topics.map((t) => {
     const value = source?.[t];
     if (Array.isArray(value)) {
-      return [t, value.length > 0 ? value.reduce((sum, item) => sum + Number(item || 0), 0) / value.length : 0];
+      const nums = value.map((item) => Number(item)).filter((item) => Number.isFinite(item));
+      return [t, nums.length > 0 ? nums.reduce((sum, item) => sum + item, 0) / nums.length : Number.NaN];
     }
-    return [t, Number(value ?? 0)];
+    if (value === undefined || value === null || value === '') return [t, Number.NaN];
+    const numeric = Number(value);
+    return [t, Number.isFinite(numeric) ? numeric : Number.NaN];
   }));
   baselineSource = baselineFile;
   const known = Object.values(baseline).filter((value) => Number.isFinite(value));
@@ -129,6 +133,10 @@ if (baselineFile && baselineFile !== true) {
     for (const topic of topics) {
       if (!Number.isFinite(baseline[topic])) baseline[topic] = fallback;
     }
+  } else {
+    // 一个样本都没有：按 raw bootstrap，不居中
+    baseline = null;
+    baselineSource = 'raw-bootstrap';
   }
 }
 
