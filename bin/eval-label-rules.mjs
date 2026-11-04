@@ -123,6 +123,13 @@ if (baselineFile && baselineFile !== true) {
     return [t, Number(value ?? 0)];
   }));
   baselineSource = baselineFile;
+  const known = Object.values(baseline).filter((value) => Number.isFinite(value));
+  if (known.length > 0) {
+    const fallback = known.reduce((sum, value) => sum + value, 0) / known.length;
+    for (const topic of topics) {
+      if (!Number.isFinite(baseline[topic])) baseline[topic] = fallback;
+    }
+  }
 }
 
 // 先算一遍 raw，够用来做 leave-one-out 均值

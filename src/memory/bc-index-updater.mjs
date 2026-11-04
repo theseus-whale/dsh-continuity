@@ -39,6 +39,12 @@ function baselineMeans(state) {
   return means;
 }
 
+function baselineGlobalMean(means) {
+  const values = Object.values(means ?? {}).filter((value) => Number.isFinite(value));
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function updateBaseline(state, scores) {
   if (!scores || typeof scores !== 'object') return state;
   for (const [concept, score] of Object.entries(scores)) {
@@ -181,6 +187,7 @@ export function createIndexUpdater({
       const resolvedBaselineFile = baselineFile ?? path.join(path.dirname(file), 'bc-topic-baseline.json');
       const baseline = loadBaseline(resolvedBaselineFile);
       const baselineMeansMap = baselineMeans(baseline);
+      const baselineFallback = baselineGlobalMean(baselineMeansMap);
 
       if (activeLabeler === null) activeLabeler = createBLabeler({
         embed: embedTexts,
@@ -206,6 +213,7 @@ export function createIndexUpdater({
           topicLead: 0.02,
           topicTopK: 1,
           topicBaseline: baselineMeansMap,
+          topicBaselineFallback: baselineFallback,
           chunkChars: 600,
           maxChunks: 12,
         };

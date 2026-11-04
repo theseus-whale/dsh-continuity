@@ -63,18 +63,24 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
     topicTopK = 1,
     workflowTopK = 2,
     topicBaseline = null,
+    topicBaselineFallback = null,
     vector = [],
     chunks = 1,
   } = {}) {
     if (split) {
       const topics = scored
         .filter((item) => kindOf(item.concept) === 'topic')
-        .map((item) => ({
-          concept: item.concept,
-          score: item.score,
-          rawScore: item.score,
-          centered: item.score - (Number.isFinite(topicBaseline?.[item.concept]) ? topicBaseline[item.concept] : 0),
-        }))
+        .map((item) => {
+          const center = Number.isFinite(topicBaseline?.[item.concept])
+            ? topicBaseline[item.concept]
+            : (Number.isFinite(topicBaselineFallback) ? topicBaselineFallback : 0);
+          return {
+            concept: item.concept,
+            score: item.score,
+            rawScore: item.score,
+            centered: item.score - center,
+          };
+        })
         .sort((a, b) => b.centered - a.centered);
       const topTopic = topics[0];
       const secondTopic = topics[1];
@@ -106,6 +112,7 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
         topicCenterMin,
         topicLead,
         topicBaseline,
+        topicBaselineFallback,
         chunks,
         unknown: candidates.length === 0,
         top: topicCandidates[0] ?? workflow[0] ?? null,
