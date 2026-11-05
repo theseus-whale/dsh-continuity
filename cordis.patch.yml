@@ -290,18 +290,19 @@
                   # 0.2.5: handles/pauses/previews are never previewed again;
                   # pass records include a post-pass measurement; manual
                   # /compact gets a follow-up gist header and a manual record.
-                  # 0.2.6: emergency 0.65 is 515,174 (49.1% full).
-                  # 0.2.7: high/emergency ratio 74%: high 0.48, low 0.32.
+                  # 0.2.6: emergency 0.85 is 673,690 (85% full).
+                  # 0.2.7: high .76 / low .38 / emergencyTo .62 / protect .20.
+                  # band-high budget = .4 * (.76-.38)W = 120,472 < maxPerBatch.
                   #
                   # All values are explicit so a hot preset reconciliation cannot
                   # fall back to an older cached module default.
                   policy:
-                    setpoint: 0.48
-                    high: 0.48
-                    low: 0.32
-                    emergency: 0.65
-                    emergencyTo: 0.42
-                    protect: 0.14
+                    setpoint: 0.76
+                    high: 0.76
+                    low: 0.38
+                    emergency: 0.85
+                    emergencyTo: 0.62
+                    protect: 0.20
                     maxPerBatch: 190000
                     minAction: 24000
                     k: 0.4
