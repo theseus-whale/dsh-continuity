@@ -33,7 +33,7 @@ client：提供左侧“连续性”面板和右侧 A/B/C/K tab
 把 tgz 装进目标 DSH profile，备份 `~/.dsh/continuity`，然后重启 DSH。
 
 ```text
-dsh-continuity-4.11.34.tgz
+dsh-continuity-4.11.35.tgz
 ```
 
 为什么必须重启？
@@ -51,7 +51,7 @@ dsh-continuity-4.11.34.tgz
 重启后确认版本：
 
 ```text
-dsh-continuity 4.11.34
+dsh-continuity 4.11.35
 ```
 
 ## 3. 第一次 pre-step 会做什么
@@ -172,7 +172,7 @@ agent-preset/locked
 按顺序看：
 
 ```text
-1. 版本 = 4.11.34
+1. 版本 = 4.11.35
 2. 左侧有“连续性”
 3. 右侧“更多工具”下有 A/B/C/K
 4. sessions/<id>/ 有基础文件

@@ -146,7 +146,7 @@ function confidenceOf(score) {
  * @param {(event, options?) => string} opts.eventText  session-log 的 eventText
  * @param {Function} [opts.log]
  */
-export async function runRelabelMigration({ indexFile, rawFile, events: eventsProvider, conceptsFile, markerFile, labeler, eventText, log = () => {} }) {
+export async function runRelabelMigration({ indexFile, rawFile, events: eventsProvider, conceptsFile, markerFile, labeler, eventText, forceFull = false, log = () => {} }) {
   const marker = readMarker(markerFile);
   if (!marker) return { status: 'no-marker' };
   const fields = Array.isArray(marker.fields) ? marker.fields : [];
@@ -218,6 +218,18 @@ export async function runRelabelMigration({ indexFile, rawFile, events: eventsPr
 
   const records = fs.readFileSync(indexFile, 'utf8').replace(/^\uFEFF/, '')
     .split(/\r?\n/).filter((line) => line.trim() !== '').map((line) => JSON.parse(line));
+
+  // 安全增量：只有“全表 stamp 都等于本次 stamp”才整体跳过。
+  // 不做逐行跳过：self-LOO baseline 会因为少算 stale 行而偏，写盘会得到错误的 centered。
+  if (!forceFull && records.length > 0 && records.every((record) => record.labelStamp === stamp)) {
+    fs.unlinkSync(markerFile);
+    log('[relabel] 跳过：所有行 labelStamp 已是当前值');
+    return {
+      status: 'done',
+      noop: true,
+      stats: { rows: records.length, relabelled: 0, unresolved: 0, topicChanged: 0, toEmpty: 0, fromEmpty: 0, same: records.length },
+    };
+  }
 
   // 覆盖前置检查：**先验证事件能不能覆盖 index 的全部 turn，再开始打标**。
   // 若宿主给的是有界快照，原来的流程会先白烧几秒到几分钟 CPU（风扇先转一下），
