@@ -4,7 +4,7 @@
  * Old:
  *   跑团 => 游戏 / 故事 / 对话
  * New:
- *   跑团 => B:游戏/故事/剧情/对话 | K:example-name | minB:2 | 摘要：...
+ *   跑团 => B:游戏/故事/剧情/对话 | K:Coopanion/Coo | minB:2 | 摘要：...
  *
  * One line per term; `#` starts a comment.
  */

@@ -17,7 +17,7 @@ import { loadConcepts } from './concepts-file.mjs';
 import { appendCostLog, createIndexUpdater, defaultCostLogPath } from './bc-index-updater.mjs';
 import { createBLabeler } from './bc-label.mjs';
 import { runRelabelMigration } from './relabel-migrate.mjs';
-import { consumePendingHint, maybeRunAudit } from './bc-audit.mjs';
+import { buildRecentReview, consumePendingHint, maybeRunAudit } from './bc-audit.mjs';
 import { ensureSessionScaffolds, maybeOnboard, bootstrapPaths } from './onboarding.mjs';
 import { isPersonaEnabled, resolvePersona, resolveVocabFile, sessionFile } from './persona.mjs';
 import { embedTexts } from '../facets/embedding.mjs';
@@ -126,6 +126,18 @@ export function createBCPreStep({ records = [], cmap, prefix = '', sessionQuery 
     let auditNote = null;
     if (auditIndexFile !== null) {
       try { auditNote = consumePendingHint(auditIndexFile); } catch { /* ignore */ }
+    }
+    if (auditIndexFile !== null && auditConceptsFile !== null && records.length > 0) {
+      try {
+        const recentReview = buildRecentReview({
+          indexFile: auditIndexFile,
+          conceptsFile: auditConceptsFile,
+          records,
+          window: 24,
+          cooldown: 12,
+        });
+        if (recentReview) auditNote = recentReview.text;
+      } catch { /* recent review must not block */ }
     }
     try {
       maybeOnboard({ session: payload?.agent?.session, messages: decision.messages });

@@ -1,3 +1,358 @@
+# 发行说明 — 4.12.9
+
+## open turn pin 收窄
+
+A4 的 active pin 不再固定整个未结束 turn。现在只 pin 未配对的在飞 tool call；已经拿到 tool/result 的 call 可以参与折叠。这样长 turn（例如事件总线连续 sts_do）不会因为整个 turn 都是硬后缀而让 fold 退化成“只折 1 条摘要载体”。
+
+新增回归：open turn 里已完成的 call 不再被 pin。
+
+# 发行说明 — 4.12.8
+
+## T/TAG 与 turnGate 清理（4.12.8）
+
+彻底删除 T/TAG header、打标提醒、tag-debt 写入、turn-stopping 注册与 turnGate 配置。`autoTagCompletedTurn` 也删除，不再自动写 turn-tags；旧 turn-tags 仅只读兼容。说明书不再提 T/TAG。
+
+rules/habits carrier 在重启后扫描 surface 中的全文消息；发现多份时保留最早一份，其余原位清空，避免重启一次多一份。
+
+# 发行说明 — 4.12.6
+
+## rules/habits 全文保持一份最新（4.12.6）
+
+`pointersOnly: false`，恢复全文注入。规则/习惯变化且 carrier 仍在 surface 时用 `surfaceOp: replace` 原位替换；carrier 已被 fold 走才 append；hash 不变不注入。
+
+4.12.5 已发布，不能覆盖；规则全文修复由 4.12.6 承载。
+
+# 发行说明 — 4.12.5
+
+## A 锚的 onboarding（4.12.5）
+
+onboarding 与 base-rules 明确：A 表不自动生成，也不自动增长；每轮系统会做 B 标注，但 A 空时 B 只会是 weak。实例识别出新话题时，需要手动往 `concepts.md` 追加一行。
+
+没有新增一次性提醒机制；A 的行为由 rules 承担。
+
+## rules/habits 全文保持一份最新
+
+`pointersOnly: false`，恢复全文注入。规则/习惯变化且 carrier 仍在 surface 时，用 `surfaceOp: replace` 原位替换；carrier 已被 fold 走才 append；hash 不变不注入。
+
+# 发行说明 — 4.12.4
+
+## Band 从菜单移除
+
+`preset-band` 不再声明，模式菜单不再显示 Band (config-only)。没有现存 session 使用 band；引擎 baseline 代码保留，供内部对照。
+
+
+## Continuity 默认 PTC（4.12.4）
+
+`continuity` 保留原 id，composition 改为原生 `@deepseek-ai/dsh-tool-executor-ptc`。
+`continuity-ptc` 保留为临时别名，已有会话切回 `continuity` 后再删除。
+
+```text
+continuity       -> PTC
+continuity-ptc   -> 过渡别名
+```
+
+PTC 主路径已在 Sonar 会话验证：run_code、ptc_handoff、artifact 复制、child_asset、session_log、assistant/message。
+
+# 发行说明 — 4.12.3
+
+## 修复 DSH 0.2.2 preset broken（4.12.3）
+
+DSH 0.2.2 不再提供 `@deepseek-ai/dsh-tool-subagent-control/list-agents`。
+4.12.3 从 `preset-band` 和 `preset-continuity` 删除 `tool-subagent-list-agents` 两行，保留主 `tool-subagent-control`。
+
+修复前 roster 会返回：
+
+```text
+broken: tool-subagent-list-agents (@deepseek-ai/dsh-tool-subagent-control/list-agents): never started
+```
+
+结果：模式菜单没有 Continuity，continuity session 载入失败。
+
+# 发行说明 — 4.12.2
+
+## 水位恢复 + maxPerBatch high-protect（4.12.2）
+
+4.12.2 恢复 4.12.0 水位，只把 `maxPerBatch` 放到 high−protect；native LLM summary 不变。
+
+```text
+setpoint 0.76
+high     0.76
+low      0.38
+emergency 0.85 -> 0.62
+protect  0.20
+maxPerBatch 443843
+minAction 24000
+mechanicalNote false
+```
+
+`443843 = (0.76 - 0.20) × 792,576 = 443,842.56`。
+
+band-high 实际 budget：
+
+```text
+min(est - low, 443843)
+```
+
+正常 high 折约 `602,358 - 301,179 = 301,179`；overshoot 也不会被 cap 截成二次小折。target 仍是 low，不会折进 protect 尾。
+
+`protectCalibration` 不再显式关闭，回到 4.12.0 默认。  
+`recall_exact` / `recall` / ABCK / gist / history-map 不变。
+
+# 发行说明 — 4.12.1
+
+## 阈值调整，保留 native LLM summary（4.12.1）
+
+4.12.1 基于 4.12.0，只改折叠阈值；不启用 mechanical note。
+
+```text
+setpoint 0.80
+high     0.80
+low      0.40
+emergency 0.90 -> 0.66
+protect  0.16
+maxPerBatch 507249
+minAction 24000
+protectCalibration false
+mechanicalNote false
+```
+
+`507249 = (0.80 - 0.16) × 792,576`，覆盖 high-protect。  
+band-high 实际 budget：
+
+```text
+min(est - low, 507249)
+```
+
+正常 high 折约 317,030；overshoot 也不会被 cap 截成二次小折。target 仍是 low，不会折进 protect 尾。
+
+`recall_exact` / `recall` / ABCK / gist / history-map 不变。  
+4.13.x 的 mechanical note 保留为实验代码，4.12.1 不启用。
+
+# 发行说明 — 4.13.3
+
+## maxPerBatch 覆盖 high-protect（4.13.3）
+
+```text
+high .80
+low  .40
+protect .16
+maxPerBatch 507249
+```
+
+`507249 = (0.80 - 0.16) × 792,576 = 507,248.64`。
+
+原因：
+
+```text
+折叠不一定正好在 high 线上开始，会有 overshoot
+cap 若只到 high-low（317k），overshoot 时会被 cap 成更高落点
+放宽到 high-protect 后，band-high 仍以 low 为 target，但不会被 cap 截断
+```
+
+实际 budget：
+
+```text
+min(est - low, maxPerBatch)
+```
+
+正常高线：
+
+```text
+min(634,061 - 317,030, 507,249) = 317,030
+```
+
+overshoot 时：
+
+```text
+est 700,000 -> budget 382,970，仍 < 507,249
+-> 一次折到 low，不会留下二次小折
+```
+
+注意：maxPerBatch 放宽不会把 target 改到 protect；target 仍是 low。
+
+# 发行说明 — 4.13.2
+
+## maxPerBatch 覆盖 high-low（4.13.2）
+
+```text
+setpoint 0.80
+high     0.80
+low      0.40
+emergency 0.90 -> 0.66
+protect  0.16
+maxPerBatch 320000
+minAction 24000
+protectCalibration false
+mechanicalNote 32k
+```
+
+`maxPerBatch 320,000` 覆盖 high-low 的 `317,030`。
+
+实际 band-high budget：
+
+```text
+min(est - low, maxPerBatch)
+= min(634,061 - 317,030, 320,000)
+= 317,030
+```
+
+所以一次 high 折叠目标落点是 low .40，不是 320k 满额折。  
+`maxPerBatch` 只是上限，不是每次都按上限抽。
+
+# 发行说明 — 4.13.1
+
+## 阈值调整（4.13.1）
+
+```text
+setpoint 0.80
+high     0.80
+low      0.40
+emergency 0.90 -> 0.66
+protect  0.16
+maxPerBatch 190000
+minAction 24000
+protectCalibration false
+mechanicalNote 32k
+```
+
+目的：把 high-low 的间隔拉开，同时保证一次 band-high 不直接折穿 low。
+
+```text
+W−O 792,576
+high-low gap 317,030
+maxPerBatch 190,000 = 60% gap
+high fold 后仍剩约 127k 到 low
+
+emergency .90 = 713,318
+emergencyTo .66 = 523,100
+emergency drop = 190,218 ≈ maxPerBatch
+```
+
+`low .40` 是下界目标/方向，不是一次 band-high 必须到达的落点；`maxPerBatch 190k` 的意图是分次折，high 后约 56%，下一次再触发才继续。
+
+其余不变：recall_exact / recall / ABCK / gist / history-map / mechanical note 逻辑。
+
+# 发行说明 — 4.13.0
+
+## 机械摘要 trial（4.13.0）
+
+4.13.0 是独立试验线；4.12.0 冻结，不覆盖其 tgz。
+
+```text
+protect .16
+low     .40
+high    .76（不变）
+mechanical note 32k
+protectCalibration false
+```
+
+`protectCalibration: false` 是“完整 protect”的一部分：否则 calibration 会把 .16 抬到 .20。  
+`protect` 是硬地板；floor 高于 low 目标时允许 protectBinds，停在 floor，不强行压到 low。
+
+fold 的 summary 不再调用 LLM，而由 `src/memory/mechanical-note.mjs` 机械渲染：
+
+```text
+保留 user 文本、tool call、tool receipt
+不保留 assistant 正文、reasoning、系统注入
+32k token cap；超了从更早条目裁
+```
+
+预算：
+
+```text
+baseline 约 150k + protect .16 约 127k + note 32k ≈ 309k
+low .40 约 317k
+余量约 7.7k
+```
+
+不涉及：
+
+```text
+recall_exact
+recall / ABCK / gist
+history-map
+high / emergency
+```
+
+测试：
+
+```text
+mechanical-note 2 pass
+recall-exact 2 pass
+现有 summary/history-map 测试继续通过
+```
+
+# 发行说明 — 4.12.0
+
+## recall_exact 并入主包（4.12.0）
+
+以前 `recall_exact` 是独立的 `@local/recall-exact-shadow`；4.12.0 起并入 `dsh-continuity`：
+
+```text
+src/recall-exact-tool.mjs
+index.mjs 全局注册
+不再依赖 @local
+```
+
+能力：
+
+```text
+字面搜索，独立于 recall 的语义路径
+只搜 user + assistant text
+排除 reasoning / tool-call / 注入文本
+ASCII 边界 [0-9A-Za-z]，中文子串
+返回 totalTurns / totalIntervals / shown / turnShare
+只读、不排序、不写
+```
+
+用法：
+
+```text
+recall_exact({ query: "0.2.17" })
+recall_exact({ query: "stage19", since: 2200 })
+recall_exact({ query: "coo-read-side", near: 2300, window: 20 })
+```
+
+升级时请移除旧的 `@local/recall-exact-shadow`，避免同名工具。
+
+## 中间层收敛到 native summary（4.12.0）
+
+```text
+默认中间层 = DSH native checkpoint
+fold 仍由 compactIfNeeded 触发
+LLM 写 summary，旧 summary 下次折入
+history-map 默认 off
+```
+
+`history-map` 只保留为实验档：
+
+```text
+~/.dsh/continuity/history-map-mode
+  off       默认
+  observe   只写 probe
+  auto      实验注入
+```
+
+详见 `docs/history-map.md`。
+
+## summary-index / window 工具（4.12.0）
+
+```text
+bin/summary-index.mjs
+bin/summary-query.mjs
+src/memory/window-summary.mjs
+```
+
+`--extract-pending` 可在有 pending window 时生成抽取式摘要；默认不自动跑。
+
+## 验证（4.12.0）
+
+```text
+recall-exact 单测 2 pass
+history-map / summary-index / window-summary 既有测试继续通过
+0b raw 88k 事件性能：首次 67ms，缓存 13ms
+```
+
 # 发行说明 — 4.11.36
 
 ## 宽度策略调整（4.11.36）
@@ -32,10 +387,6 @@ relabel-log.jsonl 记录 start/log/result/error；失败写回 marker.attempts/l
 
 仍不接线。updater 增加 whenIdle/isRunning/pendingCount、gate 命中不写盘不推进 state、pending 合并、labelStamp；pre-step 建共享 gate 与 conceptsFile；round-trip 守卫覆盖 labelStamp/terms/topicMinScore。
 
-## relabel 迁移模块（4.11.36）
-
-只合模块与单测，不接线。relabel-migrate 支持 events provider、all-or-nothing、labelStamp、显式 LABELER_VERSION；启动钩子留 4.11.36/30。
-
 ## dry-run 支持 v2 baseline（4.11.36）
 
 relabel-dry-run 支持 {version:2,topics,workflows}，workflow 也建 baseline 并传入 labelChunked；不再对 v2 静默退回 LOO。
@@ -67,10 +418,6 @@ bc-index-updater 从 cmap.md 读 term，text/keywords 命中即写入 record.ter
 ## topicMinScore 持久化（4.11.36）
 
 toPointer 之前漏了 topicMinScore，导致 labeler/updater 有值但写盘被过滤。现已加入 pointer，测试覆盖 roundtrip。旧行不回填，需 relabel 时补。
-
-## relabel 只读演练（4.11.36）
-
-bin/relabel-dry-run.mjs 进包；只读，不写 index/baseline/raw；LOO 样本 <100 时输出显式警告；raw 缺失轮记 unresolved。
 
 ## eval baseline 缺失修复（4.11.36）
 

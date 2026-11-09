@@ -75,7 +75,7 @@ export function blocksByTag({ events = [], tagOf = new Map(), fromSeq = 0, toSeq
     if (event?.type !== 'user/message' && event?.type !== 'assistant/message') continue;
     // user/message 没有 data.turn（结构性事实）；调用方可以先用 attributeTurnSeqs 把轮号
     // 填到 event.turn 上。只认 data.turn 会把用户原话排除在折叠边界之外——那正是
-    // “想找原话却折不进去”的根源（历史调试 实测：块起点落在 assistant 而不是 user）。
+    // “想找原话却折不进去”的根源（2026-10-30 实测：块起点落在 assistant 而不是 user）。
     const turn = Number(event?.data?.turn ?? event?.turn);
     const seq = Number(event?.seq);
     if (!Number.isInteger(turn) || !Number.isInteger(seq)) continue;

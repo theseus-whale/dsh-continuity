@@ -91,7 +91,7 @@ recall()
 recall({ query: "跑团", recent: true })
 recall({ query: "A标签" })           // 当前 session 的 topic
 recall({ query: "A标签:workflow" })  // 当前 session 的 workflow
-recall({ query: "A标签:示例主题" })   // 任意 A 概念
+recall({ query: "A标签:跑团叙事" })   // 任意 A 概念
 recall({ query: "B标签" })
 recall({ query: "C标签" })
 recall({ query: "K标签" })

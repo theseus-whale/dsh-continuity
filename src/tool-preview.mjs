@@ -1,8 +1,10 @@
 /**
  * Pure A4/B helpers: active-tool pinning and deterministic tool-result previews.
  *
- * A4 keeps a hard pin on the tools of the current open turn (plus every
- * unpaired call). All other `tool/result` nodes may be rewritten to a head +
+ * A4 keeps a hard pin only on unpaired calls in the current open turn (plus
+ * every unpaired call in the recent-turn buffer). Completed calls in the open
+ * turn are foldable; their result is already paired. All other `tool/result`
+ * nodes may be rewritten to a head +
  * marker + tail preview; user/assistant/reasoning content is never touched.
  * The marker cites the original seq so `session_log get seq=<n>` can recover
  * the full text; the raw log is never rewritten.
@@ -173,7 +175,8 @@ export function activeCallIds(events, { recentTurns = 3 } = {}) {
     if (callId === undefined || callId === null) continue;
     const inOpenTurn = openTurn !== null && event.data?.turn === openTurn;
     const recentUnpaired = recent.has(event.data?.turn) && !completed.has(String(callId));
-    if (inOpenTurn || recentUnpaired) active.add(String(callId));
+    const openUnpaired = inOpenTurn && !completed.has(String(callId));
+    if (openUnpaired || recentUnpaired) active.add(String(callId));
   }
   return active;
 }

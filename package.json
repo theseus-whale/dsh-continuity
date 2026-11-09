@@ -1,7 +1,7 @@
 {
   "name": "dsh-continuity",
-  "version": "4.11.36",
-  "description": "Session-scoped long-term memory for DeepSeek Harness: band-controlled compaction, per-session A/B/C/K indexes, offline recall, and verifiable pass receipts.",
+  "version": "4.12.10",
+  "description": "Band-controlled compaction with session-scoped pointer indexes, persona-scoped A/B/C/K memory, verifiable pass receipts, and read-only retrieval for DeepSeek Harness",
   "type": "module",
   "license": "MIT",
   "main": "./src/index.mjs",
@@ -70,24 +70,19 @@
     "icon.svg",
     "README.md",
     "RELEASE-NOTES.md",
-    "bin/bc-relabel.mjs",
-    "bin/export-turns.py",
-    "bin/eval-label-rules.mjs",
+    "bin",
     "models",
+    "templates/rules-safe.md",
+    "templates/cmap.md",
+    "templates/keywords.md",
+    "templates/rules.md",
+    "templates/habits.md",
+    "templates/concepts.md",
+    "templates/rebuild.md",
     "docs/*.md",
     "guides",
-    "templates/*.md",
-    "LICENSE",
-    "DISCLAIMER.md",
-    "PRIVACY.md",
-    "SECURITY.md",
-    "THIRD-PARTY-NOTICES.md",
-    "CHANGELOG.md",
     "PANEL.md",
-    "bin/panel-check.mjs",
-    "bin/vec-check.mjs",
-    "INSTALL.md",
-    "bin/relabel-dry-run.mjs"
+    "INSTALL.md"
   ],
   "dsh": {
     "bundle": {
@@ -103,7 +98,10 @@
       ]
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "node test/policy.test.mjs && node test/provenance.test.mjs && node test/range.test.mjs && node test/session-log.test.mjs && node test/tool-preview.test.mjs && node test/stats.test.mjs && node test/threads.test.mjs && node test/tags.test.mjs && node test/tag-reject.test.mjs && node test/tag-detect.test.mjs && node test/user-turn.test.mjs && node test/save-start.test.mjs && node test/backfill.test.mjs && node test/migrate.test.mjs && node test/dispatch-probe.test.mjs && node test/t0.test.mjs && node test/topic.test.mjs && node test/inject-policy.test.mjs && node test/tag-confirm.test.mjs && node test/recheck.test.mjs && node test/tag-maintenance.test.mjs && node test/facets.test.mjs && node test/recall-cue.test.mjs && node test/recall-tool.test.mjs && node test/pointer-only.test.mjs && node test/bc-pre-step.test.mjs && node test/bc-store.test.mjs && node test/bc-recall.test.mjs && node test/special-keywords.test.mjs && node test/peer-smoke.test.mjs && node test/bc-panel-state.test.mjs && node test/recall-source-filter.test.mjs && node test/cmap-file.test.mjs && node test/recall-width.test.mjs && node test/bc-index-updater.test.mjs && node test/session-guard.test.mjs && node test/recall-exact.test.mjs && node test/mechanical-note.test.mjs",
+    "check": "node --check src/index.mjs && node --check src/engine.mjs && node --check src/range.mjs && node --check src/state.mjs && node --check src/session-log.mjs && node --check src/session-log-tool.mjs && node --check src/threads.mjs && node --check src/threads-store.mjs && node --check src/threads-backend.mjs && node --check src/threads-core.mjs && node --check src/threads-tool.mjs && node --check src/tags.mjs && node --check src/tags-store.mjs && node --check src/folds-store.mjs && node --check src/deleted-store.mjs && node --check src/backfill.mjs && node --check src/save-start.mjs && node --check src/user-turn.mjs && node --check src/tag-reject.mjs && node --check src/tag-detect.mjs && node --check src/tool-preview.mjs && node --check client.js && node --check src/tag-maintenance.mjs && node --check src/facets/schema.mjs && node --check src/facets/extract.mjs && node --check src/facets/index.mjs && node --check src/facets/scanner.mjs && node --check bin/facet-mvp.mjs && node --check src/facets/classifier.mjs && node --check src/facets/hybrid.mjs && node --check bin/facet-validate.mjs && node --check bin/facet-scan.mjs && node --check bin/facet-train.mjs && node --check src/facets/worker.mjs && node --check src/facets/service.mjs && node --check src/facets/random.mjs && node --check bin/facet-random-validate.mjs && node --check src/facets/sensitivity.mjs && node --check bin/facet-curve.mjs && node --check src/facets/panel.mjs && node --check src/facets/panel-state.mjs && node --check bin/facet-panel.mjs && node --check src/facets/load.mjs && node --check bin/facet-load.mjs && node --check src/facets/fold-plan.mjs && node --check bin/facet-fold.mjs && node --check src/facets/online-knn.mjs && node --check bin/facet-online-validate.mjs && node --check src/facets/linear-probe.mjs && node --check src/facets/mlp-probe.mjs && node --check src/facets/mlp-worker.mjs && node --check src/facets/mlp-service.mjs && node --check bin/facet-mlp-scan.mjs && node --check src/memory/event-log.mjs && node --check src/memory/bm25.mjs && node --check src/memory/summary-tree.mjs && node --check src/memory/vector-index.mjs && node --check src/memory/planner.mjs && node --check src/memory/tokenize.mjs && node --check bin/memory-build.mjs && node --check bin/memory-build-summary.mjs && node --check bin/memory-build-vector.mjs && node --check bin/memory-query.mjs && node --check bin/memory-eval.mjs && node --check bin/memory-bench.mjs && node --check bin/memory-scale.mjs && node --check bin/memory-dry-run.mjs && node --check bin/memory-loop-test.mjs && node --check bin/memory-replay-hints.mjs && node --check bin/memory-load-gate-replay.mjs && node --check bin/memory-closed-loop.mjs && node --check bin/memory-scenario-test.mjs && node --check bin/memory-event-alias-test.mjs && node --check src/memory/event-model.mjs && node --check src/memory/term-extractor.mjs && node --check src/memory/referent-ledger.mjs && node --check src/memory/event-summary-tree.mjs && node --check src/memory/calibration.mjs && node --check bin/memory-calibration.mjs && node --check src/memory/pre-turn.mjs && node --check bin/memory-pre-turn-harness.mjs && node --check src/memory/language-router.mjs && node --check src/memory/extraction-core.mjs && node --check src/memory/extraction-score.mjs && node --check src/memory/referent-candidates.mjs && node --check src/memory/structured-adapters.mjs && node --check src/memory/extraction-adapter.mjs && node --check bin/memory-extraction-bench.mjs && node --check bin/memory-user-loop.mjs && node --check src/recall-tool.mjs && node --check src/memory/bc-recall.mjs && node --check src/memory/bc-label.mjs && node --check src/memory/bc-pre-step.mjs && node --check src/memory/bc-store.mjs && node --check src/memory/bc-index.mjs && node --check src/memory/bc-shift.mjs && node --check src/memory/bc-panel-state.mjs && node --check src/memory/recall-cue.mjs && node --check bin/plugin-integrity.mjs && node --check src/peer.mjs && node --check src/peer-tool.mjs && node --check src/memory/special-keywords.mjs && node --check bin/bc-add-keywords.mjs && node --check bin/bc-ingest-index.mjs && node --check src/memory/cmap-file.mjs && node --check src/memory/bc-index-updater.mjs && node --check bin/eval-label-rules.mjs && node --check bin/relabel-dry-run.mjs && node -e \"import('./src/memory/relabel-migrate.mjs')\" && node --check src/recall-exact-tool.mjs"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
     "@deepseek-ai/dsh-agent": "*",
@@ -139,14 +137,5 @@
   "dependencies": {
     "@huggingface/transformers": "^4.3.2",
     "sharp": "^0.35.5"
-  },
-  "author": "dsh-continuity contributors",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/theseus-whale/dsh-continuity.git"
-  },
-  "homepage": "https://github.com/theseus-whale/dsh-continuity",
-  "bugs": {
-    "url": "https://github.com/theseus-whale/dsh-continuity/issues"
   }
 }

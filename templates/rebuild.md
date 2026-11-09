@@ -83,14 +83,14 @@ kind = topic | workflow
 ```text
 recall("A标签") -> 只列 topic
 recall("A标签:workflow") -> workflow
-recall("示例活动") -> 仍走 C，不退回
+recall("跑团") -> 仍走 C，不退回
 ```
 
 ## 8. 补 C 表 + 别名表
 
 ```text
 sessions/<当前 session>/cmap.md
-  示例活动 => 示例主题 | minB:1
+  跑团 => 跑团叙事 | minB:1
 
 sessions/<当前 session>/aliases.md
   只放跨语言标识符（短信 => sms），不放同义词。

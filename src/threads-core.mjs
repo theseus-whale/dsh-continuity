@@ -265,7 +265,7 @@ export class ThreadsCore {
 
   async save(args = {}, signal) {
     // home 必须是函数级：闸、override 日志、fold-empty 日志、preflight 诊断都在不同块里用它。
-    // 历史调试 实测：它原先声明在闸的 try 块里，出块即 ReferenceError，
+    // 2026-10-30 实测：它原先声明在闸的 try 块里，出块即 ReferenceError，
     // 于是 save 成功、preflight 却报 "home is not defined"。
     const home = continuityHome();
     // 预检要用的会话事件：闸在 try 块里读到，但出了块就没了，所以在这里留一份引用。
@@ -333,7 +333,7 @@ export class ThreadsCore {
     try {
       const overrideFile = join(home, 't0-override.json');
       // override 必须写明“放行哪些闸 + 为什么”。空文件不再等于全部放行——
-      // 踩过：一个残留的空 t0-override.json 静默跳过了四道闸，一批没标签也存进去了。
+      // 踩过：一个残留的空 t0-override.json 静默跳过了四道闸，52 轮没标签也存进去了。
       let override = null;
       try {
         const doc = JSON.parse(readFileSync(overrideFile, 'utf8'));
@@ -363,7 +363,7 @@ export class ThreadsCore {
       const startFrom = resolved.startFrom;
       const snapshot = await this.sessionQuery.readSession(this.agent.session.id);
       // readTags() 返回的是包装对象 { state, missing, corrupt }，闸要的是 state 本体。
-      // 直接传包装对象等于传了一份空文档：overrides/runs 从来没进过闸（历史调试 抓到）。
+      // 直接传包装对象等于传了一份空文档：overrides/runs 从来没进过闸（2026-10-30 抓到）。
       const tagsRead = await readTags();
       if (tagsRead.corrupt || tagsRead.missing) {
         recordError(
@@ -394,7 +394,7 @@ export class ThreadsCore {
       }
       // 折叠右界：显式 toSeq 优先，否则取“最后一个已结束轮”的边界。
       // 这里原写成 `let toSeq = Infinity`，把外层显式 toSeq 遮蔽了——
-      // 实测：明确给 某段范围，却多折了 某段范围（历史调试 定向验证抓到）。
+      // 实测：明确给 42426..43040，却多折了 43444..43670（2026-10-30 定向验证抓到）。
       let boundaryTo = Infinity;
       if (Number.isFinite(maxTurn)) {
         let boundary = -Infinity;
@@ -408,7 +408,7 @@ export class ThreadsCore {
       }
       const cutTo = toSeq !== undefined ? toSeq : boundaryTo;
       // 逐轮标签必须在使用前读进来：之前写成“先用后声明”，ReferenceError 被下面的
-      // catch 吞掉，四道闸全部静默失效（历史调试 反向验收抓到：一批无标签也存了）。
+      // catch 吞掉，四道闸全部静默失效（2026-10-29 反向验收抓到：90 轮无标签也存了）。
       let turnTagRows = [];
       try {
         turnTagRows = readFileSync(join(home, 'turn-tags.jsonl'), 'utf8').split('\n').filter(Boolean)
@@ -422,7 +422,7 @@ export class ThreadsCore {
       for (const row of turnTagRows) tagOf.set(Number(row.turn), String(row.tag));
       // user/message 没有 data.turn（结构性事实）：先归轮，再切块——**两个分支都要用**。
       // 不归轮的话块会从 assistant 开始，用户原话永远折不进去，下次 save 又看见它。
-      // （历史调试 踩过：把这段放在 exclude 分支里，else 分支直接 ReferenceError。）
+      // （2026-10-30 踩过：把这段放在 exclude 分支里，else 分支直接 ReferenceError。）
       const orderedForRuns = (Array.isArray(allEvents) ? allEvents : [])
         .map((event) => ({
           seq: Number(event?.seq),
@@ -587,7 +587,7 @@ export class ThreadsCore {
         }) + '\n');
       } catch { /* 日志都写不了就算了，但不能因此阻断 */ }
       // 闸自身写错（ReferenceError/TypeError）时静默放行，等于四道闸一起失效——
-      // 今天已经这样漏过两次（20 轮、一批无标签被折叠）。改成响亮地中止。
+      // 今天已经这样漏过两次（20 轮、97 轮无标签被折叠）。改成响亮地中止。
       if (error?.name === 'ReferenceError' || error?.name === 'TypeError') {
         const fatal = new Error('continuity.save: 闸自身出错（' + error.name + ': ' + error.message
           + '），已中止保存——不静默放行。详情见 gate-errors.jsonl。');

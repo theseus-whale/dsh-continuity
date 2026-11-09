@@ -1,5 +1,5 @@
 /**
- * Pre-turn integration: one incoming user/peer message -> facet/event/gate/load.
+ * Pre-turn integration: one incoming user/Coo message -> facet/event/gate/load.
  * Pure system layer. No live session writes.
  */
 import { MemoryLoadState, latestCandidate, candidateSegment } from './load-gate.mjs';

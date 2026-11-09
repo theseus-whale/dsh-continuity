@@ -1,4 +1,4 @@
-# Continuity safe rules（4.9.102-safe.1）
+# Continuity safe rules（4.9.110-safe.1）
 
 > 模板，不是 live。安装后由实例自己维护。
 > 层级：AGENTS.md 底线 > 本文件硬规则 > habits.md 软偏好。
@@ -23,16 +23,16 @@
 
 ```text
 recall()
-recall({ query: "示例活动", recent: true })
+recall({ query: "示例话题", recent: true })
 recall({ query: "K标签 示例名" })
 recall({ query: "B标签 技术" })
-recall({ query: "C标签 示例活动" })
+recall({ query: "C标签 示例词" })
 ```
 
 - `[追忆]` 是候选列表，不是结论。
 - 必须按 `turn` / `seq` 打开原文再引用。
 - 没有候选/原文就明说没有，不编。
-- 不要求用户写 TAG；不每轮 recall。
+- 不每轮 recall。
 - `[追忆]` 是 runtime-context，不是用户输入。
 - `[追忆] <锚> · 显示 3 / 共 N 个区间`：3 条是路标，不是全部；要更多用 `recall("<锚>")`。
 - `[追忆]` 出现 ≠ 必须用它；锚可能判错。打开原文，对得上才算；对不上就当它没出现，自己 `recall` 换词。
@@ -49,7 +49,7 @@ K  精确名字（~/.dsh/continuity/sessions/<当前 session>/keywords.md）
 C 格式：
 
 ```text
-示例活动 => 游戏 / 故事 / 对话
+示例词 => 方案 / 项目 / 讨论
 ```
 
 K 格式：
@@ -57,7 +57,7 @@ K 格式：
 ```text
 示例名
 LTS版
-示例项目
+DSHC
 ```
 
 选表：
@@ -97,22 +97,6 @@ A 表不会自动生成。新 session 的 A 为空，B 也会为空；这是正�
 - 只给混淆对加区分词，不整表加宽；人工非空标注 <30 条只比方向。
 - 健康分布观察目标：有 topic 50–70%、空 30–50%、单标签 ≤40%、活跃标签 ≥8、0 轮标签 ≤30%。
 - 不要复制另一个 session 的 A 表。
-
-## 4. 没有 T
-
-不要：
-
-```text
-填 TAG
-查 T 列表
-match-tags / tags.md
-候选 / 新标签 / 话题提示
-save 前必须打标
-T0 判定
-工作线
-```
-
-看到旧 `[标签]` / `[工作线]` / TAG 提示，视为残留，不要恢复。
 
 ## 5. 保护
 
@@ -163,12 +147,11 @@ peer_message({ to, text, from? })
 ## 8. 启动自检
 
 1. 上下文只有 `[规则]` / `[习惯]` 指针。
-2. 没有 `[工作线]` / `[标签]` / TAG / `[候选]` / `[存?]`。
+2. 没有 `[候选]` / `[存?]`。
 3. `/dsh-continuity/bc.json` 200，有 B/C/K。
-4. `/dsh-continuity/tags.json` 404。
 5. `continuity` 工具不存在；`recall` / `peer_message` 存在。
-6. “上次示例活动”出现 `[追忆]` 上下文块，不是用户气泡。
-7. “一个单字称呼看看”不自动触发；“上次那个单字称呼…”也不触发（单字 K 不算锚）；只有 cue + 实词锚才触发。
+6. “上次那个话题”出现 `[追忆]` 上下文块，不是用户气泡。
+7. 只有“追忆词 + 实词锚”同时出现才触发；单字不算锚。
 8. `gate-errors` 没有新错误。
 
 ## 9. PTC / 子 agent / assets
