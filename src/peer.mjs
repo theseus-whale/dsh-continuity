@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Target-addressed peer delivery on the Host's existing loopback web server.
  *
- * This is deliberately not a pet bridge: that bridge owns one socket and
+ * This is deliberately not the Coo pet bridge: that bridge owns one socket and
  * routes to `agents.owner`, so switching the active session changes its target.
  * Here `to` is a session id, lookup is exact, and a missing target is a refusal.
  * Nothing in this module appends a session event directly; the only write path
@@ -59,7 +59,7 @@ export function parsePeerPayload(payload) {
   if (text.length === 0) return { ok: false, error: 'text-required' };
   if (text.length > PEER_TEXT_LIMIT) return { ok: false, error: 'text-too-long' };
   const rawFrom = typeof payload.from === 'string' ? payload.from : '';
-  const from = rawFrom.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, PEER_FROM_LIMIT) || 'peer';
+  const from = rawFrom.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, PEER_FROM_LIMIT) || '创';
   return { ok: true, to, from, text };
 }
 

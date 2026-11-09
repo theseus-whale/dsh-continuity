@@ -20,6 +20,60 @@ const cos = (a, b) => {
   for (let i = 0; i < Math.min(a.length, b.length); i += 1) dot += a[i] * b[i];
   return dot;
 };
+
+const CJK = /[\u3400-\u9fff]/;
+const IDENTIFIER = /^(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)+|[a-z]+[0-9]+|[0-9a-f]{8,}|[a-z]+(?:id|uuid|hash))$/i;
+const NOISE = new Set(['revision', 'actionid', 'sessionid', 'session', 'compact', 'turn', 'seq', 'json', 'tool', 'result', 'state', 'true', 'false', 'null']);
+
+function termKey(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isUsefulTerm(value) {
+  const term = String(value ?? '').trim();
+  if (!term) return false;
+  if (NOISE.has(termKey(term))) return false;
+  if (IDENTIFIER.test(term)) return false;
+  if (/[0-9a-f]{8}-[0-9a-f-]{8,}/i.test(term)) return false;
+  // Tokenizer output is mostly lowercase English; those are commands/identifiers,
+  // not new proper names. Keep CJK terms and capitalized names.
+  if (!CJK.test(term) && /^[a-z][a-z0-9_-]*$/.test(term)) return false;
+  return CJK.test(term) || term.length >= 3;
+}
+
+function topConcept(record) {
+  const scores = record?.conceptScores ?? {};
+  let best = '';
+  let bestScore = 0;
+  for (const [label, score] of Object.entries(scores)) {
+    if (Number(score) > bestScore) { best = label; bestScore = Number(score); }
+  }
+  return best;
+}
+
+function segmentFeatures(members, conceptLabels, newConcepts) {
+  const size = Math.max(1, members.length);
+  const empty = members.filter((m) => Number(m.confidence ?? 0) === 0 || Object.keys(m.conceptScores ?? {}).length === 0).length;
+  const bleed = members.filter((m) => newConcepts.has(topConcept(m))).length;
+  const vocab = new Set(conceptLabels.map(termKey));
+  const newTermTurns = members.filter((m) => {
+    const terms = [...(m.terms ?? []), ...(m.keywords ?? [])].map(termKey);
+    return terms.some((term) => term && !vocab.has(term) && isUsefulTerm(term));
+  }).length;
+  return {
+    emptyRate: empty / size,
+    bleedRate: bleed / size,
+    newTermRate: newTermTurns / size,
+  };
+}
+
+function candidateScore(features, topicMax) {
+  const topicGap = Math.max(0, Math.min(1, 1 - Number(topicMax ?? 0)));
+  return 0.35 * features.emptyRate
+    + 0.30 * features.bleedRate
+    + 0.20 * features.newTermRate
+    + 0.15 * topicGap;
+}
 const readJson = (file, fallback) => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch { return fallback; }
 };
@@ -54,6 +108,47 @@ export function readAuditState(indexFile) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value
     : { lastAuditTurn: 0 };
+}
+
+function reviewPaths(indexFile) {
+  return { stateFile: path.join(path.dirname(indexFile), 'recent-review.json') };
+}
+
+/**
+ * Cheap per-turn gate. No kmeans, no embeddings.
+ * Returns a short one-shot review directive only when the recent window is
+ * clearly weak, and at most once per cooldown turns.
+ */
+export function buildRecentReview({ indexFile, conceptsFile = null, records = [], window = 24, cooldown = 12 } = {}) {
+  if (!indexFile || records.length < 8) return null;
+  const recent = records.slice(-window);
+  const lastTurn = Number(recent.at(-1)?.turn);
+  if (!Number.isInteger(lastTurn)) return null;
+  const state = readAuditState(indexFile);
+  const prior = Array.isArray(state.conceptsAtLastAudit) ? state.conceptsAtLastAudit.map(String) : [];
+  const rows = loadConcepts(conceptsFile ?? defaultConceptsPath());
+  const concepts = rows.map((row) => row.label);
+  const newConcepts = prior.length > 0
+    ? new Set(concepts.filter((label) => !prior.includes(String(label))))
+    : new Set();
+  const features = segmentFeatures(recent, concepts, newConcepts);
+  const bleedTurns = Math.round(features.bleedRate * recent.length);
+  const strong = features.emptyRate >= 0.3 || (newConcepts.size > 0 && bleedTurns >= 2);
+  if (!strong) return null;
+
+  const reviewState = readJson(reviewPaths(indexFile).stateFile, null);
+  const lastReviewTurn = Number(reviewState?.lastTurn ?? 0);
+  if (Number.isFinite(lastReviewTurn) && lastTurn - lastReviewTurn < cooldown) return null;
+
+  const flags = [];
+  if (features.emptyRate >= 0.3) flags.push(`empty ${features.emptyRate.toFixed(2)}`);
+  if (bleedTurns >= 2) flags.push(`bleed ${bleedTurns}轮`);
+  const start = recent[0]?.turn ?? lastTurn;
+  const text = `[continuity:review] 快速校验 turn ${start}-${lastTurn}（${flags.join(' / ')}）。\n`
+    + `只回答三行：1 实际在做什么；2 top label 是漏标还是错标（对就写对）；3 最小修改（追加/降权/不修）。\n`
+    + `不展开、不另开 turn；三行后立刻继续用户请求。`;
+  writeJson(reviewPaths(indexFile).stateFile, { lastTurn, at: new Date().toISOString() });
+  return { text, range: [start, lastTurn], emptyRate: features.emptyRate, bleedTurns };
 }
 
 const AUDIT_RUNNING_TTL_MS = 15 * 60 * 1000;
@@ -206,37 +301,80 @@ export async function runAudit({ indexFile, conceptsFile } = {}) {
       centers[c] = norm(sum);
     }
   }
-  const clusters = groups.filter((group) => group.members.length >= 10).map((group) => {
-    const members = group.members;
-    const topicMax = members.reduce((sum, point) => {
-      const scores = point.record.conceptScores ?? {};
-      return sum + Math.max(0, ...concepts.map((name) => scores[name] ?? 0));
-    }, 0) / members.length;
-    const chatter = members.reduce((sum, point) => sum + (point.record.chatter ?? 0), 0) / members.length;
-    const turns = members.map((point) => point.turn).sort((a, b) => a - b);
-    const kw = [...new Set(members.flatMap((point) => point.record.keywords ?? []))].slice(0, 6);
-    return { start: turns[0], end: turns.at(-1), size: turns.length, topicMax, chatter, kw };
-  });
-  const candidates = clusters.filter((cluster) => cluster.topicMax < 0.5)
-    .sort((a, b) => a.topicMax - b.topicMax || b.size - a.size).slice(0, 5);
   const state = readAuditState(indexFile);
+  const priorConcepts = Array.isArray(state.conceptsAtLastAudit) ? state.conceptsAtLastAudit.map(String) : [];
+  // First run after upgrading has no baseline. Do not call every existing concept "new".
+  const newConcepts = priorConcepts.length > 0
+    ? new Set(concepts.filter((label) => !priorConcepts.includes(String(label))))
+    : new Set();
   const at = new Date().toISOString();
+
+  const buildCandidate = (members, extra = {}) => {
+    const recordsIn = members.map((point) => point.record ?? point);
+    const turns = recordsIn.map((record) => record.turn).sort((a, b) => a - b);
+    const topicMax = recordsIn.reduce((sum, record) => {
+      const scores = record.conceptScores ?? {};
+      return sum + Math.max(0, ...concepts.map((name) => scores[name] ?? 0));
+    }, 0) / Math.max(1, recordsIn.length);
+    const chatter = recordsIn.reduce((sum, record) => sum + (record.chatter ?? 0), 0) / Math.max(1, recordsIn.length);
+    const kw = [...new Set(recordsIn.flatMap((record) => record.keywords ?? []))].slice(0, 6);
+    const features = segmentFeatures(recordsIn, concepts, newConcepts);
+    return {
+      start: turns[0], end: turns.at(-1), size: turns.length, topicMax, chatter, kw,
+      ...features,
+      score: candidateScore(features, topicMax),
+      ...extra,
+    };
+  };
+
+  const clusters = groups.filter((group) => group.members.length >= 10)
+    .map((group) => buildCandidate(group.members));
+
+  const recentWindow = records.slice(-40);
+  const recentCandidate = recentWindow.length > 0 ? buildCandidate(recentWindow, { recent: true }) : null;
+  const recentIsStrong = Boolean(recentCandidate && (
+    recentCandidate.emptyRate >= 0.3
+    || recentCandidate.bleedRate >= 0.15
+    || recentCandidate.newTermRate >= 0.2
+  ));
+
+  const historical = clusters
+    .filter((cluster) => cluster.topicMax < 0.5)
+    .sort((a, b) => b.score - a.score || a.topicMax - b.topicMax || b.size - a.size);
+
+  const candidates = [];
+  if (recentIsStrong) candidates.push(recentCandidate);
+  for (const candidate of historical) {
+    if (candidates.length >= 5) break;
+    if (candidates.some((item) => item.start === candidate.start && item.end === candidate.end)) continue;
+    candidates.push(candidate);
+  }
+  if (candidates.length === 0 && recentCandidate) candidates.push(recentCandidate);
   if (candidates.length > 0) {
     const lines = candidates.map((item) => ({
       at, event: 'pending', range: [item.start, item.end], size: item.size,
       topicMax: Number(item.topicMax.toFixed(2)), chatter: Number(item.chatter.toFixed(2)), kw: item.kw,
+      emptyRate: Number(item.emptyRate.toFixed(2)), bleed: Number(item.bleedRate.toFixed(2)),
+      newTermRate: Number(item.newTermRate.toFixed(2)), score: Number(item.score.toFixed(3)),
+      recent: Boolean(item.recent),
     }));
     fs.appendFileSync(auditPaths(indexFile).hintFile, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, 'utf8');
-    const hint = '    → topicMax<0.5 且 kw 是话题词（非人名/道具/英文标识符）才考虑加；加就一步：concepts.md 追加 `名字 | 词1、词2… | 覆盖估算`';
-    const text = `[continuity:audit] 距上次 200 轮，${candidates.length} 个候选：\n`
-      + candidates.map((item) => `- turn ${item.start}-${item.end} · ${item.size}轮 · topicMax ${item.topicMax.toFixed(2)} · chatter ${item.chatter.toFixed(2)} · kw ${item.kw.join('/')}\n${hint}`).join('\n');
-    writeJson(auditPaths(indexFile).pendingFile, { at, text });
+    const strongest = candidates[0];
+    const flags = [];
+    if (strongest.emptyRate >= 0.3) flags.push(`empty ${strongest.emptyRate.toFixed(2)}`);
+    if (strongest.bleedRate >= 0.15) flags.push(`bleed ${strongest.bleedRate.toFixed(2)}`);
+    if (strongest.newTermRate >= 0.2) flags.push(`newTerm ${strongest.newTermRate.toFixed(2)}`);
+    const text = `[continuity:review] 快速校验 turn ${strongest.start}-${strongest.end}（${flags.join(' / ') || 'weak'}）。\n`
+      + `只回答三行：1 实际在做什么；2 top label 是漏标还是错标（对就写对）；3 最小修改（追加/降权/不修）。\n`
+      + `不展开、不另开 turn；三行后立刻继续用户请求。`;
+    writeJson(auditPaths(indexFile).pendingFile, { at, text, review: true, range: [strongest.start, strongest.end] });
   }
   writeJson(auditPaths(indexFile).stateFile, {
     lastAuditTurn: records.at(-1)?.turn ?? state.lastAuditTurn ?? 0,
     nextAuditTurn: (records.at(-1)?.turn ?? 0) + 200,
     lastResult: candidates.length > 0 ? 'candidates' : 'no-candidates',
     candidates: candidates.length,
+    conceptsAtLastAudit: concepts,
     at,
     running: false,
     runningAt: null,

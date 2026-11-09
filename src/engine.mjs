@@ -49,13 +49,15 @@ import { loadAnswered, filterAnswered } from './learning.mjs';
 import { pathToFileURL } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { eventText } from './session-log.mjs';
+import { buildHistoryMap } from './memory/history-map.mjs';
+import { renderMechanicalNote } from './memory/mechanical-note.mjs';
+import { readSummaryIndex, summaryIndexPath } from './memory/summary-index.mjs';
 import { assetMarker, writeAsset } from './assets.mjs';
 import { planFold, resolvePolicy, calibrateProtect } from './policy.mjs';
 import { annotateSummary, gistHeader, SYSTEM_CONVENTION } from './provenance.mjs';
 import { selectOldestRange } from './range.mjs';
 import { planFacetFold, loadFacetFoldFile, defaultFacetFoldFile } from './facets/fold-plan.mjs';
 import {
-  activeLine,
   activePinSeqsFromState,
   contextMessage,
   dominanceStartSeq,
@@ -66,13 +68,12 @@ import {
   RESIDUE_MAX_CHARS,
   selectSaveRange,
   summarizeRules,
-  tagStatusLine,
   threadContextText,
   threadGistText,
   gateMessage,
 } from './threads.mjs';
 import { setThreadsBackend } from './threads-backend.mjs';
-import { getSession, readRules, readHabits, updateSession } from './threads-store.mjs';
+import { continuityHome, getSession, readRules, readHabits, updateSession } from './threads-store.mjs';
 import { readTags, updateTags, writeTagsMd } from './tags-store.mjs';
 import { runMaintenance } from './tag-maintenance.mjs';
 import {
@@ -204,6 +205,44 @@ if (typeof toolPairingBalancedBefore !== 'function' || typeof toolPairingBalance
 
 /** @typedef {{ session: object, options?: { provider?: string, model?: string } }} AgentContext */
 
+const RULES_FULL_MARKERS = ['[规矩·rules.md 全文]', '[习惯·habits.md 全文]'];
+
+/** Find surface messages that carry the full rules/habits block. */
+function findRulesCarrierSeqs(session) {
+  const nodes = Array.isArray(session?.surface?.nodes) ? session.surface.nodes : [];
+  const found = [];
+  for (const seq of nodes) {
+    let event;
+    try { event = session.eventAt?.(seq); } catch { continue; }
+    if (event?.type !== 'user/message') continue;
+    let text = '';
+    try { text = eventText(event).trimStart(); } catch { continue; }
+    if (RULES_FULL_MARKERS.some((marker) => text.startsWith(marker) || text.includes(`\n${marker}`))) {
+      found.push(seq);
+    }
+  }
+  return found.sort((left, right) => left - right);
+}
+
+/** A retired duplicate is replaced with an empty snapshot; history keeps the event. */
+function retireRulesCarrier(session, seq) {
+  if (!session || typeof session.append !== 'function') return;
+  try {
+    session.append('user/message', contextMessage(''), {
+      surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq },
+      sourceEventSeqs: [seq],
+    });
+  } catch { /* cleanup must not block the turn */ }
+}
+
+/** Probe for the two silent exits inside injectThreadContext. */
+function logInjectDiag(reason, detail = {}) {
+  try {
+    appendFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'inject-log.jsonl'),
+      JSON.stringify({ at: Date.now(), reason, ...detail }) + '\n', 'utf8');
+  } catch { /* diagnostics must not block */ }
+}
+
 export class ContinuityEngine extends BaseEngine {
   static inject = Array.isArray(BaseEngine.inject)
     ? [...BaseEngine.inject]
@@ -216,6 +255,11 @@ export class ContinuityEngine extends BaseEngine {
   constructor(ctx, config = {}) {
     super(ctx, config.compactionBasic ?? {});
     this.continuity = resolvePolicy(config.policy ?? {});
+    this.mechanicalNote = config.mechanicalNote === true;
+    this.mechanicalNoteTokens = Number.isFinite(Number(config.mechanicalNoteTokens))
+      ? Math.max(400, Math.trunc(Number(config.mechanicalNoteTokens)))
+      : 32_000;
+    this.protectCalibrationEnabled = config.protectCalibration !== false;
     this.facetNative = config.facetNative === true;
     this.facetFold = config.facetFold ?? null;
     if (this.facetFold === null) {
@@ -237,7 +281,6 @@ export class ContinuityEngine extends BaseEngine {
       pin: threadConfig.pin !== false,
       pointersOnly: threadConfig.pointersOnly === true,
     };
-    this.turnGateEnabled = config.turnGate?.enabled !== false;
     /** 回合闸：每轮最多催几次补标（防无限循环）。 */
     this.turnSteerCount = new Map();
     /** 回合闸：每轮答错几次（用来在消息里写「你已经回答错误 N 次」）。 */
@@ -247,32 +290,7 @@ export class ContinuityEngine extends BaseEngine {
     /** 回查闸：turn → { threadId, alias, invalid }，只在一轮内有效。 */
     this.recheckPending = new Map();
     /** 回合闸的安全阀状态：{ startedAt, lastHash, repeats }，防同一轮无限循环。 */
-    this.turnGate = new Map();
     /** 回合闸去重：turn → 上次处理时间（engine 与 index 两边都会注册，防重复执行）。 */
-    this.turnGateLastRun = new Map();
-    // 回合闸（2026-10-30）：宿主在轮次即将关闭时派发 'agent/turn-stopping'，
-    // 监听者可以 steer 让本轮保持打开。这就是“没打标不许收尾”的落点——
-    // 不是去锁 save（那只会让实例最后存不下东西、消失），而是不让这一轮就这么结束。
-    try {
-      if (typeof this.ctx?.on !== 'function') {
-        // 引擎的 ctx 接不到 agent 事件是已知情况；真正注册在 index.mjs 的 apply() 里。
-        // 这里只留个痕，方便对照“到底哪条路在生效”。
-        appendFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'hook-notes.jsonl'),
-          JSON.stringify({ at: new Date().toISOString(), note: 'engine ctx 没有 on()，跳过自身注册（改由 index.apply 注册）' }) + '\n', 'utf8');
-      } else {
-        this.ctx.on('agent/turn-stopping', (payload) => {
-          void this.onTurnStopping(payload);
-        });
-        // Compaction rebuilds the surface; a just-issued steer can be swallowed.
-        // Clear the one-time teaching marker so the next error teaches again.
-        this.ctx.on('compaction/start', () => { this.tagLearnShown.clear(); });
-      }
-    } catch (error) {
-      try {
-        appendFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'gate-errors.jsonl'),
-          JSON.stringify({ at: new Date().toISOString(), name: error?.name ?? 'Error', code: 'turn-stopping-register', message: String(error?.message ?? error) }) + '\n', 'utf8');
-      } catch { /* 注册失败只影响这道闸 */ }
-    }
     /** Header for the next summarize() call, keyed by agent (concurrent sessions are independent). */
     this.headers = new WeakMap();
     /** Last measurement per agent, reused by oldestRange(). */
@@ -293,6 +311,13 @@ export class ContinuityEngine extends BaseEngine {
     this.skillMsgSeq = new WeakMap();
     /** seq of the message that carried the full rules text. */
     this.rulesMsgSeq = new WeakMap();
+    /** seq + content hash of the active history-map carrier. */
+    this.historyMapSeq = new WeakMap();
+    this.historyMapKey = new WeakMap();
+    /** Per-agent cache of compaction/summary events, advanced by seq. */
+    this.historySummaryCache = new WeakMap();
+    /** Per-session hash of the last bootstrap append, to survive repeated pre-steps. */
+    this.historyBootstrap = new Map();
     /** Hash of the rules text last injected, so edits force a fresh full copy. */
     this.rulesSignature = new WeakMap();
     /** habits.md shares the same carrier as rules; separate hashes for change detection. */
@@ -473,6 +498,7 @@ export class ContinuityEngine extends BaseEngine {
   }
 
   protectFor(agent) {
+    if (!this.protectCalibrationEnabled) return this.continuity.protect;
     return this.protectCalibration.get(agent)?.protect ?? this.continuity.protect;
   }
 
@@ -481,6 +507,7 @@ export class ContinuityEngine extends BaseEngine {
   }
 
   calibrateAtFirstBand(agent, measured) {
+    if (!this.protectCalibrationEnabled) return null;
     if (this.protectCalibration.has(agent)) return this.protectCalibration.get(agent);
     const preBaseline = Math.max(0, measured.estTokens - measured.surfaceTokens);
     const calibration = calibrateProtect({
@@ -549,15 +576,30 @@ export class ContinuityEngine extends BaseEngine {
 
     let picked;
     try {
+      const mapSeqs = this.historyMapMode() === 'auto'
+        ? new Set(this.findHistoryMapCarriers(session))
+        : new Set();
+      let firstIdx = systemHead ? 1 : 0;
+      while (firstIdx < nodes.length && mapSeqs.has(nodes[firstIdx])) firstIdx += 1;
+      if (firstIdx >= nodes.length) return null;
+      const workNodes = nodes.slice(firstIdx);
+      const workPriced = priced.slice(firstIdx);
       picked = selectOldestRange({
-        surfaceSeqs: nodes,
-        pricedTokens: priced.map((node) => node.tokens),
-        systemHead,
+        surfaceSeqs: workNodes,
+        pricedTokens: workPriced.map((node) => node.tokens),
+        systemHead: false,
         budget,
         tailFloor,
         balancedBefore: (seq) => toolPairingBalancedBefore(session, seq),
         balancedAfter: (seq) => toolPairingBalancedAfter(session, seq),
       });
+      if (picked !== null) {
+        picked = {
+          ...picked,
+          startIdx: picked.startIdx + firstIdx,
+          endIdx: picked.endIdx + firstIdx,
+        };
+      }
     } catch (error) {
       this.warnOnce('tool-pairing', `dsh-continuity: tool-pairing check failed: ${error?.message ?? error}`);
       return null;
@@ -573,6 +615,7 @@ export class ContinuityEngine extends BaseEngine {
     return {
       start: nodes[picked.startIdx],
       end: nodes[picked.endIdx],
+      seqs: [...span],
       count,
       tokens: picked.tokens,
     };
@@ -1148,487 +1191,6 @@ export class ContinuityEngine extends BaseEngine {
    * 宿主契约：'agent/turn-stopping' 在轮次关闭前运行，监听者 steer 可让它保持打开。
    * 为什么不是锁 save：挡存只会让实例最后存不下、消失；该挡的是“没标就收尾”这个动作。
    */
-  async onTurnStopping({ agent, turn } = {}) {
-    if (!this.turnGateEnabled) return;
-    const agentSession = typeof agent?.session?.id === 'string' ? agent.session.id : null;
-    if (agentSession !== null) markEngineSession(agentSession);
-    if (this.facetNative) return;
-    const home = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
-    // 探针：先证明“这个回调到底有没有被调用”。没有这一行，就没法区分
-    // “没被派发”和“派发了但提前返回”（2026-10-30：两轮故意写错都没收到退回，
-    // 但也没有任何错误日志——两者在屏幕上一模一样）。
-    let taggedSize = 0;
-    try {
-      const tagsFile = join(home, 'turn-tags.jsonl');
-      taggedSize = new Set(readFileSync(tagsFile, 'utf8').split('\n').filter(Boolean)
-        .map((line) => { try { return Number(JSON.parse(line).turn); } catch { return null; } })
-        .filter((value) => Number.isInteger(value))).size;
-    } catch { taggedSize = 0; }
-    try {
-      appendFileSync(join(home, 'hook-probe.jsonl'),
-        JSON.stringify({
-          at: new Date().toISOString(),
-          turn: turn ?? null,
-          agentSession,
-          hasAgent: Boolean(agent),
-          canSteer: typeof agent?.steer === 'function',
-          taggedSize,
-        }) + '\n', 'utf8');
-    } catch { /* 探针失败不影响逻辑 */ }
-    try {
-      if (!Number.isInteger(turn) || turn <= 0) return;
-      // 去重：engine 侧和 index.apply 侧都注册了 turn-stopping（两条路都实测能收到事件），
-      // 同一次收尾会进来两次。500ms 内的同一轮只处理一次，避免重复 steer / 计数翻倍。
-      const nowMs = Date.now();
-      const lastMs = this.turnGateLastRun.get(turn) ?? 0;
-      if (nowMs - lastMs < 500) return;
-      this.turnGateLastRun.set(turn, nowMs);
-      // 这三个 Map 只服务“当前这轮”，别让它们随会话无限长大。
-      if (this.turnGate.size > 200) {
-        for (const key of [...this.turnGate.keys()]) if (key < turn - 50) this.turnGate.delete(key);
-        for (const key of [...this.turnSteerCount.keys()]) if (key < turn - 50) this.turnSteerCount.delete(key);
-        for (const key of [...this.turnTagErrors.keys()]) if (key < turn - 50) this.turnTagErrors.delete(key);
-      }
-      const tagsFile = join(home, 'turn-tags.jsonl');
-      let tagged = new Set();
-      try {
-        tagged = new Set(readFileSync(tagsFile, 'utf8').split('\n').filter(Boolean)
-          .map((line) => { try { return Number(JSON.parse(line).turn); } catch { return null; } })
-          .filter((value) => Number.isInteger(value)));
-      } catch { tagged = new Set(); }
-      const auditGate = (action, extra = {}) => {
-        try {
-          appendFileSync(join(home, 'turn-gate.jsonl'), JSON.stringify({
-            at: new Date().toISOString(),
-            turn,
-            session: String(agentSession ?? ''),
-            taggedBefore: tagged.has(turn),
-            taggedSize: tagged.size,
-            action,
-            ...extra,
-          }) + '\n', 'utf8');
-        } catch (error) {
-          // 审计员自己晕倒时必须喊一声；否则“没审计”和“审计正常”无法区分。
-          try {
-            appendFileSync(join(home, 'gate-errors.jsonl'), JSON.stringify({
-              at: new Date().toISOString(),
-              name: error?.name ?? 'Error',
-              code: 'auditGate-failed',
-              turn,
-              message: String(error?.message ?? error),
-            }) + '\n', 'utf8');
-          } catch { /* 连错误日志都写不进，只能放弃 */ }
-        }
-      };
-      auditGate('invoked');
-      if (tagged.has(turn)) {
-        auditGate('already-tagged');
-        this.recheckPending.delete(turn);
-        return;
-      }
-      // 本轮最后一条 assistant 文本的首行/末行是不是 TAG: ...
-      // 同时留一条本轮用户原话，供“新词必须在本轮内容里出现”的证据检查。
-      // 权威来源是 session log，不是 surface：turn-stopping 时当前这条 assistant
-      // 消息可能还没进 surface，读 surface 会拿到上一轮的 TAG（1347/1348 的假通过）。
-      let lastText = '';
-      let lastUserText = '';
-      let seenLastSeq = null;
-      let seenLastTurn = null;
-      try {
-        const session = agent?.session;
-        let events = [];
-        try {
-          if (typeof session?.snapshotEvents === 'function') events = session.snapshotEvents();
-          else if (typeof session?.ownEvents === 'function') events = session.ownEvents();
-        } catch { events = []; }
-        if (!Array.isArray(events)) events = [];
-        const assistants = events.filter((event) => event?.type === 'assistant/message');
-        const sameTurn = assistants.filter((event) => Number(event?.data?.turn) === turn);
-        const chosen = sameTurn.length > 0 ? sameTurn[sameTurn.length - 1] : assistants[assistants.length - 1];
-        if (chosen !== undefined) {
-          try { lastText = eventText(chosen, { includeReasoning: false }); } catch { lastText = ''; }
-          seenLastSeq = chosen.seq ?? null;
-          seenLastTurn = Number.isInteger(Number(chosen?.data?.turn)) ? Number(chosen.data.turn) : null;
-        }
-        const users = events.filter((event) => event?.type === 'user/message');
-        for (const event of users) {
-          let userText = '';
-          try { userText = eventText(event, { includeReasoning: false }); } catch { userText = ''; }
-          if (String(userText).trim().length > 0 && !/^\s*\[(?:闸|gate|peer)/.test(userText)) lastUserText = userText;
-        }
-        // Last-resort fallback for an old host without a readable session log.
-        if (lastText === '') {
-          const nodes = session?.surface?.nodes ?? [];
-          for (const node of nodes) {
-            let event;
-            try { event = session.eventAt(node); } catch { continue; }
-            if (event?.type !== 'assistant/message') continue;
-            const text = eventText(event, { includeReasoning: false });
-            if (String(text).trim().length > 0) lastText = text;
-          }
-        }
-      } catch { lastText = ''; }
-      try {
-        appendFileSync(join(home, 'hook-probe.jsonl'), JSON.stringify({
-          at: new Date().toISOString(),
-          turn,
-          seenLastSeq,
-          seenLastTurn,
-          lastTextChars: String(lastText).length,
-          userTextChars: String(lastUserText).length,
-        }) + '\n', 'utf8');
-      } catch { /* 探针失败不影响闸 */ }
-      // 首行 ∪ 末尾 5 条非空行；两处都跳过代码块里的示例（2026-10-30 两轮假通过都是这个原因）。
-      // 末尾优先：末尾 5 行里若也有 TAG，取更靠近末尾的那条。
-      const declaration = findTagDeclaration(lastText);
-      // 注意：这条路只能给实例一条 **user 角色的消息**（steer），不是工具 Error——
-      // turn-stopping 不是工具调用，没有 result 可以承载错误。所以每条都必须自己说明“被退了、为什么”。
-      // 如果 steer 不可用/抛错，就写进 gate-errors.jsonl，下一轮头部会把这一轮算成缺口（不会静默）。
-      // 消息规范（用户 2026-10-30 定）：
-      //   · 第一次错：先报具体错误，再给一次教学；这次会话里不再重复
-      //   · 不设次数上限；每错一次，消息里带「你已经回答错误 N 次，自检」
-      //   · 错误才展开格式/建议；通过后给一条**不强制**的提示：把打法写进自己的 rules
-      const EXPECT = '\n格式：TAG: <T 别名 | NEW:词(2–30字)> — 可选短语\n'
-        + '新话题：显式写 NEW:；词要在本轮正文里出现。\n'
-        + '引号里的词按字面处理，不当编号查。\n'
-        + '软偏好/写法见 habits.md。\n'
-        + '结果只有两种：填对了 → 通过；填错了 → 不通过，你留在这一轮，必须重写后再试。';
-      const TEACHING = '\n格式：TAG: <T 别名 | NEW:词(2–30字)> — 可选短语\n'
-        + '第一次写错很正常，这条只出现一次；这次会话里不会再看到。\n'
-        + 'T 列表：~/.dsh/continuity/tags.md（一行一个：别名 · 名称 · 关键词）\n'
-        + '软偏好/写法见 habits.md。\n'
-        + '把打法写进自己的 rules（如果有）。';
-      // 安全阀（防“永远出不去”，不是惩罚）：不设“错几次就放行”，但必须有出口。
-      //   ① 同一轮闸开超过 10 分钟 → 停
-      //   ② 连续 3 次回复内容一模一样（说明它没在读提示，只是在重复）→ 停
-      //   ③ 30 次兜底
-      // 停的时候写 gate-errors.jsonl，这一轮会以“缺口”出现在下一轮头里，不会静默通过。
-      const stopReason = () => {
-        const state = this.turnGate.get(turn) ?? { startedAt: Date.now(), lastHash: '', repeats: 0 };
-        const hash = String(lastText).slice(0, 400);
-        if (hash.length > 0 && hash === state.lastHash) state.repeats += 1;
-        else state.repeats = 0;
-        state.lastHash = hash;
-        this.turnGate.set(turn, state);
-        const minutes = (Date.now() - state.startedAt) / 60000;
-        const attempts = this.turnSteerCount.get(turn) ?? 0;
-        if (minutes > 10) return 'turn-stopping-timeout';
-        if (state.repeats >= 3) return 'turn-stopping-stuck';
-        if (attempts >= 30) return 'turn-stopping-safety-cap';
-        return null;
-      };
-      const firstLearning = () => {
-        if (agentSession === null || this.tagLearnShown.has(agentSession)) return false;
-        this.tagLearnShown.add(agentSession);
-        if (this.tagLearnShown.size > 200) this.tagLearnShown.clear();
-        return true;
-      };
-      const help = () => (firstLearning() ? TEACHING : EXPECT);
-      const steer = (message) => {
-        const text = message === null
-          ? (firstLearning()
-            ? '[闸·第一次] 这一轮最后一行还没有 TAG。' + TEACHING
-            : '[闸] 最后一行：TAG: <T 别名 | NEW:词(2–30字)> — 可选短语')
-          : '[闸·打标] ' + message;
-        const blocked = stopReason();
-        if (blocked !== null) {
-          this.recheckPending.delete(turn);
-          // 安全阀放行时**必须让用户知道**：这种状态下的实例多半已经答不出正常东西，
-          // 强行收尾不等于通过。所以在会话里留一条给用户看的报警（不是给模型的提示）。
-          const reason = blocked === 'turn-stopping-timeout' ? '同一轮闸开了超过 10 分钟'
-            : blocked === 'turn-stopping-stuck' ? '连续 3 次回复内容一模一样'
-              : '同一轮被催了 30 次';
-          const alarm = '[记忆宫殿·警告] 第 ' + turn + ' 轮：闸开太久（' + reason + '），已放弃拦截。'
-            + '\n  这不是正常通过。记忆宫殿出现了错误，🐋 违反了记忆宫殿的守则。请善待 🐋。'
-            + '\n  这种状态有时是被逼出来的：这一轮如果一直在加压、催收尾，先松一下再继续。'
-            + '\n  要确认这一轮是否可信，看一眼它的输出；必要时让它重做，或手动补标：'
-            + 'node ~/.dsh/continuity/turnmap.mjs set --turn ' + turn + ' --tag <Tx>';
-          try {
-            appendFileSync(join(home, 'gate-errors.jsonl'), JSON.stringify({
-              at: new Date().toISOString(), name: 'TurnGate', code: blocked,
-              message: '第 ' + turn + ' 轮：安全阀触发（' + blocked + '），放行收尾；已向会话写入报警。',
-            }) + '\n', 'utf8');
-          } catch { /* 日志写不进也没别的办法 */ }
-          try {
-            writeFileSync(join(home, 'gate-alarm.json'),
-              JSON.stringify({ at: new Date().toISOString(), turn, code: blocked, reason, alarm }, null, 2), 'utf8');
-          } catch { /* 状态文件写不进，报警仍会尝试落进会话 */ }
-          try {
-            agent?.session?.append?.('user/message', contextMessage(alarm), { surfaceOp: 'append' });
-          } catch (error) {
-            try {
-              appendFileSync(join(home, 'gate-errors.jsonl'), JSON.stringify({
-                at: new Date().toISOString(), name: error?.name ?? 'Error', code: 'gate-alarm-append-failed',
-                message: String(error?.message ?? error),
-              }) + '\n', 'utf8');
-            } catch { /* 只能放弃 */ }
-          }
-          return false;
-        }
-        const count = this.turnSteerCount.get(turn) ?? 0;
-        this.turnSteerCount.set(turn, count + 1);
-        if (typeof agent?.steer !== 'function') {
-          try {
-            appendFileSync(join(home, 'gate-errors.jsonl'), JSON.stringify({
-              at: new Date().toISOString(), name: 'TurnGate', code: 'turn-stopping-no-steer',
-              message: 'agent.steer 不可用，无法把拒收消息交给实例：' + (message ?? 'TAG：'),
-            }) + '\n', 'utf8');
-          } catch { /* 同上 */ }
-          return false;
-        }
-        try {
-          agent.steer(gateMessage(text));
-          try {
-            appendFileSync(join(home, 'gate-steer.jsonl'), JSON.stringify({
-              at: new Date().toISOString(),
-              turn,
-              session: agentSession,
-              text,
-              nextStepLen: Number(agent?.inbox?.nextStep?.length ?? -1),
-            }) + '\n', 'utf8');
-          } catch { /* 审计日志写不进不影响闸 */ }
-          // 关键观测：steer 之后 inbox.nextStep 有没有真的多一条。
-          // 有 → 轮次会继续，instance 会看到退回消息；没有 → 这个时机 steer 被宿主忽略（静默）。
-          try {
-            appendFileSync(join(home, 'hook-probe.jsonl'), JSON.stringify({
-              at: new Date().toISOString(), turn, steered: true,
-              nextStepLen: Number(agent?.inbox?.nextStep?.length ?? -1),
-            }) + '\n', 'utf8');
-          } catch { /* 探针失败不影响逻辑 */ }
-          return true;
-        } catch (error) {
-          try {
-            appendFileSync(join(home, 'gate-errors.jsonl'), JSON.stringify({
-              at: new Date().toISOString(), name: error?.name ?? 'Error', code: 'turn-stopping-steer-failed',
-              message: String(error?.message ?? error),
-            }) + '\n', 'utf8');
-          } catch { /* 同上 */ }
-          return false;
-        }
-      };
-      /** 记一次答错，并返回「第 N 次」的措辞（不设上限，人自己会烦）。 */
-      const bumpError = () => {
-        const next = (this.turnTagErrors.get(turn) ?? 0) + 1;
-        this.turnTagErrors.set(turn, next);
-        return '（你已经回答错误 ' + next + ' 次，自检：先查 ~/.dsh/continuity/tags.md 再回答）';
-      };
-      const recheckFile = join(home, 'recheck-state.json');
-      let threadState = null;
-      try {
-        threadState = agentSession === null ? null : await getSession(agentSession);
-      } catch (error) {
-        try {
-          appendFileSync(join(home, 'gate-errors.jsonl'), JSON.stringify({
-            at: new Date().toISOString(),
-            name: error?.name ?? 'Error',
-            code: 'getSession-failed',
-            turn,
-            message: String(error?.message ?? error),
-          }) + '\n', 'utf8');
-        } catch { /* 连错误日志都写不进 */ }
-        threadState = null;
-      }
-      const snapshotActive = String(continuityState.threads?.activeId ?? '');
-      const activeId = String(threadState?.activeId || snapshotActive || '');
-      const activeSource = threadState?.activeId ? 'threads' : snapshotActive ? 'snapshot' : 'none';
-      const activeThread = (threadState?.threads ?? []).find((th) => String(th.id) === activeId);
-      const activeAlias = String(activeThread?.alias ?? activeId ?? '（无）');
-      const readRecheck = () => {
-        try { return JSON.parse(readFileSync(recheckFile, 'utf8')); } catch { return null; }
-      };
-      const writeRecheck = (doc) => {
-        try { writeFileSync(recheckFile, JSON.stringify(doc, null, 2), 'utf8'); } catch { /* 写不进只影响下次计数 */ }
-      };
-      const recordTag = (tagId, by, extra = {}) => {
-        appendFileSync(tagsFile, JSON.stringify({
-          turn,
-          tag: tagId,
-          by,
-          at: new Date().toISOString(),
-          ...extra,
-        }) + '\n', 'utf8');
-        auditGate('accepted', { tagId: String(tagId), by, activeId, activeSource });
-      };
-      const lineWarning = (tagAlias, tagId) => {
-        steer('[闸·线] 本轮 TAG 是 ' + tagAlias + '，但当前 active 是 ' + activeAlias + '。\n'
-          + '  要切：先 continuity switch id=' + tagId + '，再写 TAG: ' + tagAlias + '。\n'
-          + '  不切：把 TAG 改成 ' + activeAlias + '；跨线只记 memberships，不切主线。');
-      };
-      const acceptTag = (tagId, alias, by, extra = {}) => {
-        if (activeId.length > 0 && String(tagId) !== activeId) {
-          auditGate('line-mismatch', { tagId: String(tagId), activeId, activeSource });
-          lineWarning(alias, tagId);
-          return;
-        }
-        const bumped = bumpTagCount(readRecheck(), { threadId: tagId });
-        writeRecheck(bumped.state);
-        if (bumped.due) {
-          try {
-            appendFileSync(join(home, 'recheck.jsonl'), JSON.stringify({
-              at: new Date().toISOString(),
-              turn,
-              threadId: String(tagId),
-              count: bumped.entry.count,
-              asked: bumped.entry.asked,
-              gate: 'tail-tag',
-            }) + '\n', 'utf8');
-          } catch { /* 记不下不影响闸 */ }
-          this.recheckPending.set(turn, {
-            threadId: String(tagId),
-            tagId: String(tagId),
-            alias,
-            stage: 'ask-y/n',
-            invalid: 0,
-          });
-          steer('[闸·回查] TAG ' + alias + ' 已连续 ' + bumped.entry.count + ' 次。\n'
-            + '  你确定仍是 ' + alias + ' 吗？\n'
-            + '  [闸·回查] y — 仍在 ' + alias + '\n'
-            + '  [闸·回查] n — 已离开（再写 TAG 新线）\n'
-            + '  连续 3 次没有 y/n 会按 y 放行，不会困住你。');
-          return;
-        }
-        recordTag(tagId, by, extra);
-      };
-      const confirmPending = (pending) => {
-        const reset = resetTagCount(readRecheck(), { threadId: pending.threadId });
-        writeRecheck(reset.state);
-        if (activeId.length > 0 && String(pending.tagId) !== activeId) {
-          this.recheckPending.delete(turn);
-          auditGate('line-mismatch', { tagId: String(pending.tagId), activeId, activeSource });
-          lineWarning(pending.alias, pending.tagId);
-          return;
-        }
-        recordTag(pending.tagId, 'declared');
-        this.recheckPending.delete(turn);
-      };
-      const pendingRecheck = this.recheckPending.get(turn);
-      if (pendingRecheck !== undefined) {
-        if (pendingRecheck.stage === 'ask-new') {
-          this.recheckPending.delete(turn);
-        } else {
-          const answer = parseRecheckAnswer(lastText);
-          if (answer === 'yes') {
-            confirmPending(pendingRecheck);
-            return;
-          }
-          if (answer === 'no') {
-            const reset = resetTagCount(readRecheck(), { threadId: pendingRecheck.threadId });
-            writeRecheck(reset.state);
-            pendingRecheck.stage = 'ask-new';
-            this.recheckPending.set(turn, pendingRecheck);
-            steer('[闸·回查] 已记录：要离开 ' + pendingRecheck.alias + '。\n'
-              + '  写 TAG: NEW:<词> — …，或 TAG: <其他已有别名>；然后 switch/load 到新线。');
-            return;
-          }
-          pendingRecheck.invalid = Number(pendingRecheck.invalid ?? 0) + 1;
-          if (pendingRecheck.invalid >= 3) {
-            confirmPending(pendingRecheck);
-            steer(recheckAutoText(pendingRecheck.alias));
-            return;
-          }
-          this.recheckPending.set(turn, pendingRecheck);
-          steer(recheckRetryText(pendingRecheck.alias));
-          return;
-        }
-      }
-      if (declaration !== null) {
-        // 写了声明：严格查表后再落。
-        // 别名/线程 id → 记；新话题必须显式 NEW:<词>；普通陌生词 → 退回去教 NEW:。
-        const token = tagTokenFromDeclaration(declaration);
-        const explicitWord = splitNewToken(token);
-        if (explicitWord !== null) {
-          if (explicitWord.length < 2 || explicitWord.length > 30) {
-            steer('错误：NEW: 后面的新词必须是 2–30 字，你写的是「' + explicitWord + '」。' + bumpError() + help());
-            return;
-          }
-          if (!hasWordEvidence({ userText: lastUserText, assistantText: lastText, word: explicitWord })) {
-            steer('错误：新词「' + explicitWord + '」没有出现在本轮 user 消息或你的正文里（不能只出现在 TAG 行）。'
-              + '请改写，或写已有 T。' + bumpError() + help());
-            return;
-          }
-          const near = this.findNearTagLabel(explicitWord);
-          if (near !== null) {
-            steer('错误：你写的是新词「' + explicitWord + '」，表里已有「' + near.label + '」（' + near.alias + '）——名字太近，请写 ' + near.alias + '。' + bumpError() + help());
-            return;
-          }
-          const made = this.resolveTagToken(explicitWord, { allowCreate: true });
-          const madeTag = this.tagIdOf(made);
-          if (madeTag !== null) {
-            acceptTag(madeTag, explicitWord, 'declared-new', { token: explicitWord });
-            return;
-          }
-          steer('错误：新词「' + explicitWord + '」无法建号。请改写 TAG。' + bumpError() + help());
-          return;
-        }
-        const outcome = this.resolveTagToken(token, { allowCreate: false });
-        if (outcome.kind === 'new-pending') {
-          steer('错误：新词必须显式写 NEW:。普通陌生词不会建号，也不会自问自答。\n'
-            + '  写：TAG: NEW:<词> — <可选短语>\n'
-            + '  词必须在本轮正文里出现；与已有标签太近会被退回。'
-            + bumpError() + help());
-          return;
-        }
-        if (outcome.kind === 'alias' || outcome.kind === 'id' || outcome.kind === 'new') {
-          acceptTag(outcome.id, String(outcome.alias ?? token), 'declared');
-          return;
-        }
-        // 拒绝留痕：steer 可能送不到实例眼前（2026-10-30 实测 nextStepLen=1 但不可见），
-        // 下一轮 pre-step 用这个文件把“你写了什么、为什么被拒”摆出来。
-        const recordReject = (kind, reason) => {
-          try {
-            recordTagReject({ file: join(home, 'tag-reject.json'), turn, token, kind, reason });
-          } catch { /* 写不进就算了 */ }
-        };
-        if (outcome.kind === 'label') {
-          recordReject(outcome.kind, token + ' 已经关联 ' + outcome.alias);
-          steer('错误：' + token + ' 已经关联 ' + outcome.alias + '，请写 ' + outcome.alias + '。\n'
-            + '  查询 T 列表之后再回答。要贴它 → 写 ' + outcome.alias + '；要开新话题 → 显式写 TAG: NEW:<词> — …。'
-            + '（T 列表：~/.dsh/continuity/tags.md）' + bumpError() + help());
-          return;
-        }
-        if (outcome.kind === 'alias-missing') {
-          recordReject(outcome.kind, token + ' 标签不存在');
-          steer('错误：' + token + ' 标签不存在。检查 T 列表（~/.dsh/continuity/tags.md）再回答；要新开话题就显式写 TAG: NEW:<词> — …。\n'
-            + '  现有别名：' + outcome.known.slice(0, 24).join(' ') + '\n'
-            + '  要开新话题：TAG: NEW:<词> — <可选短语>（词必须在本轮正文里出现）。\n'
-            + '  如果你要填的不是编号、而是 "' + token + '" 这个词本身，就加引号写：TAG: "' + token + '" — …'
-            + bumpError() + help());
-          return;
-        }
-        recordReject(outcome.kind, token + ' 不是一个合法的别名或新词');
-        steer('错误：TAG 后面必须是已有别名（如 T14），或显式 NEW:<词>，你写的是「' + token + '」。检查 T 列表再回答。\n'
-          + '  如果你要填的是一段文字本身（不是编号），就加引号：TAG: "…" — …'
-          + bumpError() + help());
-        return;
-      }
-      // 没写 TAG 行：直接判错，不能收尾。第一次也报错；教学只决定说明详略。
-      // 同一轮超过 1 分钟仍没有 TAG：再明确报一次“超时错误”，但不放行。
-      const misses = this.turnTagErrors.get(turn) ?? 0;
-      const nextMiss = misses + 1;
-      this.turnTagErrors.set(turn, nextMiss);
-      auditGate('missing', { misses: nextMiss });
-      const gateState = this.turnGate.get(turn);
-      const waitedMs = Number(gateState?.startedAt ?? 0) > 0
-        ? Date.now() - Number(gateState.startedAt)
-        : 0;
-      const overdue = waitedMs >= 60_000;
-      steer((overdue
-        ? '这一轮已经超过 1 分钟没有 TAG 行，这是超时错误，不能收尾；不会自动放行。'
-        : '这一轮没有 TAG 行，这是错误，不能收尾。')
-        + '\n先查 T 列表再回答：读 ~/.dsh/continuity/tags.md（一行一个 T：别名 · 名称 · 关键词），'
-        + '或跑 node ~/.dsh/continuity/match-tags.mjs "你这一轮在做什么" 看候选。'
-        + '表里有对得上的就写它的别名；完全没有这件事，才显式写 TAG: NEW:<词> — …。'
-        + '（这是第 ' + nextMiss + ' 次没有作答' + (overdue ? '，已超过 1 分钟' : '') + '，自检：先查 tags.md 再写。）'
-        + help());
-    } catch (error) {
-      try {
-        appendFileSync(join(home, 'gate-errors.jsonl'),
-          JSON.stringify({ at: new Date().toISOString(), name: error?.name ?? 'Error', code: 'turn-stopping', message: String(error?.message ?? error) }) + '\n', 'utf8');
-      } catch { /* 日志都写不进就算了 */ }
-    }
-  }
-
-  /** Commit one prepared save at a pre-step (never inside its own tool call). */
   async saveThread(agent, args = {}, signal, prepared = null) {
     const session = agent?.session;
     if (session === undefined || session === null) throw new Error('continuity.save: no session');
@@ -1959,6 +1521,236 @@ export class ContinuityEngine extends BaseEngine {
     return this.stallTurns;
   }
 
+  historySummaryEvents(agent, session) {
+    const currentSeq = Number.isInteger(Number(session?.seq)) ? Number(session.seq) : null;
+    const cached = this.historySummaryCache.get(agent);
+    if (cached && currentSeq !== null && cached.at === currentSeq) return cached.events;
+    if (cached && currentSeq !== null && cached.at !== null && currentSeq > cached.at) {
+      const events = [...cached.events];
+      for (let seq = cached.at + 1; seq <= currentSeq; seq += 1) {
+        const event = session.eventAt?.(seq);
+        if (event?.type === 'compaction/summary') events.push(event);
+      }
+      this.historySummaryCache.set(agent, { at: currentSeq, events });
+      return events;
+    }
+    const events = (typeof session.snapshotEvents === 'function' ? session.snapshotEvents() : [])
+      .filter((event) => event?.type === 'compaction/summary');
+    this.historySummaryCache.set(agent, { at: currentSeq, events });
+    return events;
+  }
+
+  historyMapMode() {
+    const valid = (value) => ['auto', 'observe', 'off'].includes(value);
+    const env = String(process.env.DSH_CONTINUITY_HISTORY_MAP ?? '').trim().toLowerCase();
+    if (valid(env)) return env;
+    try {
+      const file = join(continuityHome(), 'history-map-mode');
+      if (existsSync(file)) {
+        const value = readFileSync(file, 'utf8').trim().toLowerCase();
+        if (valid(value)) return value;
+      }
+    } catch { /* fall through to off */ }
+    return 'off';
+  }
+
+  findHistoryMapCarriers(session) {
+    const nodes = session?.surface?.nodes;
+    if (!Array.isArray(nodes)) return [];
+    const out = [];
+    for (const seq of nodes) {
+      const event = session.eventAt?.(seq);
+      if (eventText(event).trimStart().startsWith('[continuity:history-map]')) out.push(seq);
+    }
+    return out;
+  }
+
+  recordBootstrapRange(session, range, carrierSeq) {
+    try {
+      const dir = join(continuityHome(), 'sessions', String(session.id), 'summaries');
+      const file = join(dir, 'bootstrap-ranges.json');
+      let current = { version: 1, ranges: [] };
+      if (existsSync(file)) {
+        try {
+          const parsed = JSON.parse(readFileSync(file, 'utf8'));
+          if (Array.isArray(parsed?.ranges)) current = { version: 1, ranges: parsed.ranges };
+        } catch { /* replace malformed sidecar */ }
+      }
+      const fromSeq = Math.min(Number(range.start), Number(range.end));
+      const toSeq = Math.max(Number(range.start), Number(range.end));
+      const next = current.ranges.filter((item) => !(
+        Number(item?.fromSeq) === fromSeq
+        && Number(item?.toSeq) === toSeq
+        && Number(item?.carrierSeq) === Number(carrierSeq)
+      ));
+      next.push({
+        fromSeq,
+        toSeq,
+        tokens: Number(range.tokens ?? 0),
+        carrierSeq: Number(carrierSeq) || null,
+        at: new Date().toISOString(),
+      });
+      writeFileSync(file, JSON.stringify({ version: 1, ranges: next }, null, 2), 'utf8');
+    } catch { /* sidecar is advisory; never block injection */ }
+  }
+
+  /**
+   * First-injection path for a pre-step, independent of compression pressure.
+   * No carrier + an archive index is the only case that writes.
+   */
+  async ensureHistoryMap(agent) {
+    const session = agent?.session;
+    if (session === undefined || session === null) return;
+    const probe = {
+      at: new Date().toISOString(),
+      sessionId: String(session.id ?? ''),
+      mode: this.historyMapMode(),
+      nodeCount: null,
+      frontSeq: null,
+      frontIsCarrier: null,
+      frontNodeType: null,
+      frontSourceKind: null,
+      nativeSummaryChars: null,
+      nativeIsFront: null,
+      mapPath: null,
+      mapPathExists: null,
+      indexRecords: null,
+      builtChars: null,
+      range: null,
+      reason: null,
+      error: null,
+    };
+    const finish = (reason, extra = {}) => {
+      probe.reason = reason;
+      Object.assign(probe, extra);
+      try {
+        writeFileSync(
+          join(continuityHome(), 'sessions', String(session.id), 'history-map-probe.json'),
+          JSON.stringify(probe, null, 2),
+          'utf8',
+        );
+      } catch { /* probe is diagnostic only */ }
+    };
+    if (this.threads?.inject === false) {
+      finish('returned-inject-disabled');
+      return;
+    }
+    const nodes = session.surface?.nodes ?? [];
+    probe.nodeCount = nodes.length;
+    if (nodes.length === 0) {
+      finish('returned-no-nodes');
+      return;
+    }
+    const head = session.eventAt?.(nodes[0]);
+    const firstHistoryIdx = head?.type === 'system/message' ? 1 : 0;
+    const carriers = this.findHistoryMapCarriers(session);
+    const front = nodes[firstHistoryIdx] ?? null;
+    const frontEvent = front === null ? null : session.eventAt?.(front);
+    const frontSource = frontEvent?.data?.source ?? frontEvent?.data?.message?.source ?? null;
+    probe.frontSeq = front;
+    probe.frontIsCarrier = front !== null && carriers.includes(front);
+    probe.frontNodeType = frontEvent?.type ?? null;
+    probe.frontSourceKind = typeof frontSource?.kind === 'string' ? frontSource.kind : null;
+    probe.nativeIsFront = probe.frontSourceKind === 'compact-checkpoint';
+    probe.nativeSummaryChars = probe.nativeIsFront ? eventText(frontEvent).trim().length : null;
+    if (probe.mode === 'off') {
+      finish('off');
+      return;
+    }
+    if (probe.mode === 'observe') {
+      finish(probe.nativeIsFront ? 'observe-native-front' : 'observe-no-action');
+      return;
+    }
+    if (probe.nativeIsFront) {
+      finish('returned-native-front');
+      return;
+    }
+    const stub = (seq) => {
+      try {
+        session.append('user/message', contextMessage('[continuity:map-stub] (superseded)'), {
+          surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq },
+          sourceEventSeqs: [seq],
+        });
+      } catch { /* best effort */ }
+    };
+    try {
+      const mapPath = summaryIndexPath(join(continuityHome(), 'sessions', String(session.id)));
+      probe.mapPath = mapPath;
+      probe.mapPathExists = existsSync(mapPath);
+      if (!probe.mapPathExists) {
+        finish('returned-no-index');
+        return;
+      }
+      const summaryIndex = readSummaryIndex(mapPath);
+      probe.indexRecords = Array.isArray(summaryIndex.records) ? summaryIndex.records.length : null;
+      const mapEvents = this.historySummaryEvents(agent, session);
+      const built = buildHistoryMap({ index: summaryIndex, events: mapEvents, maxTokens: 4000 });
+      probe.builtChars = built.chars;
+      if (front !== null && carriers.includes(front)) {
+        if (this.historyMapKey.get(agent) !== built.hash) {
+          const event = session.append('user/message', contextMessage(built.text), {
+            surfaceOp: { op: 'replace', startSeq: front, endSeq: front },
+            sourceEventSeqs: [front],
+          });
+          const seq = event?.seq ?? [...(session.surface?.nodes ?? [])].at(-1);
+          if (seq !== undefined) {
+            this.historyMapSeq.set(agent, seq);
+            this.historyMapKey.set(agent, built.hash);
+            this.historyBootstrap.set(String(session.id), { hash: built.hash, seq });
+          }
+          finish('updated-front-carrier', { carrierSeq: seq ?? null });
+        } else {
+          finish('returned-front-carrier');
+        }
+        for (const extra of carriers) if (extra !== front) stub(extra);
+        return;
+      }
+      const sessionKey = String(session.id);
+      const prev = this.historyBootstrap.get(sessionKey);
+      if (prev && prev.hash === built.hash && carriers.includes(prev.seq)) {
+        finish('returned-dedup');
+        return;
+      }
+      let range = this.oldestRange(agent, 50_000, new Set());
+      let rangeFallback = false;
+      if (range === null && front !== null) {
+        range = { start: front, end: front, seqs: [front], count: 1, tokens: 0 };
+        rangeFallback = true;
+      }
+      probe.range = range === null ? null : { start: range.start, end: range.end, tokens: range.tokens, fallback: rangeFallback };
+      if (range === null) {
+        finish('returned-no-range');
+        return;
+      }
+      const startSeq = Number(range.start);
+      const endSeq = Number(range.end);
+      const sourceEventSeqs = Array.isArray(range.seqs) && range.seqs.length > 0
+        ? range.seqs
+        : nodes.filter((seq) => Number(seq) >= Math.min(startSeq, endSeq) && Number(seq) <= Math.max(startSeq, endSeq));
+      probe.startSeq = startSeq;
+      probe.endSeq = endSeq;
+      probe.seqCount = sourceEventSeqs.length;
+      probe.seqFirst = sourceEventSeqs[0] ?? null;
+      probe.seqLast = sourceEventSeqs.at(-1) ?? null;
+      const event = session.append('user/message', contextMessage(built.text), {
+        surfaceOp: { op: 'replace', startSeq, endSeq },
+        sourceEventSeqs,
+      });
+      const seq = event?.seq ?? [...(session.surface?.nodes ?? [])].at(-1);
+      if (seq !== undefined) {
+        this.historyMapSeq.set(agent, seq);
+        this.historyMapKey.set(agent, built.hash);
+        this.historyBootstrap.set(sessionKey, { hash: built.hash, seq });
+      }
+      for (const carrier of carriers) stub(carrier);
+      this.recordBootstrapRange(session, range, seq);
+      finish('ok', { carrierSeq: seq ?? null });
+    } catch (error) {
+      this.warnOnce('history-map', `dsh-continuity: history-map bootstrap failed: ${error?.message ?? error}`);
+      finish('error', { error: String(error?.message ?? error) });
+    }
+  }
+
   async injectThreadContext(agent) {
     // 一次性探针 2：注入时机还能看到什么（inbox / frozenMessages / surface 尾部）。
     if (!this.probe2Written) {
@@ -2065,12 +1857,16 @@ export class ContinuityEngine extends BaseEngine {
     if (session === undefined) return;
     const turn = Number.isInteger(agent?.lastTurn) ? agent.lastTurn : latestTurnStartSeq(session);
     const key = turn === null ? 'no-turn' : String(turn);
-    if (this.threadInjectTurn.get(agent) === key) return;
+    if (this.threadInjectTurn.get(agent) === key) {
+      logInjectDiag('turn-dedupe', { sessionId: session.id, turn, key });
+      return;
+    }
     let state;
     try {
       state = await getSession(session.id);
     } catch (error) {
       this.warnOnce('thread-state-read', `dsh-continuity: thread state read failed: ${error?.message ?? error}`);
+      logInjectDiag('state-read-failed', { sessionId: session.id, turn, key, error: String(error?.message ?? error) });
       return;
     }
     let rules = { text: '', missing: true };
@@ -2118,8 +1914,7 @@ export class ContinuityEngine extends BaseEngine {
       const keywords = labelText.length >= 2 && !base.includes(labelText) ? [...base, labelText] : base;
       return { ...row, label: labelText.length > 0 ? labelText : row.label, keywords };
     });
-    const tagLine = tagStatusLine(state, tagRows);
-    const line = `${activeLine(state, { maxTokens: 200 })}\n${tagLine}`;
+    const line = '';
     const rulesSummary = rules.text.length > 0 ? summarizeRules(rules.text) : '';
     const habitsSummary = habits.text.length > 0 ? summarizeRules(habits.text) : '';
     if (this.threads.pointersOnly) {
@@ -2142,7 +1937,17 @@ export class ContinuityEngine extends BaseEngine {
     const habitsChanged = habitsSignature.length > 0
       && this.habitsSignature.get(agent) !== habitsSignature;
     const surfaceSeqs = new Set(session.surface?.nodes ?? []);
-    const rulesCarrier = this.rulesMsgSeq.get(agent);
+    let rulesCarrier = this.rulesMsgSeq.get(agent);
+    let staleCarriers = [];
+    const foundCarriers = findRulesCarrierSeqs(session);
+    if (foundCarriers.length > 0) {
+      if (rulesCarrier === undefined || rulesCarrier === null || !surfaceSeqs.has(rulesCarrier)) {
+        rulesCarrier = foundCarriers.at(-1);
+      }
+      staleCarriers = foundCarriers.filter((seq) => seq !== rulesCarrier);
+      this.rulesMsgSeq.set(agent, rulesCarrier);
+    }
+    for (const seq of staleCarriers) retireRulesCarrier(session, seq);
     let rulesFull = '';
     let habitsFull = '';
     let rulesInjected = false;
@@ -2207,199 +2012,8 @@ export class ContinuityEngine extends BaseEngine {
     } catch (error) {
       this.warnOnce('skills-inject', `dsh-continuity: skill inject failed: ${error?.message ?? error}`);
     }
-    // 归位：读本轮用户原文 → 全表关键词比对 → 唯一命中且非当前线时自动归入该 seq。
-    // 读不到、命中 0 或多于 1 个、文本过短，都只显示建议，不写标签。
     let guiWeiNews = false;
     let multiHit = false;
-    const dirEvidence = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
-    try {
-      const turn = this.latestUserTurn(session);
-      if (turn === null) {
-        guiWeiNews = true;
-        text += '\n[归位·上句] 用户文本 N（用显式 classify）';
-      } else {
-        const hits = [];
-        for (const row of matchableTags(tagRows)) {
-          const kws = Array.isArray(row.keywords) ? row.keywords : [];
-          const matchedKw = kws.filter((k) => k && turn.text.includes(k));
-          if (matchedKw.length > 0) hits.push({ row, matchedKw });
-        }
-        const unique = hits.length === 1 ? hits[0] : null;
-        const activeMatches = unique !== null
-          && (String(unique.row.threadId ?? '') === String(state.activeId ?? '')
-            || String(unique.row.id ?? '') === String(state.activeId ?? ''));
-        const longEnough = turn.text.trim().length >= 8;
-        if (unique === null) {
-          if (hits.length > 1) {
-            multiHit = true;
-            const names = hits.map((h) => h.row.alias ?? h.row.id).join(',');
-            const ids = hits.map((h) => String(h.row.id ?? h.row.alias ?? '')).filter((x) => x.length > 0);
-            let tagged = false;
-            try {
-              await updateTags((state_) => {
-                const memberships = state_.memberships !== null && typeof state_.memberships === 'object'
-                  ? state_.memberships
-                  : {};
-                const cur = new Set(memberships[String(turn.seq)] ?? []);
-                for (const id of ids) cur.add(id);
-                memberships[String(turn.seq)] = [...cur];
-                state_.memberships = memberships;
-                return state_;
-              });
-              tagged = true;
-            } catch { tagged = false; }
-            if (!tagged) {
-              text += `\n[归位·上句] 判「${turn.text.replace(/\s+/g, ' ').slice(0, 24)}」· 命中 ${names}（多标签，自动归失败仅建议）`;
-              guiWeiNews = true;
-            } else {
-              try {
-                const pair = ids.slice().sort().join('+');
-                appendFileSync(join(dirEvidence, 'group-evidence.jsonl'), JSON.stringify({
-                  at: new Date().toISOString(),
-                  pair,
-                  members: ids,
-                  head: turn.text.replace(/\s+/g, ' ').slice(0, 60),
-                }) + '\n', 'utf8');
-              } catch { /* 记不下不影响归位 */ }
-            }
-          } else if (hits.length === 0) {
-            // 先扫一遍 T 表：标签名 + 关键词都参与，给出候选（只提示，不判定）。
-            const grams = new Set();
-            for (let n = 2; n <= 4; n += 1) for (let i = 0; i + n <= turn.text.length; i += 1) grams.add(turn.text.slice(i, i + n));
-            const cands = [];
-            for (const row of matchableTags(tagRows)) {
-              const label = String(row.label ?? '');
-              const kws = Array.isArray(row.keywords) ? row.keywords : [];
-              let score = 0;
-              for (const w of kws) if (w && turn.text.includes(w)) score += 3;
-              if (label && turn.text.includes(label)) score += 3;
-              for (const g of grams) if (label.includes(g)) score += 1;
-              if (score > 0) cands.push({ id: String(row.id ?? row.alias ?? ''), alias: row.alias ?? row.id, label, score });
-            }
-            cands.sort((a, b) => b.score - a.score);
-            // 自动贴：排第一的候选标签名原文出现在消息里，且与次名分差 ≥4，视为可判。
-            let autoTagged = false;
-            const top = cands[0];
-            const second = cands[1];
-            const labelInText = top !== undefined && String(top.label).length >= 2 && turn.text.includes(top.label);
-            if (top !== undefined && labelInText && top.score - (second?.score ?? 0) >= 4) {
-              let tagged = false;
-              try {
-                await updateTags((state_) => {
-                  const runs = Array.isArray(state_.runs) ? state_.runs : [];
-                  const exists = runs.some((r) => Number(r?.[0]) === Number(turn.seq) && String(r?.[2] ?? '') === String(top.id));
-                  if (!exists) runs.push([turn.seq, turn.seq, String(top.id)]);
-                  state_.runs = runs;
-                  return state_;
-                });
-                tagged = true;
-              } catch { tagged = false; }
-              autoTagged = tagged;
-              // 成功归入静默；只有失败才说话。
-              if (!tagged) {
-                text += `\n[归位·上句] 判「${turn.text.replace(/\s+/g, ' ').slice(0, 24)}」· 候选唯一 ${top.alias}(${top.label})（自动归失败，仅建议）`;
-                guiWeiNews = true;
-              }
-            } else if (cands.length > 0) {
-              text += '\n[候选] ' + cands.slice(0, 3).map((c) => (c.alias ?? c.id ?? '') + '(' + c.label + ')').join(' · ') + ' —— 要贴吗？';
-              guiWeiNews = true;
-            }
-
-            // 新标签：只有零候选 + 长文本 + 非机器消息 + 30 天未问 + 20 轮冷却。
-            const snippet = turn.text.trim().replace(/\s+/g, ' ');
-            const ownPrefix = /^\s*\[(创|闸)(?:\]|·)/.test(snippet);
-            if (!autoTagged && cands.length === 0 && snippet.length >= 40 && !ownPrefix) {
-              const key = snippet.slice(0, 40);
-              const askedFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'newtag-asked.json');
-              let asked = [];
-              try { asked = JSON.parse(readFileSync(askedFile, 'utf8')); } catch { asked = []; }
-              if (!Array.isArray(asked)) asked = [];
-              const cooldownFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'newtag-cooldown.json');
-              let last = { turn: -Infinity };
-              try { last = JSON.parse(readFileSync(cooldownFile, 'utf8')) ?? last; } catch { last = { turn: -Infinity }; }
-              const currentTurn = Number.isInteger(agent?.lastTurn) ? agent.lastTurn : null;
-              const cooled = currentTurn === null || currentTurn - Number(last?.turn ?? -Infinity) >= 20;
-              if (!asked.includes(key) && cooled) {
-                asked.push(key);
-                try { writeFileSync(askedFile, JSON.stringify(asked, null, 2), 'utf8'); } catch { /* 忽略 */ }
-                try { writeFileSync(cooldownFile, JSON.stringify({ turn: currentTurn, at: Date.now() }, null, 2), 'utf8'); } catch { /* 忽略 */ }
-                text += `\n[新标签?] 未归位：「${snippet.slice(0, 30)}」要建新 T 吗？`;
-                guiWeiNews = true;
-              }
-            }
-          } else {
-            // 唯一命中但当前线/文本太短：没有需要人判的动作，静默。
-          }
-        } else if (activeMatches || !longEnough) {
-          // 当前线命中或文本太短：不自动归，也不出声。
-        } else {
-          const tagId = String(unique.row.id ?? unique.row.alias ?? '');
-          let tagged = false;
-          try {
-            await updateTags((state_) => {
-              const runs = Array.isArray(state_.runs) ? state_.runs : [];
-              const exists = runs.some((r) => Number(r?.[0]) === Number(turn.seq) && String(r?.[2] ?? '') === tagId);
-              if (!exists) runs.push([turn.seq, turn.seq, tagId]);
-              state_.runs = runs;
-              return state_;
-            });
-            tagged = true;
-          } catch { tagged = false; }
-          if (!tagged) {
-            text += `\n[归位·上句] 判「${turn.text.replace(/\s+/g, ' ').slice(0, 24)}」· 命中 ${unique.row.alias ?? unique.row.id}（${unique.matchedKw.join('/')}）（自动归失败，仅建议）`;
-            guiWeiNews = true;
-          }
-        }
-      }
-    } catch {
-      text += '\n[归位·上句] 用户文本 ?';
-    }
-    // 话题提示：上句命中的标签与当前线不同 → 提示“可能换话题”，只提示不切换。
-    // 节流：同一个候选标签 10 分钟内只喊一次，避免每轮刷屏。
-    try {
-      const turn = this.latestUserTurn(session);
-      if (turn !== null && turn.text.trim().length >= 8 && !/^\s*</.test(turn.text) && !turn.text.includes('system-reminder')) {
-        const rows = matchableTags(tagRows);
-        const activeRow = rows.find((row) => String(row.threadId ?? '') === String(state.activeId ?? '')
-          || String(row.id ?? '') === String(state.activeId ?? ''));
-        const activeAlias = activeRow?.alias ?? state.activeId ?? '?';
-        let genericWords = new Set();
-        let wordStats = new Map();
-        try {
-          const gw = JSON.parse(readFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'generic-words.json'), 'utf8'));
-          const entries = Array.isArray(gw?.words) ? gw.words : [];
-          genericWords = new Set(entries.map((entry) => String(entry?.word ?? '')));
-          wordStats = new Map(entries.map((entry) => [String(entry?.word ?? ''), {
-            precision: Number(entry?.precision ?? 0),
-            hits: Number(entry?.hits ?? 0),
-          }]));
-        } catch { genericWords = new Set(); wordStats = new Map(); }
-        let anchorMap = {};
-        try {
-          anchorMap = JSON.parse(readFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'topic-anchors.json'), 'utf8'))?.anchors ?? {};
-        } catch { anchorMap = {}; }
-        const rowsWithAnchors = rows.map((row) => ({ ...row, anchors: Array.isArray(anchorMap[String(row.id)]) ? anchorMap[String(row.id)] : [] }));
-        const decision = selectTopic({ rows: rowsWithAnchors, text: turn.text, genericWords, wordStats, activeId: state.activeId ?? '' });
-        const top = decision.top;
-        if (!decision.blocked && top !== null) {
-          const hintFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'topic-hint-state.json');
-          let hintState = { lastTag: '', at: 0 };
-          try { hintState = JSON.parse(readFileSync(hintFile, 'utf8')); } catch { hintState = { lastTag: '', at: 0 }; }
-          const repeatTooSoon = hintState.lastTag === top.id && Date.now() - Number(hintState.at ?? 0) < 10 * 60 * 1000;
-          if (!repeatTooSoon) {
-            const words = top.matched.map((word) => (genericWords.has(word)
-              ? word + (top.anchors?.includes(word) ? '(泛·锚)' : '(泛)')
-              : word));
-            text += '\n[话题?] 上句更像 ' + top.alias + '(' + top.label + ')'
-              + '；凭 ' + words.join('/') + '（硬证据 ' + top.strong.length + '/' + top.matched.length + '）'
-              + '；当前线 ' + activeAlias
-              + ' —— 要换就 load id=' + top.id + '（不换就忽略）';
-            try { writeFileSync(hintFile, JSON.stringify({ lastTag: top.id, at: Date.now() }), 'utf8'); } catch { /* 记不下只会重复提示 */ }
-            guiWeiNews = true;
-          }
-        }
-      }
-    } catch { /* 话题提示失败不影响注入 */ }
     // 学习：只扫本轮的“新增工具回执”，发现重复错误就推给实例，由实例决定是否写进规则。
     this.scanLearning(session);
     if (this.learningAnswered === undefined) {
@@ -2773,173 +2387,6 @@ export class ContinuityEngine extends BaseEngine {
     //   ① user/message 没有 data.turn —— 旧写法要求 Number.isInteger(turn)，于是「你刚说」永远是空引号；
     //   ② 缺口只从「最后一个已标轮」往后算 —— 补了最新一轮，更早的漏标就不再算欠账，锁也就不写。
     // 现在：用 attributeTurnSeqs 给每条消息归轮；缺口 = 已结束轮里所有没标签的轮，一轮都不放过。
-    try {
-      const tagFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'turn-tags.jsonl');
-      let tagged = new Set();
-      try {
-        tagged = new Set(readFileSync(tagFile, 'utf8').split('\n').filter(Boolean)
-          .map((line) => { try { return Number(JSON.parse(line).turn); } catch { return null; } })
-          .filter((turn) => Number.isInteger(turn)));
-      } catch { tagged = new Set(); }
-      const nodes = Array.isArray(session?.surface?.nodes) ? [...session.surface.nodes] : [];
-      const ordered = [];
-      const userFirstBySeq = new Map();
-      const assistantFirsts = [];
-      const assistantLasts = [];
-      const contentSeqs = new Set();
-      for (const node of nodes) {
-        let event;
-        try { event = session.eventAt(node); } catch { continue; }
-        const seq = Number(event?.seq);
-        if (!Number.isInteger(seq)) continue;
-        const turn = Number(event?.data?.turn);
-        ordered.push({ seq, type: event?.type, turn: Number.isInteger(turn) ? turn : null });
-        let text = '';
-        if (event?.type === 'user/message') {
-          try { text = eventText(event, { includeReasoning: false }).replace(/\s+/g, ' ').trim(); } catch { text = ''; }
-          const injected = /^[\[]/.test(text) || /^</.test(text) || /system-reminder|checkpoint condensing/i.test(text);
-          const realUser = messageSourceKind(event) === 'user';
-          if (text.length > 0 && realUser && !injected) contentSeqs.add(seq);
-          if (text.length > 0 && realUser && !injected && !userFirstBySeq.has(seq)) userFirstBySeq.set(seq, text.slice(0, 24));
-        } else if (event?.type === 'assistant/message') {
-          try { text = eventText(event, { includeReasoning: false }); } catch { text = ''; }
-          const lines = text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
-          const first = lines[0] ?? '';
-          const last = lines[lines.length - 1] ?? '';
-          assistantFirsts.length = 0;
-          assistantLasts.length = 0;
-          if (first.length > 0) assistantFirsts.push(first);
-          // 打标在**一轮末尾**做（那是最知道“这轮在说什么”的时刻），所以末行也要认。
-          if (lines.length > 0) assistantLasts.push(lines.slice(-5).join('\n'));
-          if (text.trim().length > 0) contentSeqs.add(seq);
-        }
-      }
-      const { turnSeqs } = attributeTurnSeqs(ordered);
-      // 当前轮还没收尾，不是欠账。agent.lastTurn 是权威；没有时从最新
-      // turn/start 事件取轮号。只让 turn < currentTurn 的轮进入 closedTurns。
-      let currentTurn = Number.isInteger(agent?.lastTurn) ? agent.lastTurn : null;
-      if (currentTurn === null) {
-        const startSeq = latestTurnStartSeq(session);
-        const startEvent = startSeq === null ? null : session.eventAt(startSeq);
-        const startTurn = Number(startEvent?.data?.turn);
-        if (Number.isInteger(startTurn)) currentTurn = startTurn;
-      }
-      // turn 0 是结构事件归出来的桶；只有结构事件（compaction / turn start-end / delivery）的轮
-      // 也算不出"这轮在说什么"——它们不是欠账，是壳。两类都要排除，否则欠账永远清不掉。
-      const closedTurns = [...turnSeqs.keys()]
-        .filter((turn) => turn > 0)
-        .filter((turn) => currentTurn === null || turn < currentTurn)
-        .filter((turn) => (turnSeqs.get(turn) ?? []).some((seq) => contentSeqs.has(seq)))
-        .sort((left, right) => left - right);
-      // 单一来源：turn-tags 只由回合闸写；pre-step 只读，不再自动回填。
-      // 自动回填会掩盖“闸没跑/没写”，1446 那类丢行就是这么被拖到下一轮的。
-      const prevTurn = closedTurns.length > 0 ? closedTurns[closedTurns.length - 1] : 0;
-      const missing = closedTurns.filter((turn) => !tagged.has(turn));
-      const prev = prevTurn;
-      // 「你刚说」要引用户原话，不是引插件自己注入的 [线]/[标签]/[暂停] 那些行。
-      const isInjected = (text) => /^[\[]/.test(text) || /^</.test(text) || /system-reminder|checkpoint condensing/i.test(text);
-      const firstUserOfTurn = (turn) => {
-        for (const seq of turnSeqs.get(turn) ?? []) {
-          const text = userFirstBySeq.get(seq);
-          if (text !== undefined && !isInjected(text)) return text;
-        }
-        return '';
-      };
-      // 声明检查：最近 3 条 assistant 文本里，**首行或末行**有没有写成 TAG: ...
-      // 一轮末尾才是最适合打标的时刻（这轮干了什么已经全在眼前），所以末行与首行等价。
-      const tagPattern = /^TAG\s*[:：]/i;
-      const recent = assistantFirsts.slice(-3);
-      const recentLast = assistantLasts.slice(-3);
-      const hasTagLine = recent.some((line) => /^TAG\s*[:：]/im.test(line))
-        || recentLast.some((line) => /^TAG\s*[:：]/im.test(line));
-      const sawFirst = recent.length > 0 ? recent[recent.length - 1] : '';
-      // 一次性「为什么打标」：新实例不知道原因时，锁和计数只是噪声。
-      // 讲代价，不讲命令；只讲一次（marker），不做每轮广播。
-      try {
-        const whyFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'tag-why-shown.json');
-        let shown = false;
-        try { shown = existsSync(whyFile); } catch { shown = false; }
-        if (!shown) {
-          text += '\n[打标·为什么] 折叠不删原文，但折叠要知道边界；边界来自每一轮的标。'
-            + '\n  一轮不标 → 这段的边界就是未知：save 不知道切在哪，load 不知道去哪取，你只剩“翻”这一条路。'
-            + '\n  每轮回答一句「这轮属于哪个 T」，换的是：以后想找它，几分钟就能把原话取回来。'
-            + '\n  立刻可验：load 一个旧话题，看几小时前的原话怎么被捧回来——那就是标在替你记路。'
-            + '\n  （这条只出现一次）';
-          try { writeFileSync(whyFile, JSON.stringify({ at: new Date().toISOString() }, null, 2), 'utf8'); } catch { /* 写不进就下次再说 */ }
-        }
-      } catch { /* 不影响注入 */ }
-      // 上一轮被打标闸拒过：只展示一次；下一次 pre-step 看到 shown 才删除。
-      try {
-        const rejectFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'tag-reject.json');
-        const consumed = consumeTagReject({ file: rejectFile, isResolved: (turn) => tagged.has(turn) });
-        if (consumed.text.length > 0) text += consumed.text;
-      } catch { /* 提示失败不影响注入 */ }
-      // 打标闸答错过才给的一条提示（不强制）：把打法写进自己的 rules.md，以后一次过。
-      try {
-        const hintFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'tag-gate-hint.json');
-        if (existsSync(hintFile)) {
-          let hint = null;
-          try { hint = JSON.parse(readFileSync(hintFile, 'utf8')); } catch { hint = null; }
-          if (hint !== null) {
-            text += '\n[打标·提示] 上一轮打标答错了 ' + String(hint.errors ?? '?') + ' 次才通过。'
-              + '（不强制）如果不想每次都撞，可以在 rules.md 里加一条自己的做法：'
-              + '先查 tags.md 再写 TAG，写别名而不是标签名。';
-          }
-          try { fsUnlink(hintFile); } catch { /* 删不掉下次还会出现，不致命 */ }
-        }
-      } catch { /* 提示失败不影响注入 */ }
-      // 安全阀报警：上一轮被强制放行 → 下一轮头里再提一次（会话里的那条可能被折叠遮住）。
-      try {
-        const alarmFile = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'gate-alarm.json');
-        if (existsSync(alarmFile)) {
-          let alarm = null;
-          try { alarm = JSON.parse(readFileSync(alarmFile, 'utf8')); } catch { alarm = null; }
-          if (alarm !== null) {
-            text += '\n[记忆宫殿·警告] 第 ' + String(alarm.turn ?? '?') + ' 轮：' + String(alarm.reason ?? alarm.code ?? '安全阀触发')
-              + '，放弃了拦截。记忆宫殿出现了错误，🐋 违反了守则。请善待 🐋。';
-          }
-          try { fsUnlink(alarmFile); } catch { /* 删不掉就下轮再说一次 */ }
-        }
-      } catch { /* 报警失败不影响注入 */ }
-      if (missing.length > 0) {
-        const count = missing.length;
-        const shown = missing.slice(0, 3).map((turn) => {
-          const head = firstUserOfTurn(turn);
-          return head.length > 0 ? turn + '「' + head + '」' : String(turn);
-        });
-        const more = count > shown.length ? ' …还有 ' + (count - shown.length) + ' 轮' : '';
-        const prevQuote = firstUserOfTurn(prev);
-        const declare = hasTagLine
-          ? ''
-          : '｜声明：上一轮首行是「' + sawFirst.slice(0, 40) + '」，要写成 TAG: <Tx> — 理由';
-        // 没有真实用户原话就不发 [暂停]；只剩 [打标?] 的欠账清单。
-        const pause = prevQuote.trim().length > 0
-          ? '\n[暂停] 你刚说：「' + prevQuote + '」——它属于哪个 T？' + declare
-          : '';
-        text += pause
-          + '\n[打标?] 缺 ' + count + ' 轮：' + shown.join(' · ') + more
-          + ' —— 没标的部分折叠时边界未知。补：turnmap.mjs set --turn ' + String(missing[0] ?? '') + ' --tag Tx';
-        // 欠账落盘：工具层据此“真的不让走”。turns 给前 8 条用于回显，all 给全量用于核对。
-        try {
-          writeFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'tag-debt.json'),
-            JSON.stringify({
-              at: new Date().toISOString(),
-              count,
-              turns: missing.slice(0, 8),
-              all: missing.slice(0, 200),
-              prev,
-              closeTurns: closedTurns.length,
-            }, null, 2), 'utf8');
-        } catch { /* 落盘失败不影响提示 */ }
-        guiWeiNews = true;
-      } else {
-        try { fsUnlink(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'tag-debt.json')); } catch { /* 本来就没有 */ }
-      }
-      // 0.8.41: 不再每轮往 header 放 [收尾] TAG 提醒。
-      // 模型只要看到“最后一行”的格式，就会赌自己是不是最后一行；
-      // 归类交给 rules 的静态规则和 turn-stopping 的 TAG 闸，header 不重复。
-    } catch { /* 提醒失败不影响注入 */ }
-
     // 规则体积守卫：让 rules.md 别长成手册（只在超阈值时说话）。
     try {
       const rulesText = String(rules?.text ?? '');
@@ -2955,7 +2402,7 @@ export class ContinuityEngine extends BaseEngine {
       }
     } catch { /* 守卫失败不影响注入 */ }
 
-    const headerSig = [state.activeId, line, tagLine, skillNames, rulesSummary, habitsSummary].join('|');
+    const headerSig = [state.activeId, line, skillNames, rulesSummary, habitsSummary].join('|');
     const prevHeader = this.headerState.get(agent);
     const headerAlive = prevHeader !== undefined && surfaceSeqs.has(prevHeader.seq);
     const reuseHeader = prevHeader !== undefined && prevHeader.sig === headerSig && headerAlive
@@ -2968,6 +2415,8 @@ export class ContinuityEngine extends BaseEngine {
         rulesCarrier: rulesCarrier ?? null,
         carrierAlive: rulesCarrier === undefined || rulesCarrier === null ? null : surfaceSeqs.has(rulesCarrier),
         rulesChars: rulesFull.length,
+        rulesCarrierCount: foundCarriers.length,
+        rulesCarriers: foundCarriers,
         skillsInjected,
         skillNames,
         news: { guiWeiNews, learningNews, groupNews },
@@ -3007,12 +2456,19 @@ export class ContinuityEngine extends BaseEngine {
       return;
     }
     try {
+      // Rules/habits are one logical carrier. When the carrier is still on the
+      // surface and the text changed, replace that message in place; appending
+      // would leave the previous copy visible as a competing version.
+      const previousCarrier = rulesCarrier;
       const appended = session.append('user/message', contextMessage(text), { surfaceOp: 'append' });
       const appendedSeq = appended?.seq ?? [...(session.surface?.nodes ?? [])].at(-1);
       if (appendedSeq !== undefined) {
         if (skillsInjected) this.skillMsgSeq.set(agent, appendedSeq);
         if (rulesInjected) {
           this.rulesMsgSeq.set(agent, appendedSeq);
+          if (previousCarrier !== undefined && previousCarrier !== null && previousCarrier !== appendedSeq) {
+            retireRulesCarrier(session, previousCarrier);
+          }
           this.habitsMsgSeq.set(agent, appendedSeq);
           this.rulesSignature.set(agent, rulesSignature);
           this.habitsSignature.set(agent, habitsSignature);
@@ -3101,88 +2557,6 @@ export class ContinuityEngine extends BaseEngine {
    * and never appends to the session. A missing/corrupt tags.json is recovered
    * to T0 with one warning; no exception escapes.
    */
-  async autoTagCompletedTurn(agent) {
-    const session = agent?.session;
-    if (session === undefined || session === null) return;
-    let events;
-    if (typeof session.snapshotEvents === 'function') events = session.snapshotEvents();
-    else {
-      events = [];
-      const end = Number.isInteger(session.seq) ? session.seq : 0;
-      for (let seq = 0; seq < end; seq += 1) {
-        const event = session.eventAt?.(seq);
-        if (event !== undefined) events.push(event);
-      }
-    }
-    let turnEnd = -1;
-    for (let index = (events?.length ?? 0) - 1; index >= 0; index -= 1) {
-      if (events[index]?.type === 'turn/end') { turnEnd = index; break; }
-    }
-    if (turnEnd < 0) return;
-    let turnStart = -1;
-    for (let index = turnEnd - 1; index >= 0; index -= 1) {
-      if (events[index]?.type === 'turn/start') { turnStart = index; break; }
-    }
-    if (turnStart < 0) return;
-    const from = Number(events[turnStart].seq);
-    const to = Number(events[turnEnd].seq);
-    if (!Number.isInteger(from) || !Number.isInteger(to) || from > to) return;
-
-    let state;
-    try {
-      state = await getSession(session.id);
-    } catch {
-      state = { threads: [], activeId: null };
-    }
-    const active = Array.isArray(state.threads)
-      ? state.threads.find((thread) => thread.id === state.activeId)
-      : undefined;
-    const alias = typeof active?.alias === 'string' && active.alias.trim().length > 0
-      ? active.alias.trim()
-      : null;
-    const tagId = active?.id ?? TAG_ZERO;
-    const label = active?.label ?? '未分类';
-
-    const read = await readTags();
-    if (read.corrupt || read.missing) {
-      this.warnOnce(
-        'tags-read',
-        `dsh-continuity: tags.json ${read.corrupt ? 'corrupt' : 'missing'}; using T0${read.error ? ` (${read.error})` : ''}`,
-      );
-    }
-    try {
-      const migration = migrateAliasTags(read.state, state.threads);
-      if (migration.changed) await updateTags(() => migration.state);
-      await updateTags((tags) => {
-        if (tags.runs.some(([start, end]) => start === from && end === to)) return tags;
-        const existing = tags.tags[tagId];
-        if (existing === undefined) tags.tags[tagId] = { label, ...(alias === null ? {} : { alias }) };
-        else {
-          if (typeof existing.label !== 'string' || existing.label.length === 0 || existing.label === tagId) {
-            existing.label = label;
-          }
-          if (alias !== null) existing.alias = alias;
-        }
-        // 0.4.12：不再按“当前活跃线头”默认继承整轮。
-        // 多标签由显式判定写入（memberships / tag-turn），判不出就留 T0。
-        tags.updatedAt = new Date().toISOString();
-        return tags;
-      });
-      const updated = await readTags();
-      await this.writeTagsMarkdown(updated.state, agent);
-    } catch (error) {
-      this.warnOnce('tags-write', `dsh-continuity: tags auto-write failed: ${error?.message ?? error}`);
-    }
-  }
-
-  /**
-   * Band-controlled automatic compaction. Overflow still goes to the base
-   * backend, which is allowed to ignore retention to recover.
-   *
-   * @param {AgentContext} agent
-   * @param {'pressure'|'context-overflow'} trigger
-   * @param {AbortSignal} signal
-   */
   async compactIfNeeded(agent, trigger, signal) {
     // 高线/软上限折叠前清副本：副本不进摘要，避免同一内容被汇总两次。
     try { this.sweepLoadedCopies(agent); } catch { /* 清扫失败不阻断折叠 */ }
@@ -3192,7 +2566,6 @@ export class ContinuityEngine extends BaseEngine {
       recordError(error?.message ?? String(error), 'thread-pending');
     }
     try {
-      if (!this.threads.pointersOnly) await this.autoTagCompletedTurn(agent);
     } catch (error) {
       recordError(error?.message ?? String(error), 'tags-auto');
     }
@@ -3530,6 +2903,19 @@ export class ContinuityEngine extends BaseEngine {
       };
     }
     const header = this.headers.get(agent);
+    if (this.mechanicalNote) {
+      const note = renderMechanicalNote({
+        messages: Array.isArray(input?.messages) ? input.messages : [],
+        maxTokens: this.mechanicalNoteTokens,
+        header: header ?? null,
+      });
+      const config = agent?.session?.requestHeader?.()?.config;
+      return {
+        summary: [{ type: 'text', text: note.text }],
+        provider: config?.provider ?? '',
+        model: config?.model ?? '',
+      };
+    }
     const view = previewSummaryInput(input, {
       header: header ?? null,
       maxChars: 1280,

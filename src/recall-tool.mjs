@@ -10,6 +10,7 @@ import { loadSpecialKeywords, matchSpecialKeywords } from './memory/special-keyw
 import { loadCMapEntries } from './memory/cmap-file.mjs';
 import { loadQueryAliases } from './memory/query-aliases.mjs';
 import { loadConcepts } from './memory/concepts-file.mjs';
+import { querySummaryIndex, readSummaryIndex, summaryIndexPath, summaryIndexStaleness } from './memory/summary-index.mjs';
 import { resolveVocabFile, sessionFile } from './memory/persona.mjs';
 import { eventText } from './session-log.mjs';
 
@@ -48,6 +49,24 @@ async function currentUserText(sessionQuery, exec) {
     if (text) return text;
   }
   return '';
+}
+
+async function latestSummarySeq(sessionQuery, sessionId) {
+  if (!sessionQuery || typeof sessionQuery.observeSession !== 'function') return null;
+  let observation = null;
+  try {
+    observation = await sessionQuery.observeSession(sessionId, { projectionMode: 'none' });
+    const events = Array.isArray(observation?.events) ? observation.events : [];
+    return events.reduce((max, event) => {
+      if (event?.type !== 'compaction/summary') return max;
+      const seq = Number(event.seq);
+      return Number.isInteger(seq) && seq > max ? seq : max;
+    }, -1);
+  } catch {
+    return null;
+  } finally {
+    if (typeof observation?.[Symbol.dispose] === 'function') observation[Symbol.dispose]();
+  }
 }
 
 function inventory(records, kind, specialKeywords, cTerms = [], aConcepts = [], aField = null, aKinds = null) {
@@ -222,7 +241,7 @@ function noteForLive(query, hits) {
 export function createRecallTool({ file = indexPath(), sessionQuery = null, cmapFile = null, conceptsFile = null, keywordsFile = null, literalRecords = null, aliasesFile = null } = {}) {
   return {
     name: 'recall',
-    description: 'Look up candidate memory turns. Call with no query to interpret the current user message; call with A标签/B标签/C标签/K标签 (optionally plus a value) to inspect or search one namespace. Returns bounded turn/seq pointers; open the cited original before relying on it.',
+    description: 'Look up candidate memory turns. Call with no query to interpret the current user message; call with A标签/B标签/C标签/K标签 (optionally plus a value) to inspect or search one namespace. Returns bounded turn/seq pointers; summaryHits, when available and not stale, point to the middle-layer summary text for a seq range. Open the cited original before relying on it.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -432,6 +451,39 @@ export function createRecallTool({ file = indexPath(), sessionQuery = null, cmap
       }
 
       const groups = groupHits(hits);
+      const hitTurns = new Set(hits.map((hit) => hit.turn).filter((turn) => turn !== undefined && turn !== null)).size;
+      const kTooWide = via === 'K' && hitTurns > 50;
+      const exactHint = (kTooWide || Boolean(warning)) && hits.length > 0
+        ? '[提示] 命中过宽；需要字面定位可改用 recall_exact。'
+        : null;
+      if (exactHint) note = note ? `${note}\n${exactHint}` : exactHint;
+      const summaryPath = summaryIndexPath(path.dirname(sessionIndexFile));
+      let summaryHits = [];
+      let summaryIndexState = { available: false, stale: null, path: summaryPath, maxSummarySeq: null, latestSeq: null };
+      if (fs.existsSync(summaryPath)) {
+        try {
+          const summaryIndex = readSummaryIndex(summaryPath);
+          const liveSummarySeq = await latestSummarySeq(sessionQuery, sessionId);
+          const stale = summaryIndexStaleness(summaryIndex, records, { latestSummarySeq: liveSummarySeq });
+          summaryIndexState = {
+            available: true,
+            stale: stale.stale,
+            staleBy: stale.staleBy,
+            path: summaryPath,
+            maxSummarySeq: stale.maxSummarySeq,
+            latestSeq: stale.latestSeq,
+            latestSummaryAt: stale.latestSummaryAt,
+          };
+          summaryHits = querySummaryIndex(summaryIndex, raw, { limit: 5 }).hits;
+        } catch (error) {
+          summaryIndexState = {
+            available: false,
+            stale: null,
+            path: summaryPath,
+            error: String(error?.message ?? error),
+          };
+        }
+      }
       return JSON.stringify({
         ok: true,
         mode: 'locate',
@@ -440,6 +492,7 @@ export function createRecallTool({ file = indexPath(), sessionQuery = null, cmap
         via,
         recent,
         note,
+        hint: exactHint,
         warning,
         intervals: groups.map((group) => ({
           fromTurn: group.fromTurn,
@@ -458,6 +511,10 @@ export function createRecallTool({ file = indexPath(), sessionQuery = null, cmap
           score: hit.literalScore ?? null,
           literalTerms: hit.literalTerms ?? [],
         })),
+        summaryHits,
+        summaryStale: summaryIndexState.stale,
+        summaryStaleBy: summaryIndexState.staleBy ?? null,
+        summaryIndex: summaryIndexState,
       });
     },
   };

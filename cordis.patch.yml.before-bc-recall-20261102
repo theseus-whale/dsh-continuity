@@ -1,0 +1,358 @@
+# ============================================================================
+# dsh-continuity 鈥?DSH bundle patch
+# ============================================================================
+# Three things are declared here:
+#
+#   1. The Host row `dsh-continuity`: serves the sidebar panel's JSON snapshot.
+#   2. The `band` agent preset: the shipped `standard` preset with the
+#      compaction-basic config-only override (thresholdRatio 0.92,
+#      retainRatio 0.5). This is the first experiment; it changes no engine
+#      code. `headroomTokens` is omitted on purpose: the shipped default is
+#      65536 and stays explicit in docs/EXPERIMENT.md.
+#   3. The `continuity` agent preset: the shipped `standard` preset with
+#      compaction-basic replaced by `dsh-continuity/engine`, the band
+#      controller with gist provenance.
+#
+# The shipped `standard` preset is deliberately NOT overridden: existing and
+# default sessions keep the stock backend. Pick either new preset for a new
+# session to test it. Rollback = select another preset, or remove the bundle.
+#
+# Measured loader ids on this desktop profile (DSH 0.2.1-rc.3):
+#   - base row:  entryId "include:compaction-basic", patchId "compaction-basic"
+#   - preset:    entryId "include:preset-standard" -> group "compaction"
+#                (isolate: compaction, toolResultPruner) -> child "compaction-basic"
+# A patch cannot address the preset child directly; it must override or copy
+# the whole preset declaration, which is why the two presets below restate the
+# shipped plugin list.
+# ============================================================================
+
+- insert:
+    - id: dsh-continuity
+      name: dsh-continuity
+      required: false
+      config:
+        panel:
+          enabled: true
+          path: /dsh-continuity/state.json
+        projection:
+          provider: deepseek-official
+          model: deepseek-flash
+        extraction:
+          mode: "off"
+
+    # 鈹€鈹€ config-only experiment 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    - id: preset-band
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: band
+        name: Band (config-only)
+        description: Shipped compaction backend with thresholdRatio 0.92 and retainRatio 0.5; no custom engine.
+        order: 20
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: You are a coding agent powered by the {{model}} model.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-schedule
+            name: '@deepseek-ai/dsh-tool-schedule'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement 鈥?including an answer confirming something you asked 鈥?approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                    The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                    Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+                    Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If the review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              # CONFIG-ONLY EXPERIMENT: cap-threshold at 92% of the window,
+              # retain 50% of the message budget verbatim.
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+                config:
+                  thresholdRatio: 0.92
+                  retainRatio: 0.5
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
+          - id: tool-plugin-market
+            name: '@deepseek-ai/dsh-plugin-market/tools'
+            disabled: true
+
+    # 鈹€鈹€ band engine + provenance 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    - id: preset-continuity
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: continuity
+        name: Continuity
+        description: Band-controlled compaction with gist headers and one standing provenance convention.
+        order: 21
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: You are a coding agent powered by the {{model}} model.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: tool-schedule
+            name: '@deepseek-ai/dsh-tool-schedule'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          # Retrieval tool: scoped to this preset; standard and band do not get it.
+          - id: session-log-tool
+            name: dsh-continuity/session-log-tool
+          # Thread scaffolding: save/load/active/list. The save commit runs at
+          # the next pre-step so the tool call/result pair is never split.
+          - id: threads-tool
+            name: dsh-continuity/threads-tool
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+          - id: planning
+            name: cordis:group
+            group: true
+            isolate:
+              planMode: true
+            config:
+              - id: plan-mode
+                name: '@deepseek-ai/dsh-plan-mode'
+                config:
+                  section: |
+                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement 鈥?including an answer confirming something you asked 鈥?approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+                    The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+                    Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+                    Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+                    When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If the review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              # One engine per context: this row replaces compaction-basic
+              # inside the same isolate realm. command-compact and the pruner
+              # stay so /compact and overflow recovery keep working.
+              - id: continuity-engine
+                name: dsh-continuity/engine
+                config:
+                  # Band policy lives in src/policy.mjs (CACHE_FIRST_POLICY):
+                  # setpoint = high = 0.60 (475,546, 45.4% full), low 0.40 (317,030),
+                  # emergency 0.65 (515,174, 49.1% full) -> emergencyTo
+                  # 0.42 (332,882), maxPerBatch 190000, minAction 24000, protect 0.30.
+                  # The high→emergency gap is 5% W (39,628), above minAction.
+                  # One pass per high crossing; no proportional-zone passes.
+                  # emergencyTo is below high, so one emergency cannot chain
+                  # into a second band-high pass.
+                  #
+                  # 0.2.4 A4-safe: active open-turn tool calls are hard-pinned;
+                  # old non-active tool results are previewed toward low 40%
+                  # (42% for emergency), and the same compression continues with
+                  # a pass to the target even if the preview drops below high.
+                  # B previews tool results in the summarization input only.
+                  # Non-text results become semantic handles; overflow may
+                  # detach the responsible active result into a pause handle.
+                  # 0.2.5: handles/pauses/previews are never previewed again;
+                  # pass records include a post-pass measurement; manual
+                  # /compact gets a follow-up gist header and a manual record.
+                  # 0.2.6: the 515k cap policy above; 515k is 49.1% full / 65% of W.
+                  # 0.2.7: high/emergency ratio 92%: high 0.60, low 0.40; the
+                  # 5% W gap is above minAction, unlike the 0.62/0.65 3% gap.
+                  #
+                  # setpoint and emergencyTo are pinned explicitly: they match
+                  # CACHE_FIRST_POLICY and keep a hot preset reconciliation from
+                  # falling back to an older cached module default. The other
+                  # fields inherit from src/policy.mjs.
+                  policy:
+                    setpoint: 0.60
+                    emergencyTo: 0.42
+                  # Stage switches: stage 1 (save/load/active/list + state) is
+                  # always on; stage 2 injects the per-turn [线] line + rules;
+                  # stage 3 pins the active loadSeq against automatic folds.
+                  threads:
+                    inject: true
+                    pin: true
+                    pointersOnly: true
+                  provenance:
+                    header: false
+                    standingConvention: false
+                  turnGate:
+                    enabled: false
+                  compactionBasic:
+                    thresholdRatio: 0.8
+                    retainRatio: 0.5
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent-list-agents
+                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+              - id: tool-subagent-fork
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: fork
+                  toolName: subagent_fork
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
+                config:
+                  provider: spawn
+              - id: tool-workflow
+                name: '@deepseek-ai/dsh-tool-workflow'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+          - id: tool-plugin-manager
+            name: '@deepseek-ai/dsh-plugin-manager/tools'
+            disabled: true
+          - id: tool-plugin-market
+            name: '@deepseek-ai/dsh-plugin-market/tools'
+            disabled: true

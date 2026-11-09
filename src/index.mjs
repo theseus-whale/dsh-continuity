@@ -24,6 +24,7 @@ import { installBCPreStep } from './memory/bc-pre-step.mjs';
 import { buildBCPanelState } from './memory/bc-panel-state.mjs';
 import { isPersonaEnabled, resolvePersona, sessionFile } from './memory/persona.mjs';
 import { installSessionGuard } from './session-guard.mjs';
+import { createRecallExactTool } from './recall-exact-tool.mjs';
 
 export const name = 'dsh-continuity';
 export const inject = [];
@@ -133,6 +134,11 @@ export function apply(ctx, config = {}) {
     scoped.effect(() => scoped.webServer.register(peerRoute));
     scoped.logger?.info?.(`[dsh-continuity] peer route mounted at ${PEER_PATH}`);
   });
+  // recall_exact is a global read-only tool, not a preset-only feature.
+  ctx.inject(['tools', 'sessionQuery'], (scoped) => {
+    const tool = createRecallExactTool({ sessionQuery: scoped.sessionQuery });
+    scoped.effect(() => scoped.tools.register(tool));
+  });
   // Extraction is opt-in by config or environment. Default off means this
   // listener is never registered, so the normal turn path is byte-for-byte unchanged.
   try {
@@ -174,50 +180,25 @@ export function apply(ctx, config = {}) {
       }) + '\n', 'utf8');
     } catch { /* registration failure must not block the plugin */ }
   }
-  // 回合闸注册在这里，不在 engine 里：engine 是挂在 agent preset 里的 compaction service，
-  // 它自己的 ctx 接不到 agent/* 事件（历史调试 实测：重启后 turn-stopping 一次都没触发，
-  // 也没有注册错误——引擎那边是可选链，ctx 不对就静默跳过）。插件入口的 ctx 一定在。
-  const hookHome = join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
-  if (config.safeMode === true) {
-    log.info?.('[dsh-continuity] safe mode: turn-stopping hook not registered');
-  } else try {
-    ctx.on('agent/turn-stopping', (payload) => {
-      // Dispatch probe: write this before the gate call so a null/foreign
-      // engine is distinguishable from "the Host never dispatched".
-      const turn = Number.isInteger(payload?.turn) ? payload.turn : null;
-      const engine = continuityState.engineInstance;
-      const engineCallable = typeof engine?.onTurnStopping === 'function';
-      const agentSession = typeof payload?.agent?.session?.id === 'string' ? payload.agent.session.id : null;
-      const continuitySession = continuityState.engineSession ?? null;
-      const foreignSession = Boolean(agentSession && continuitySession && agentSession !== continuitySession);
+  // First history-map injection must not wait for compression pressure.
+  try {
+    ctx.on('agent/pre-step', async (payload, next) => {
       try {
-        appendFileSync(join(hookHome, 'dispatch-probe.jsonl'),
-          JSON.stringify({
-            at: new Date().toISOString(),
-            event: 'agent/turn-stopping',
-            turn,
-            enginePresent: Boolean(engine),
-            engineCallable,
-            agentSession,
-            continuitySession,
-            foreignSession,
-          }) + '\n', 'utf8');
-      } catch { /* probe failure must not block the gate */ }
-      if (engineCallable) {
-        void engine.onTurnStopping(payload);
+        const engine = continuityState.engineInstance;
+        if (engine !== null && typeof engine?.ensureHistoryMap === 'function') {
+          await engine.ensureHistoryMap(payload?.agent);
+        }
+      } catch (error) {
+        try {
+          log.warn?.(`[dsh-continuity] history-map bootstrap skipped: ${error?.message ?? error}`);
+        } catch { /* logging only */ }
       }
+      return next();
     });
-    try {
-      writeFileSync(join(hookHome, 'hook-registered.json'),
-        JSON.stringify({ at: new Date().toISOString(), via: 'index.apply', event: 'agent/turn-stopping' }, null, 2), 'utf8');
-    } catch { /* 探针写不进不影响注册 */ }
   } catch (error) {
     try {
-      appendFileSync(join(hookHome, 'gate-errors.jsonl'), JSON.stringify({
-        at: new Date().toISOString(), name: error?.name ?? 'Error', code: 'hook-register-failed',
-        message: String(error?.message ?? error),
-      }) + '\n', 'utf8');
-    } catch { /* 只能放弃 */ }
+      log.warn?.(`[dsh-continuity] history-map pre-step registration failed: ${error?.message ?? error}`);
+    } catch { /* ignore */ }
   }
   const panel = config.panel ?? {};
   if (panel.enabled === false) {

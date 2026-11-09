@@ -430,7 +430,7 @@ export function createThreadsTool({ sessionQuery, tokenMeter, getBackend = getTh
       const input = args !== null && typeof args === 'object' ? args : {};
       assertAction(input);
       exec?.signal?.throwIfAborted?.();
-      // 欠账**不再锁工具**（历史调试 用户裁定：挡 save 只会让实例最后存不下、消失；
+      // 欠账**不再锁工具**（2026-10-30 用户裁定：挡 save 只会让实例最后存不下、消失；
       // 挡读只会让人恼怒）。真正的闸在回合末：'agent/turn-stopping' 里催补标并把本轮续上。
       // tag-debt.json 仍由引擎写，只作为头部提示的来源，工具层不再据此拒绝。
       const backend = {

@@ -1,0 +1,76 @@
+# 发布记录
+
+> 每次 release.mjs 追加一行：版本 · 时间 · sha · 说明。
+
+- **4.9.124-safe.1** · 2026-11-03 · sha `EC7ADA95F6FC6C55109DDE79951A4E95D501D77BFEEFD18727D5CAA3FBDB3297` · context-log.jsonl 只读白名单；.14 与 fold 字段不变
+- **4.9.123-safe.1** · 2026-11-03 · sha `9506A3B53BDAC9D84EBD836D8602458B136FD05370C25D6A6FF953F6388E482E` · 文档：afterTokens 可高于 floor，差额来自 tool-pair 切边（实测 +3,639）
+- **4.9.122-safe.1** · 2026-11-03 · sha `C4C3AAE1D4AC111931A22BD1E8A796B1672DC663D58A2CB5BE95CDC1E15AE88F` · .14 默认；fold receipt 加 protectBinds/floor/low/afterBaseline；baseline 相位说明
+- **4.9.121-safe.1** · 2026-11-03 · sha `43AEB02B245C8BCAF3CE221B1B22313AE9B90CF11748BCC232C80D58C06154CE` · 平衡带 .48/.32/.16；floor≈248k，low 254k 可达；4.9.120 作废
+- **4.9.120-safe.1** · 2026-11-03 · **作废**：protect .30 使 floor≈356k，low .32 到不了；不要安装
+- **4.9.119-safe.1** · 2026-11-03 · sha `3DF19EF029E7E9FF3164D1DFF8239EDE2203DF94ECC890328E4A52A84A389AA7` · 根级 session-persona/operator-sessions 只读白名单；shell 仍拦；修 rules 与 guard 冲突
+- **4.9.118-safe.1** · 2026-11-03 · sha `0D1CA32A31A1DB7B5A160BDB63F800B5BAC97D59A264CE6A0CEBAA7575D5EE37` · operator-sessions.json 显式维护者放行；session guard 支持跨 session 人工维护
+- **4.9.117-safe.1** · 2026-11-03 · sha `44F6E10E6DB1EE730CA95AE6E0E3CE435F5161B84FFA32EBA0B78838EA1B3A1A` · 0.19 折中带：high .455 / low .34 / protect .19；预计 363k -> ~269k
+- **4.9.116-safe.1** · 2026-11-03 · sha `1A6B10F75CF36F8BF5C87F007D991955EDDCC3AF164337F5E41DC0A259FB5D52` · token-saver 压缩带：high .45 / low .35 / protect .20 / emergency .55 / max 140k；目标每轮 363k -> ~277k
+- **4.9.115-safe.1** · 2026-11-03 · sha `5B7367B12A89D4A8D5FE12FBB49F0E4F88437C17BB79F526AC5D2BAF1D0A5EE9` · 06-EMBEDDING + bin/vec-check；embedding 失败提示 approve-builds/rebuild；empty vec 审计排查
+- **4.9.114-safe.1** · 2026-11-03 · sha `889772D8487DC68718A021DD59501135FB108438C62E8CF28C9837671B702E68` · 00-READ-FIRST 加 01–05 链接；bundle 文件名带（先读Read-First）
+- **4.9.113-safe.1** · 2026-11-03 · sha `3C6D432B49AC612B52E056A1FEF748A88E2D8242D214A79C55D132E0D339CA63` · guides/00–05 改为带“为什么/不做会怎样/如果…则…”的说明文；命令和路径不变
+- **4.9.112-safe.1** · 2026-11-03 · sha `42B0CBB3D31D997391F5960606901831D6D295257B8B4DA2CA760DD24AA91714` · base rules 增加 A 表维护段；明确 A 空 -> B 空、审计跳过；已有 session 不自动重写 rules
+- **4.9.111-safe.1** · 2026-11-03 · sha `6C5C35677B099A27033AD99B1D3B102245B3E3F797295E947248B91BB4F635BF` · 面板排错 PANEL.md + bin/panel-check.mjs；确认 client.js/dsh.client 随包；诊断 host route/宿主 sidebarRight
+- **4.9.110-safe.1** · 2026-11-03 · sha `27713176BB2ED26C51DA9E4506C30AD8EA4B49B61F235A5BE086D5F017233F31` · audit.lock owner token + quarantine；释放只删自己的锁；拿到锁后复查 200 轮资格；8 条锁/稀疏测试
+- **4.9.109-safe.1** · 2026-11-03 · sha `A9A3A2761A104032570433166CDF5D89D7E2223417C74136DBB1C64BEB89C65F` · null state 归一化；audit.lock 跨进程锁/未来 mtime；严格 base64；legacy selector 全部兼容
+- **4.9.108-safe.1** · 2026-11-03 · sha `F284E8A7AE86AF446B61A7DBC2DE29BCA62CEE2864D8B33C37809C65A1512AC2` · audit stale running 15m 恢复；vec 有限/非零/维度校验；legacy `[闸]` prefix 兼容
+- **4.9.107-safe.1** · 2026-11-03 · sha `38E780A792C8775BC2339E6B122D93B176098F7CC225A7C1B16F765F72C7E1FD` · 稀疏索引审计修复：k 上限 = 实际记录数；1/5/19 条 vec 测试；不再卡死
+- **4.9.104-safe.1** · 2026-11-03 · sha `2539BD4A5FA5839C0C728BE11FB0A24794F7E1F41ED99283C7545CF91CE9E5D4` · dropped-ranges 按 session 分文件；remove internal T wording from public docs; startup rebuild + 单测
+- **4.9.102-safe.1** · 2026-11-03 · sha `751F0A955E021DA1A6E07EA9E5CA885D27BFAD66A02CF57A799001599B5A8B21` · 中文主文档：README、guides/00–05、SESSION-LAYOUT、RELEASE-NOTES；ARCH/HANDOFF 保留英文技术附录
+- **4.9.101-safe.1** · 2026-11-03 · sha `A38A130CCE239DF8E88C337F3F5DE6F901B2384FAA891EF2C9FA5D1C0D01D135` · 04-REBUILD 标注实战状态：continuity preset 已跑通，standard preset 未验证；无其他变化
+- **4.9.100-safe.1** · 2026-11-03 · sha `3455566F989853408F38FC2128DCFFA047D3A9BFA3CF6CF441C837FF0B4CACEE` · 恢复经典 00–05 编号说明书（含 04-REBUILD、bin/export-turns.py）；包内 6 份 guides，无 session-specific 工具/无 pycache
+- **4.9.99-safe.1** · 2026-11-03 · sha `5B5DB94D8F2418733EB24AD12F031876EBC21662D9B57CA853E2EDC10D6DD110` · 包内补齐全部 docs/*.md（13 份）；docs/README 区分现行与历史；无 session-specific 工具
+- **4.9.98-safe.1** · 2026-11-03 · sha `A2DF375A7DFF6FD3D6F48D9B99EF435CD632F0047EC49B6A6BABAFA193785DCB` · 移除 session-specific CLI；包内只保留插件、docs/SESSION-LAYOUT、templates；版本/文档/包内容对齐
+- **4.9.97-safe.1** · 2026-11-03 · sha `CC432F2C3166449425D3F4B7CF5381B0499B48B7BC7F6AC4D6358B767F7AF6C9` · 包内含 docs/SESSION-LAYOUT.md；路径/权限矩阵；明确 header 切换与已启动 preset 锁定
+- **4.9.96-safe.1** · 2026-11-03 · sha `8D3DCB936BB5A631F2930D119DC172FB1DAE8218C4F026AE667FE6401A6377CE` · host 切换入口；仅首个 turn 前可用，已启动 session 返回 agent-preset/locked
+- **4.9.95-safe.1** · 2026-11-03 · sha `1F2093A143F145FA5D0CE92641C9AB6298A15C68BAA2FB830D19E42F5833CC1A` · 空 session 面板固定显示 A/B/C/K 空表，不再隐藏 section
+- **4.9.94-safe.1** · 2026-11-03 · sha `5E366ACB7887D8E7639B951DD43F41BAF92120E8413BF50E098D89245AD6129E` · guard 字段级路径检查，消息/文件正文不再误判
+- **4.9.93-safe.1** · 2026-11-03 · sha `56F4720D54DD72260B5C6F0CD2EDD9084B4470C8677F21176E6558F6C9F80C2F` · guard 判断顺序修正；disabled persona 普通工具放行
+- **4.9.92-safe.1** · 2026-11-03 · sha `C333CC908A710B8F20E930B1DC18A1427CF22688A70DAEB175B39D2A1B64B4EE` · concepts/cmap mtime 热重载；personas 弃用标记；session-persona 语义说明
+- **4.9.91-safe.1** · 2026-11-03 · sha `75FDFD37F4169022341A095F756BBBEB697063EF1EF6D0C789D1EC4DFF7737BC` · 每 session 全套 A/C/K/rules/habits；既有 session 迁移、新 session root 空表；best-effort 跨 session 工具守卫
+- **4.9.90-safe.1** · 2026-11-03 · sha `7718D7481DA30D39B4DD1DEAC2B509B189274EBB2DC3545A700D6D555B61BFC4` · persona enable switch；非 continuity session 自有 A/C/K，不继承 continuity；persona-disabled 关 tab
+- **4.9.89-safe.1** · 2026-11-03 · sha `2537EC3AC0ADB8863E08A44BB1D7678D7761710987753C44E08819159A506549` · 宣告版：无运行时代码差异；附 5/6 验收表、folds 待现场、v2 generic 组成对 bc-shift 的已知风险
+- **4.9.88-safe.1** · 2026-11-03 · sha `31A92C22D41CEC1DABF909E2A510C2AAD2D8015155EC2D83A5D7009F0EA32F45` · folds 新记录加 count/compactionId；v2 标签字段（genericTopic/topicScore/topicConfidence/genericWorkflow/labelVersion=2）；header 动态节数
+- **4.9.87-safe.1** · 2026-11-02 · sha `5091B12C674CA7631EED0BC42BB401C295AC9AEBBEC7DFF97A5CB848E4BA8E7E` · rules header 截断时显示“共 N 节，仅显示前 M 节”
+- **4.9.86-safe.1** · 2026-11-02 · sha `696134F6649761B998C294688D73D5CB223EE4DF27DFF9E9FE7DFDB35C909074` · 文档/版本对齐：session/persona 分层、A topic/workflow、pass 回执、folds 历史、可达下限；README/ARCHITECTURE/NEW-INSTANCE-HANDOFF/rebuild 重写；旧文档标 Historical
+- **0.4.79** · 2026-10-29 21:38:59 · sha `8FC9B21EFC1DA22A` · preflight 加 health（覆盖率+投影）；规则体积守卫- **4.11.17** · 2026-11-04 · public sha `BE0F8D384F84029FF9536C8E2198D4B9B9A128B02952D26DDA521FBAC8AD8EBC` · baseline 缺失 topic 回退全局均值
+- **4.11.16** · 2026-11-04 · public sha `9A3520C6638C8140AC42CB890A35F523749CA30C8DFBFC5DC45B32E66C17B662` · eval-label-rules 随包 + concepts 模板 + baseline 双格式
+- **4.11.15** · 2026-11-04 · public sha `51DC5D3A3DEC8CCAFD09A83EC95CA2C185AA5CAF828353CD25D586F5510B843C` · topic baseline 居中，D 判据 centered .02/lead .02
+- **4.11.14** · 2026-11-04 · public sha `BE163EC122DBE63D0D8B8803E2825F06E59E8683645C581D90EE19B31E20D901` · A 表描述具体名词优先 + ≥30 轮复核
+- **4.11.13** · 2026-11-04 · public sha `457EB6D51669906DFCA4A81C1FF1EAED8C5DEF4B3C0CF9BB768553AD26C3078C` · user turn 映射 + 去 reasoning + 用户优先
+- **4.11.12** · 2026-11-04 · public sha `7B175BF283E10731B0E496BDB8DE5A5784513D40AF994F5670EA1E28A53165FF` · labelChunked 600 字/12 块 + topicMargin .03
+- **4.11.11** · 2026-11-04 · public sha `2D16C1316BBDFC3A33E6B00DEEA86CF673A95EB57F085AE5BE5CEA3738BC4992` · topicMinScore .33，topic 可空，record 记录阈值
+- **4.11.10** · 2026-11-04 · public sha `415293743DDB475C10D122322911B9BE25D9B84CF5DE995ECB7CEA21C07E2C56` · workflow 不回传 childSessionId，子必须自报
+- **4.11.9** · 2026-11-04 · public sha `3341823F2361676B6A4039F2B5545A1C5573FBEAE9D6481DB7B3DFA1A41CF16F` · unresolvedArtifacts 形状写入 guide/根规则
+- **4.11.8** · 2026-11-04 · public sha `F70030C9F340CA8211171DD40A5DB2A9D90C4794F86A79539754550327357150` · 指南编号修正：06-EMBEDDING、07-PTC-AND-ASSETS
+- **4.11.7** · 2026-11-04 · public sha `957A7FE93CBD1CF6864DC3848C36F4256D7B2CBF7E6125D918595BC2DF80C0B5` · PTC/子 agent/assets 说明书 + 根规则第11节
+- **4.11.6** · 2026-11-04 · public sha `97B367B92C24755CCC5680E6EF75DB199F5324C27E5DAF0A0E59A55E848C763E` · artifactSources 每条带 mime
+- **4.11.5** · 2026-11-04 · public sha `8E45C94D5064CBEE9C9B1A4F5611B9666FBB15985C02EA0ED15221D027804C56` · artifact mime 推断 + handoff 内唯一 seq
+- **4.11.4** · 2026-11-04 · public sha `B93F4C2B9778976023DF7DDBD88B16D6F9F4DECF1970656CC83C43BD298BEBB1` · ptc_handoff 复制 artifact 到 assets/ptc，缺失文件标 unresolvedArtifacts
+- **4.11.3** · 2026-11-04 · public sha `EFA3BF9A97BD74BDCFA177BD3484720768B0989F09C787467F5FE774A2D19A6C` · attachmentId 解析 + session_asset 从 raw parent 恢复已折叠图
+- **4.11.2** · 2026-11-04 · public sha `584F549D78C786FBF8F064379786D7A09F47BC1546160D2CC4328881326DCA43` · data.content 用户图片扫描 + header=false 仍写 asset 指针
+- **4.11.1** · 2026-11-04 · public sha `96DF2CEC6A8BB1802BC686B20D2B37E003B7F94E4C7932F0919188366866125E` · read_image/path-only image 用 statSync 补 bytes，避免 4MiB 闸误判为 handle
+- **4.11.0** · 2026-11-04 · public sha `47EA33A828C38F4CD21F4B77802B2067A24A437F8C571A5D30D322DFFC684553` · assets 落盘 + session_asset / child_asset / ptc_handoff；图片回灌仍待宿主契约
+- **4.10.4** · 2026-11-04 · sha `D1D48CAD60F510AE4F5327EC68C50447F51D4AAF26824EC606B66E454FF89558` · 图片保留加 4MiB 阈值；超过回 non-text handle
+- **4.10.3** · 2026-11-04 · sha `4F25D276AE26C70849B416B9C451933D22EFF78214C330C60DB066C30ADDC4D7` · 图片工具结果保留（image 跳过 non-text handle）；video/file/audio 仍替换
+- **4.10.2** · 2026-11-03 · **未发布/被 4.10.3 取代**：coo/peer 双角色兼容
+- **4.10.1** · 2026-11-03 · **作废/被 4.10.2 取代**：public 把 coo 替换为 peer，pet bridge 分支可能失效
+- **4.10.0** · 2026-11-03 · **作废**（public 包内 engine 未同步）：C 表 fallback / 首次校准 / drift / 面板 C / 根版 rules / warnOnce 不再写 lastError
+- **4.11.30** · 2026-11-05 · public sha `6EE9796DBB480236AE94357F2C2DE6A4A3C680994DBCD2BA31DCF4D48690EB62` · relabel 启动钩子（不自动打 marker）
+- **4.11.29** · 2026-11-04 · public sha `7C6B9A7AB727DB8C2EDB7E9801826615B63AF99BA0E04487F1FA4E0694DDD26B` · updater gate + labelStamp（不接线）
+- **4.11.28** · 2026-11-04 · public sha `3EC1BE638E6B51CDB8FD450907098361FCC20D8F48FBDA1516C3EEB46CFE4540` · relabel 迁移模块（不接线）
+- **4.11.27** · 2026-11-04 · public sha `494FA6F97B9273A0BB5292A304C582C4431C7984BD46257FCAE2305E9769917D` · dry-run v2 baseline
+- **4.11.26** · 2026-11-04 · public sha `09944A2A76B2BFA85FF98A1CDE2CDE86140CB13C4FD776838C8224142B28173C` · 面板 A 表实算 + 健康分布规则
+- **4.11.25** · 2026-11-04 · public sha `7B2AE104C2AD2B09BE633B0119E67E77540CCD6B15E103F37A21FE0F93C1BD7C` · 混淆对加区分词规则
+- **4.11.24** · 2026-11-04 · public sha `0F1E7DA75FDC09402B3E322CD672ED23186FC3C350750C5E0133B8B9F45219A5` · workflow eval 指标随包
+- **4.11.23** · 2026-11-04 · public sha `D1D87D3F89331F531C245F3FB983DF642EAD8FA28446C8670D80C8C1EDBA1404` · workflow baseline v2 + 0 条出口
+- **4.11.22** · 2026-11-04 · public sha `9932D9CBBF0951B4D7D5AA962F6CFE3DE31C8090366CD2931DE624D2C3DAD3E2` · cmapFile 接线到 updater
+- **4.11.21** · 2026-11-04 · public sha `DF7B559E122BE5891A6BF615917B7122952D8E4D5BA9018D703BCF0C3E490104` · C map terms 写入 index
+- **4.11.20** · 2026-11-04 · public sha `7736D03A74523D3F2399BF0B54EED2C35C689A0C3412C7FDB615D08B67D90EC3` · topicMinScore 写入 pointer index
+- **4.11.19** · 2026-11-04 · public sha `E2480E2BADAC63ECA2BDD872DBBF9D8FA884F2BB0338153B4BCB21990428944B` · relabel 只读演练进包，<100 轮警告
+

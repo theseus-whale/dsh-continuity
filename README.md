@@ -1,4 +1,48 @@
-# dsh-continuity 4.11.36
+# dsh-continuity 4.12.8
+
+## 4.12.8 T/TAG 与 turnGate 清理
+
+彻底删除 T/TAG header、打标提醒、tag-debt 写入、turn-stopping 注册与 turnGate 配置。`autoTagCompletedTurn` 也删除，不再自动写 turn-tags；旧 turn-tags 仅只读兼容。说明书不再提 T/TAG。
+
+rules/habits carrier 在重启后扫描 surface 中的全文消息；发现多份时保留最早一份，其余原位清空，避免重启一次多一份。
+
+## 4.12.6 rules/habits 全文保持一份最新
+
+4.12.5 已发布，不能覆盖；4.12.6 承载 rules 全文修复。
+
+## 4.12.5 A 锚的 onboarding
+
+onboarding 与 base-rules 明确：A 表不自动生成，也不自动增长；每轮系统会做 B 标注，但 A 空时 B 只会是 weak。实例识别出新话题时，需要手动往 `concepts.md` 追加一行。
+
+没有新增一次性提醒机制；A 的行为由 rules 承担。
+
+rules/habits 全文：`pointersOnly: false`。carrier 仍在 surface 时内容变化用 `surfaceOp: replace` 原位换掉；carrier 被 fold 走才 append；hash 不变不注入。
+
+> Band (config-only) 已从生产菜单移除；不再提供 `band` preset，只保留内部 baseline 代码。
+
+## 4.12.4 Continuity 默认 PTC
+
+`continuity` 保留原 id，composition 改为原生 `@deepseek-ai/dsh-tool-executor-ptc`。
+`continuity-ptc` 只保留为临时别名，等已有会话切回 `continuity` 后删除。
+
+```text
+continuity       -> PTC（新会话默认）
+continuity-ptc   -> 过渡别名，内容相同
+```
+
+已验证：`run_code` 可调用 `ptc_handoff`、`session_log`、`child_asset`；asset 复制与取回正常。
+
+## 4.12.3 修复 DSH 0.2.2 preset broken
+
+DSH 0.2.2 不再提供 `@deepseek-ai/dsh-tool-subagent-control/list-agents` 子路径。4.12.3 从 `preset-band` 和 `preset-continuity` 移除 `tool-subagent-list-agents` 行，保留主 `tool-subagent-control`。
+
+否则 preset 会被标记为：
+
+```text
+broken: tool-subagent-list-agents ... never started
+```
+
+模式菜单不显示 Continuity，已有 continuity session 也无法载入。
 
 给 DSH 的长上下文连续性插件。每个 session 拥有自己完整的一套记忆；
 persona 只是身份/启用标签。
@@ -23,7 +67,7 @@ panel           每个 session 自己的 A/B/C/K
 peer_message    明确投递给另一个 live session
 ```
 
-不包含额外的提示词分类、自动标注或工作线注入；本包只负责记忆索引、压缩和检索。
+不包含额外的提示词分类或自动标注；本包只负责记忆索引、压缩和检索。
 
 ## 每个 session 的完整一套
 
@@ -62,21 +106,100 @@ peer_message    明确投递给另一个 live session
 ## 安装
 
 ```text
-dsh-continuity-4.11.36.tgz
+dsh-continuity-4.12.2.tgz
 ```
 
 装进目标 profile，备份 `~/.dsh/continuity`，重启 DSH。  
 进程是快照：只复制包不重启，运行时行为不变。
 
+## 4.12.2 水位恢复
+
+4.12.2 = 4.12.0 的水位线 + `maxPerBatch = high−protect`；**native LLM summary 保留，不启用 mechanical note。**
+
+```text
+setpoint .76
+high     .76
+low      .38
+emergency .85 -> .62
+protect  .20
+maxPerBatch 443843
+mechanicalNote false
+```
+
+`protectCalibration` 不再显式关闭，回到 4.12.0 的默认行为。
+
+`maxPerBatch 443843` 覆盖 high-protect 的 `443,842.56`：  
+实际 budget 仍是 `min(est − low, maxPerBatch)`，正常高线折约 301k，overshoot 不被 cap 截成二次小折。
+
+`recall_exact` / `recall` / ABCK / gist / history-map 都不动。  
+4.13.x 的 mechanical note 只保留为实验代码，4.12.2 不启用。
+
+## 4.12.0 新增
+
+### recall_exact
+
+字面搜索，独立于 `recall` 的语义路径；只读、不排序、不写。
+
+```text
+recall_exact({ query: "0.2.17" })
+recall_exact({ query: "stage19", since: 2200 })
+recall_exact({ query: "coo-read-side", near: 2300, window: 20 })
+```
+
+规则：
+
+```text
+只搜 user + assistant 的 text
+不搜 reasoning / tool-call
+排除 continuity / 规则 / 系统注入文本
+ASCII 用 [0-9A-Za-z] 边界；中文按子串
+单个中文字必须白名单（目前只放“创”）
+返回 totalTurns / totalIntervals / shown / turnShare
+```
+
+没有 path 参数；只查当前 session。
+
+### native summary 是默认中间层
+
+fold 仍由 DSH 原生 compaction 完成：
+
+```text
+系统选段 -> LLM 写 checkpoint -> replace 原区间
+旧 summary 下次折入新 summary
+```
+
+`history-map` 默认关闭：
+
+```text
+默认不注入 map
+默认中间层就是 native checkpoint
+auto / observe 只作实验档
+```
+
+需要时看 `docs/history-map.md`。
+
+### summary-index / window 工具
+
+```bash
+# 建当前 session 的摘要索引
+node bin/summary-index.mjs --raw <session.v4.jsonl.zstd> \
+  --session-dir <continuity session dir> --apply
+
+# 有 pending window 时生成抽取式摘要
+node bin/summary-index.mjs ... --extract-pending --apply
+```
+
+默认不自动跑；`pendingWindows=0` 时不需要。
+
 ## recall
 
 ```text
 recall()
-recall({ query: "项目词", recent: true })
+recall({ query: "跑团", recent: true })
 recall({ query: "A标签" })                 // 只看 topic
 recall({ query: "A标签:topic" })
 recall({ query: "A标签:workflow" })
-recall({ query: "A标签:示例主题" })         // 任意 A 概念
+recall({ query: "A标签:跑团叙事" })         // 任意 A 概念
 recall({ query: "B标签" })
 recall({ query: "C标签" })
 recall({ query: "K标签" })
@@ -181,11 +304,10 @@ cordis.patch.yml              bundle patch
 
 ```text
 README.md                     本文件
-RELEASE-NOTES.md              本版说明
-CHANGELOG.md                  变更记录
+RELEASE-NOTES.md              验收状态与已知限制
 PANEL.md                      面板排错与诊断
 bin/panel-check.mjs           面板/宿主路由自检
-docs/README.md                文档索引
+docs/README.md                现行/历史文档索引
 docs/SESSION-LAYOUT.md        权威路径、角色、权限
 docs/ARCHITECTURE.md          当前架构
 docs/NEW-INSTANCE-HANDOFF.md  新实例交接
@@ -200,18 +322,8 @@ guides/07-PTC-AND-ASSETS.md  PTC / 子 agent / assets
 templates/rebuild.md          当前布局的重建流程
 ```
 
-## 许可证与责任
-
-```text
-LICENSE                  MIT
-DISCLAIMER.md            责任声明（使用前必读）
-PRIVACY.md               数据与隐私
-SECURITY.md              安全模型与报告方式
-THIRD-PARTY-NOTICES.md   模型/依赖声明
-```
-
-本软件是实验性项目，不是 DeepSeek 官方产品，按“现状”提供，不保证数据不丢失。
-使用前请备份 `~/.dsh/continuity`，并先在干净 profile 测试。
+`docs/*.md` 全部随包发布；`docs/README.md` 区分现行与历史。  
+历史文档是设计档案，不是现行操作说明。
 
 ## 安全
 

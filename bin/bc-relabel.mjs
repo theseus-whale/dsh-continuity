@@ -90,6 +90,17 @@ if (rows.length === 0) {
   process.exit(2);
 }
 const labeler = createBLabeler({ embed: embedTexts, labels, concepts: Object.keys(labels) });
+const checks = [
+  [1323, '跑团叙事'],
+  [6, '插件开发'],
+  [866, '线程标签'],
+  [1584, '手机与流量'],
+  [1598, '权限与通知'],
+  [1612, '权限与通知'],
+  [827, '补丁与验证'],
+  [827, '备份与重启'],
+  [866, '关键词与标签'],
+];
 const next = [];
 for (const record of records) {
   const label = await labeler.label(turns.get(record.turn), { topK: Object.keys(labels).length, minScore: 0 });
@@ -103,12 +114,27 @@ for (const record of records) {
     status: 'weak',
   });
 }
+const checkResults = checks.map(([turn, concept]) => {
+  const record = next.find((item) => item.turn === turn);
+  if (!record) return { turn, concept, missing: true };
+  const ranked = Object.entries(record.conceptScores ?? {}).sort((a, b) => b[1] - a[1]);
+  const rank = ranked.findIndex(([name]) => name === concept) + 1;
+  return {
+    turn,
+    concept,
+    textLength: String(turns.get(turn) ?? '').length,
+    score: record.conceptScores?.[concept] ?? null,
+    rank,
+    top3: ranked.slice(0, 3).map(([name, score]) => ({ name, score: Number(score.toFixed(3)) })),
+    vector: turn === 827 ? ranked.map(([name, score]) => ({ name, score: Number(score.toFixed(3)) })) : undefined,
+  };
+});
 const bad = next.filter((record) => (record.generic ?? []).some((name) => !labels[name]));
 if (bad.length > 0) {
   console.error(`records with unknown concept names: ${bad.length}`);
   process.exit(4);
 }
-console.log(JSON.stringify({ index: indexFile, records: records.length, out: outFile, missing: 0, bad: 0 }, null, 2));
+console.log(JSON.stringify({ index: indexFile, records: records.length, out: outFile, missing: 0, bad: 0, checks: checkResults }, null, 2));
 if (!has('write')) {
   console.log('dry-run only; add --write to emit the new index');
   process.exit(0);
