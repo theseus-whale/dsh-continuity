@@ -11,10 +11,10 @@ installSessionGuard({
 });
 assert.ok(guard, 'guard installed');
 
-const OWN = 'session-0b094f6e-8a4b-4c61-9ce8-0aec316c57b3';
-const OTHER = 'session-ce5ff26d-42ed-4df0-8d93-b15eb3d20c7b';
+const OWN = 'session-example';
+const OTHER = 'session-example';
 // 拼出来，避免测试文件本身成为一个"含路径字面量"的文件
-const rootDir = ['C:', 'Users', '35794', '.' + 'dsh', 'continuity'].join('/');
+const rootDir = ['C:', 'Users', 'example', '.' + 'dsh', 'continuity'].join('/');
 const p = (...parts) => [rootDir, ...parts].join('/');
 
 const exec = (name, args, sessionId = OWN) => ({ name, arguments: args, agent: { session: { id: sessionId } } });

@@ -15,7 +15,7 @@ const argOf = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
-const dir = argOf('--dir') ?? 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400';
+const dir = argOf('--dir') ?? 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400';
 const rows = fs.readFileSync(path.join(dir, 'continuity-1500.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 const embeddings = JSON.parse(fs.readFileSync(path.join(dir, 'embeddings-1500.json'), 'utf8'));
 const vectorByTurn = new Map(embeddings.map((row) => [row.turn, row.vector]));

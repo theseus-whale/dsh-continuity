@@ -79,11 +79,11 @@ Seven real summary compactions found in the local session logs (read-only scan; 
 
 | session | shadowed tokens | shadowed surface nodes | summary maxTokens |
 |---|---:|---:|---:|
-| `session-2f831fa2…` | 363,912 | 1,259 | 65,536 |
-| `session-2f831fa2…` | 354,500 | 1,166 | 65,536 |
-| `session-2f831fa2…` | 342,756 | 1,000 | 65,536 |
-| `session-4185b80f…` | 425,772 | 804 | 8,192 |
-| `session-f1ac062b…` | 442,443 | 587 | 65,536 |
+| `session-example` | 363,912 | 1,259 | 65,536 |
+| `session-example` | 354,500 | 1,166 | 65,536 |
+| `session-example` | 342,756 | 1,000 | 65,536 |
+| `session-example` | 425,772 | 804 | 8,192 |
+| `session-example` | 442,443 | 587 | 65,536 |
 
 Full record for the first one:
 
@@ -131,6 +131,6 @@ a Band pass is visible in the session's compaction row and its log (`compaction/
 - No session has crossed the band threshold yet. The `compactionId` of the first Band pass will be
   recorded here (or in `docs/API-NOTES.md`) once it happens.
 - 2026-10-26 (later): the `continuity` engine's old policy produced 53 passes in
-  `session-0b094f6e…` (698,108 tokens total, 34 one-node passes) and repeatedly wiped the suffix
+  `session-example` (698,108 tokens total, 34 one-node passes) and repeatedly wiped the suffix
   cache. `continuity` now uses `CACHE_FIRST_POLICY` (86/62, 190k per pass, 30% protected); see
   `docs/CACHE.md`. The config-only `band` preset in this document is unchanged.

@@ -3,10 +3,10 @@ import { extractFacets } from '../src/facets/extract.mjs';
 import { deserializeClassifier, predictFacets } from '../src/facets/classifier.mjs';
 import { deserializePrototypes, predictEmbedding } from '../src/facets/embedding.mjs';
 
-const rows = fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl', 'utf8')
+const rows = fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl', 'utf8')
   .split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
-const nb = deserializeClassifier(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-model.json', 'utf8')));
-const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
+const nb = deserializeClassifier(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-model.json', 'utf8')));
+const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
 const turns = [2, 3, 40, 41, 42, 43, 49, 81, 82, 84];
 const out = [];
 for (const turn of turns) {
@@ -29,5 +29,5 @@ for (const turn of turns) {
     head: String(row.text).replace(/\s+/g, ' ').slice(0, 240),
   });
 }
-fs.writeFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/durable-memory/build-a/FACET-ROLEPLAY.json', JSON.stringify(out, null, 2));
+fs.writeFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/durable-memory/build-a/FACET-ROLEPLAY.json', JSON.stringify(out, null, 2));
 console.log(JSON.stringify(out, null, 2));

@@ -316,7 +316,7 @@ Version note: the older `0.1.5` runtime's `resolveCompactSpec` used
 `threshold = floor(W × ratio)` and `retain = floor(W × retainRatio)` with **no** output reserve or
 headroom, and defaulted `maxTokens` to **8192**. The current `0.2.1` Host subtracts the reserve and
 headroom as shown above and defaults `maxTokens` to the headroom (65,536). Older compaction records
-with `maxTokens: 8192` (for example `session-4185b80f…`) come from that generation; the current-era
+with `maxTokens: 8192` (for example `session-example`) come from that generation; the current-era
 records carry 65,536. The projection in the panel is the 0.2.1 formula.
 
 ## 5. Summary result and the provenance field
@@ -351,7 +351,7 @@ zstd frames, so one-shot `zstdDecompressSync` only yields the first frame — sp
 `28 B5 2F FD` magic bytes and decode each frame, or use the persistence package's frame scanner):
 
 ```
-session   session-2f831fa2-a345-4e99-bce7-5796444fea57
+session   session-example
 compactionId  b57ba840-1892-4175-b652-06c7e30b8609
 start     seq 8255
 summary   seq 8257   shadowedRange 4424–7043
@@ -463,7 +463,7 @@ policy with the old `0.65/0.80/0.55/8k/4k` values and silently overrode the new 
 that mismatch was the reason the 18:07 edit appeared not to work. The full analysis and
 measurements are in `docs/CACHE.md`. Key facts:
 
-- 53 compactions in `session-0b094f6e…` removed 698,108 tokens; 34 were one-node passes.
+- 53 compactions in `session-example` removed 698,108 tokens; 34 were one-node passes.
 - One request read `cacheRead 733,184`; the request after a 4k compaction read
   `input 733,414 / cacheRead 8,704` — one pass invalidated a 733k-token prefix.
 - `CACHE_FIRST_POLICY` sets `setpoint = high = 0.86`, `low = 0.62`, `maxPerBatch = 190_000`,
@@ -530,7 +530,7 @@ the convention/tool descriptions cannot match; `get <seq>` can still read a syst
 **Scope verification.** `state.json` now carries `tools.sessionLog` (registration) and
 `tools.scopes` (per live agent: current preset, `sessionLog`, `convention`, tool count). The probe
 reads the **`agentPreset` projection**, not `session.header.agentPreset`: the header is the
-creation fact, and `session-0b094f6e…` was created as `standard` then switched to `continuity`.
+creation fact, and `session-example` was created as `standard` then switched to `continuity`.
 Using the header alone mislabels that session and skips the convention check. The projection is
 authoritative.
 
@@ -542,7 +542,7 @@ same probe should read `sessionLog: true` and the tool count should increase by 
 logic itself is exercised against the real log by `tools/acceptance-0.2.0.mjs`.
 
 The exact-read Host API is already verified live: `state.json.sessionQuery` reports
-`{ source: "ctx.sessionQuery.readSession", sessionId: "session-0b094f6e…", events: 3292,
+`{ source: "ctx.sessionQuery.readSession", sessionId: "session-example", events: 3292,
 firstSeq: 0, lastSeq: 3291 }`. That is the same `readSession` call the tool's `execute` makes;
 only the preset row registration is waiting for the restart.
 
@@ -557,7 +557,7 @@ context, more invalidations). The package ships 0.86; the switch is one config/p
 
 ## 14. 0.2.0 acceptance record (real session log)
 
-`tools/acceptance-0.2.0.mjs` decodes `session-0b094f6e…` (3,293 events, 54 gists) and runs the
+`tools/acceptance-0.2.0.mjs` decodes `session-example` (3,293 events, 54 gists) and runs the
 same pure functions and ToolDefinition the model uses:
 
 - `index` lists the newest gist `seq=3020 · surface 3005-1872 · 143 msgs · ~179,725 tok`.
@@ -626,7 +626,7 @@ session, and uses `tokenMeter.measure(session)` for route-priced tokens:
   (237,773 tokens at W=792,576), not 30 tokens. `scope=raw` remains available and is labelled
   `chars4 estimate`; it includes historical/shadowed content and must not be read as the context.
 
-Measured on `session-0b094f6e…` before the A4 change:
+Measured on `session-example` before the A4 change:
 
 - current surface (584 nodes, 1,251,664 text chars): assistant 86.8%, tool result 8.8%, user 3.9%,
   system 0.5% by chars; block proxy reasoning ~78%.
@@ -992,7 +992,7 @@ The invalid event was live session seq 10762 (the save at seq 10755). The origin
 backed up byte-for-byte before repair:
 
 ```
-backups/session-0b094f6e-…-20261027-221254.v4.jsonl.zstd
+backups/session-examplev4.jsonl.zstd
 SHA256 14BD80428DDABCB3A6F1EEE67AD21D94B21B7E51AF61F1C5543759A106E38BEB
 ```
 

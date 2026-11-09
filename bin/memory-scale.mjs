@@ -4,6 +4,7 @@
  * Replicates the real 1,462-turn copy to 10k/50k for latency/memory testing.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { buildEventLog } from '../src/memory/event-log.mjs';
@@ -15,9 +16,10 @@ const argOf = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
-const dir = argOf('--dir') ?? 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/durable-memory/build-a';
+const dir = argOf('--dir') ?? process.env.CONTINUITY_FIXTURE_DIR ?? path.join(os.homedir(), 'continuity-fixtures', 'durable-memory', 'build-a');
 const source = fs.readFileSync(path.join(dir, 'events.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
-const embeddings = JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/embeddings-1500.json', 'utf8'));
+const embeddingsFile = process.env.CONTINUITY_EMBEDDINGS ?? path.join(dir, '..', '..', 'online400', 'embeddings-1500.json');
+const embeddings = JSON.parse(fs.readFileSync(embeddingsFile, 'utf8'));
 const vectorBySourceTurn = new Map(embeddings.map((row) => [row.turn, row.vector]));
 const sizes = [10000, 50000];
 const out = [];

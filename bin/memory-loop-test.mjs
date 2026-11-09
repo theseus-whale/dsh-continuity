@@ -5,6 +5,7 @@
  * latest-hit correctness, noise and misses.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { readEventLog } from '../src/memory/event-log.mjs';
 import { BM25Index } from '../src/memory/bm25.mjs';
@@ -18,9 +19,10 @@ const argOf = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
-const dir = argOf('--dir') ?? 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/durable-memory/build-a';
+const dir = argOf('--dir') ?? process.env.CONTINUITY_FIXTURE_DIR ?? path.join(os.homedir(), 'continuity-fixtures', 'durable-memory', 'build-a');
 const records = readEventLog(path.join(dir, 'events.jsonl'));
-const embeddings = JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/embeddings-1500.json', 'utf8'));
+const embeddingsFile = process.env.CONTINUITY_EMBEDDINGS ?? path.join(dir, '..', '..', 'online400', 'embeddings-1500.json');
+const embeddings = JSON.parse(fs.readFileSync(embeddingsFile, 'utf8'));
 const vectorByTurn = new Map(embeddings.map((row) => [row.turn, row.vector]));
 const cases = [
   ['上次的跑团怎么样了', (r) => r.facets.activity === '跑团'],

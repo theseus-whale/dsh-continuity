@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { backfillRecords, createCMap, learnTerm, makeRecord, renderNote, retrieve } from '../src/memory/bc-recall.mjs';
 
-const rows = fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl', 'utf8')
+const rows = fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl', 'utf8')
   .split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line))
   .filter((row) => row.facets?.activity === '跑团');
 

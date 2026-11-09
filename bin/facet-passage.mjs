@@ -21,8 +21,8 @@ const variants = {
   ooc_only: `（@Coo：闸的起落机构是什么样的？能卡在哪儿？）`,
 };
 
-const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
-const nb = deserializeClassifier(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-model.json', 'utf8')));
+const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
+const nb = deserializeClassifier(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-model.json', 'utf8')));
 
 const out = {};
 for (const [name, text] of Object.entries(variants)) {

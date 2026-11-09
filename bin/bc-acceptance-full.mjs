@@ -4,7 +4,7 @@ import {
   createCMap, expandWindow, learnFromExplanation, markAsked, renderNote, retrieve,
 } from '../src/memory/bc-recall.mjs';
 
-const root = 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity';
+const root = 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity';
 const indexPath = `${root}/projects/bc-recall/data/index.jsonl`;
 const sourcePath = `${root}/backups/continuity-tags-20261031/online400/continuity-1500.jsonl`;
 const records = loadIndexJsonl(indexPath);

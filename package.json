@@ -1,6 +1,6 @@
 {
   "name": "dsh-continuity",
-  "version": "4.12.10",
+  "version": "4.12.11",
   "description": "Band-controlled compaction with session-scoped pointer indexes, persona-scoped A/B/C/K memory, verifiable pass receipts, and read-only retrieval for DeepSeek Harness",
   "type": "module",
   "license": "MIT",

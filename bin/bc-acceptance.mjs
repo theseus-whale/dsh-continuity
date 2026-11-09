@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { loadBCStore } from '../src/memory/bc-store.mjs';
 import { learnFromExplanation, retrieve, renderNote } from '../src/memory/bc-recall.mjs';
 
-const file = process.argv[2] ?? 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/data/store.json';
+const file = process.argv[2] ?? 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/data/store.json';
 const store = loadBCStore(file);
 const before = {};
 for (const query of ['游戏', '跑团', '病毒']) {
@@ -18,5 +18,5 @@ const report = {
   learned: { ok: learned.ok, generic: learned.generic },
   after: { kind: after.kind, via: after.via, hits: after.hits?.length ?? 0, note: renderNote(after) },
 };
-fs.writeFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/acceptance.json', JSON.stringify(report, null, 2));
+fs.writeFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/acceptance.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

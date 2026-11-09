@@ -12,7 +12,7 @@ import { zstdDecompressSync } from 'node:zlib';
 import { buildIndex, getRange, grepRange, parsePointer } from '../src/session-log.mjs';
 import { createSessionLogTool } from '../src/session-log-tool.mjs';
 
-const DEFAULT_LOG = 'C:\\Users\\35794\\.dsh\\sessions\\--C-Users-35794-Documents-DeepSeek~0027s~0020Sandbox--\\session-0b094f6e-8a4b-4c61-9ce8-0aec316c57b3\\session.v4.jsonl.zstd';
+const DEFAULT_LOG = 'C:\\Users\\example\\.dsh\\sessions\\--C-Users-example-Documents-DeepSeek~0027s~0020Sandbox--\\session-example\\session.v4.jsonl.zstd';
 const file = process.argv[2] ?? DEFAULT_LOG;
 const MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
 

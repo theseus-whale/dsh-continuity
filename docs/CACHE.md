@@ -23,7 +23,7 @@ Therefore:
 
 ## 2. Measured evidence from the Continuity session
 
-Session `session-0b094f6e-8a4b-4c61-9ce8-0aec316c57b3` (preset `continuity`, log decoded read-only):
+Session `session-example` (preset `continuity`, log decoded read-only):
 
 | Metric | Value |
 |---|---:|

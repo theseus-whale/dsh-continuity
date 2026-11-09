@@ -4,7 +4,7 @@ import {
   createCMap, learnFromExplanation, markAsked, renderNote, retrieve,
 } from '../src/memory/bc-recall.mjs';
 
-const root = 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity';
+const root = 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity';
 const records = loadIndexJsonl(`${root}/projects/bc-recall/data/index.jsonl`);
 const rows = fs.readFileSync(`${root}/backups/continuity-tags-20261031/online400/continuity-1500.jsonl`, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 const rawByTurn = new Map(rows.map((row) => [row.turn, row]));

@@ -3,7 +3,7 @@ import { extractKeywords } from '../src/memory/bc-recall.mjs';
 import { loadSpecialKeywords, matchSpecialKeywords } from '../src/memory/special-keywords.mjs';
 import { loadIndexJsonl, saveIndexJsonl } from '../src/memory/bc-index.mjs';
 
-const root = 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity';
+const root = 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity';
 const indexFile = `${root}/projects/bc-recall/data/index.jsonl`;
 const sourceFile = `${root}/backups/continuity-tags-20261031/online400/continuity-1500.jsonl`;
 const records = loadIndexJsonl(indexFile);

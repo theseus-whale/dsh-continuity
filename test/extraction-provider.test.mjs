@@ -24,8 +24,8 @@ function cacheFile(text, value) {
 
 test('splitArgs preserves quoted paths with spaces and apostrophes', () => {
   assert.deepEqual(
-    splitArgs('--flag "C:\\Users\\35794\\Documents\\DeepSeek\'s Sandbox\\bin\\x.py"'),
-    ['--flag', 'C:\\Users\\35794\\Documents\\DeepSeek\'s Sandbox\\bin\\x.py'],
+    splitArgs('--flag "C:\\Users\\example\\Documents\\DeepSeek\'s Sandbox\\bin\\x.py"'),
+    ['--flag', 'C:\\Users\\example\\Documents\\DeepSeek\'s Sandbox\\bin\\x.py'],
   );
   assert.deepEqual(splitArgs('["--flag", "C:\\\\path with space\\\\x.py"]'), ['--flag', 'C:\\path with space\\x.py']);
   assert.deepEqual(splitArgs("'a b' c"), ['a b', 'c']);

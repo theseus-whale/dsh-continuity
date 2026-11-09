@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { deserializePrototypes, predictEmbedding } from '../src/facets/embedding.mjs';
 
-const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
+const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
 const text = `宁把手里那只凉箍交给柯林，箍口朝上塞进他布袋：
 
 「你拿着，别落地，也别让它见水。」

@@ -4,8 +4,8 @@ import { createBLabeler } from '../src/memory/bc-label.mjs';
 import { makeRecord } from '../src/memory/bc-recall.mjs';
 import { emptyStore, saveBCStore } from '../src/memory/bc-store.mjs';
 
-const source = process.argv[2] ?? 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl';
-const target = process.argv[3] ?? 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/data/store.json';
+const source = process.argv[2] ?? 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl';
+const target = process.argv[3] ?? 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/data/store.json';
 const rows = fs.readFileSync(source, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line))
   .filter((row) => row.facets?.activity === '跑团');
 const labeler = createBLabeler({ embed: embedTexts });

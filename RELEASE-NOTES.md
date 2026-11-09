@@ -604,7 +604,7 @@ baseline 在折叠前后可能大幅跳变（实测 133,272 → 71,450），所�
 ## 维护者访问（4.9.118）
 
 ```text
-C:\Users\35794\.dsh\continuity/operator-sessions.json
+C:\Users\example\.dsh\continuity/operator-sessions.json
 ```
 
 显式列出的 session 可以跨 session 维护；未列出时仍按 persona/本 session 拦截。没有这个文件时，operator 行为不存在。

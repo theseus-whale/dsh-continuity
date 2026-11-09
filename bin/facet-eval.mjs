@@ -3,10 +3,10 @@ import { extractFacets } from '../src/facets/extract.mjs';
 import { deserializeClassifier, predictFacets } from '../src/facets/classifier.mjs';
 import { deserializePrototypes, predictEmbedding } from '../src/facets/embedding.mjs';
 
-const rows = fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl', 'utf8')
+const rows = fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl', 'utf8')
   .split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)).filter((row) => row.facets && row.text);
-const nb = deserializeClassifier(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-model.json', 'utf8')));
-const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
+const nb = deserializeClassifier(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-model.json', 'utf8')));
+const prototypes = deserializePrototypes(JSON.parse(fs.readFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/last100/facet-prototypes.json', 'utf8')));
 const slots = ['activity', 'interaction', 'random', 'participants', 'medium', 'topic'];
 const report = { total: rows.length, methods: {} };
 for (const [name, method] of [['rule', (text) => extractFacets(text)], ['nb', (text) => predictFacets(nb, text)], ['embedding', async (text) => predictEmbedding(prototypes, text)]]) {
@@ -34,5 +34,5 @@ for (const [name, method] of [['rule', (text) => extractFacets(text)], ['nb', (t
   }
   report.methods[name] = { slots: stats, exactFull: Number((exact / rows.length).toFixed(3)) };
 }
-fs.writeFileSync('C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/durable-memory/build-a/FACET-EVAL-1462.json', JSON.stringify(report, null, 2));
+fs.writeFileSync('C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/durable-memory/build-a/FACET-EVAL-1462.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

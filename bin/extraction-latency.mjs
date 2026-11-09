@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 import { createPersistentCommandProvider } from '../src/memory/extraction-provider.mjs';
 
@@ -5,7 +6,7 @@ const cwd = process.cwd();
 const python311 = path.join(cwd, '.venvs', 'extraction311', 'Scripts', 'python.exe');
 const python38 = path.join(cwd, '.venvs', 'srl38', 'Scripts', 'python.exe');
 const python313 = path.join(cwd, '.venvs', 'relik313', 'Scripts', 'python.exe');
-const globalHf = 'C:/Users/35794/.cache/huggingface';
+const globalHf = process.env.HF_HOME || path.join(os.homedir(), '.cache', 'huggingface');
 const workHf = path.join(cwd, '..', 'backups', 'continuity-tags-20261031', 'durable-memory', 'hf-cache');
 const services = {
   ner: {

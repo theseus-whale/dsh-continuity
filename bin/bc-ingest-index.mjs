@@ -5,8 +5,8 @@ import { makeRecord } from '../src/memory/bc-recall.mjs';
 import { loadSpecialKeywords, matchSpecialKeywords } from '../src/memory/special-keywords.mjs';
 import { saveIndexJsonl } from '../src/memory/bc-index.mjs';
 
-const source = 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl';
-const target = 'C:/Users/35794/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/data/index.jsonl';
+const source = 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/backups/continuity-tags-20261031/online400/continuity-1500.jsonl';
+const target = 'C:/Users/example/Documents/DeepSeek\'s Sandbox/coopanion-continuity/projects/bc-recall/data/index.jsonl';
 const rows = fs.readFileSync(source, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 const specialKeywords = loadSpecialKeywords();
 const labeler = createBLabeler({ embed: embedTexts });
