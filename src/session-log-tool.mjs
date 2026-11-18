@@ -306,13 +306,17 @@ export function createSessionLogTool({ sessionQuery, tokenMeter }) {
  * Preset-scoped plugin entry. The row lives inside the `continuity` preset, so
  * `standard` never sees the tool.
  */
-export function apply(ctx) {
-  const tool = createSessionLogTool({ sessionQuery: ctx.sessionQuery, tokenMeter: ctx.tokenMeter });
-  ctx.effect(() => {
-    const dispose = ctx.tools.register(tool);
-    markSessionLogTool({ name: tool.name, scope: 'continuity preset' });
-    return dispose;
-  });
+export function apply(ctx, config = {}) {
+  if (config?.legacyAbcK === true) {
+    const tool = createSessionLogTool({ sessionQuery: ctx.sessionQuery, tokenMeter: ctx.tokenMeter });
+    ctx.effect(() => {
+      const dispose = ctx.tools.register(tool);
+      markSessionLogTool({ name: tool.name, scope: 'continuity preset' });
+      return dispose;
+    });
+  } else {
+    try { ctx.logger?.info?.('[dsh-continuity] legacy session_log disabled (5.0.0 runtime)'); } catch { /* ignore */ }
+  }
   const assetTool = createSessionAssetTool({ sessionQuery: ctx.sessionQuery });
   ctx.effect(() => ctx.tools.register(assetTool));
   const childAssetTool = createChildAssetTool({ sessionQuery: ctx.sessionQuery });

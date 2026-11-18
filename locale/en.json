@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Continuity",
-    "description": "Band-controlled compaction with [gist] provenance and a read-only session_log retrieval tool (index / get / grep), plus a left-sidebar control panel and two opt-in agent presets."
+    "description": "Read-only panel for the current session, memory resonance, unified fold, historical migration, and diagnostics. Public defaults are off; local overlays enable features explicitly."
   }
 }

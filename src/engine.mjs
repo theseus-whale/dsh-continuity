@@ -29,7 +29,12 @@ import { note, topCandidates, scanResults } from './learning.mjs';
 import { detectGroups, nameFromEvidence } from './groups.mjs';
 import { extractMood, parseMoodLog, selectMood, shouldRecord } from './mood.mjs';
 import { trainingMode, autoLearn } from './training.mjs';
-import { needsFullInjection, needsSkillInjection } from './inject-policy.mjs';
+import { needsSkillInjection } from './inject-policy.mjs';
+import {
+  planRulesLifecycle,
+  rulesCarrierMetadata,
+  rulesCarrierSignature,
+} from './rules-lifecycle.mjs';
 import { maybeBackupSession } from './backup.mjs';
 import { selectTopic } from './topic.mjs';
 import {
@@ -87,6 +92,15 @@ import {
   canonicalTagId,
 } from './tags.mjs';
 import { recordFold } from './folds-store.mjs';
+import { turnPingOnFold } from './turn-ping/registry.mjs';
+import { alignUnifiedFoldEnd, createUnifiedFoldBatch, recoverUnifiedPending, unifiedContentHash } from './fold/unified-fold.mjs';
+import { resolveUnifiedFoldConfig } from './fold/unified-config.mjs';
+import { createUnifiedIndexAdapter } from './fold/index-adapter.mjs';
+import { buildTurnsFromEvents as buildUnifiedTurns } from './turn-ping/host.mjs';
+import { createTurnPingStorage, turnPingRoot } from './turn-ping/storage.mjs';
+import { createLlmSummaryProvider, createBgeEmbedder } from './turn-ping/host-adapters.mjs';
+import { createDeepseekStream } from './fullseed/provider.mjs';
+import { readConfig as readTurnPingConfig } from './turn-ping/config.mjs';
 import {
   activeCallIds,
   activePinSeqs,
@@ -226,13 +240,11 @@ function findRulesCarrierSeqs(session) {
 
 /** A retired duplicate is replaced with an empty snapshot; history keeps the event. */
 function retireRulesCarrier(session, seq) {
-  if (!session || typeof session.append !== 'function') return;
-  try {
-    session.append('user/message', contextMessage(''), {
-      surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq },
-      sourceEventSeqs: [seq],
-    });
-  } catch { /* cleanup must not block the turn */ }
+  if (!session || typeof session.append !== 'function') throw new Error('rules carrier retire: session.append unavailable');
+  return session.append('user/message', contextMessage(''), {
+    surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq },
+    sourceEventSeqs: [seq],
+  });
 }
 
 /** Probe for the two silent exits inside injectThreadContext. */
@@ -303,6 +315,26 @@ export class ContinuityEngine extends BaseEngine {
     this.warned = new Set();
     /** One-shot thread gist text for the next summarize(), keyed by agent. */
     this.threadGist = new WeakMap();
+    /** Unified fold: same transaction stages turns, then commits index/context. */
+    this.unifiedFold = resolveUnifiedFoldConfig(config.unifiedFold, { home: config.unifiedFold?.home ?? continuityHome() });
+    this.unifiedBatches = new WeakMap();
+    this.unifiedCommitted = new WeakMap();
+    if (this.unifiedFold) {
+      const llm = typeof ctx.get === 'function' ? ctx.get('llm') : null;
+      const uf = this.unifiedFold;
+      const credentials = uf.credentials ?? process.env.DSH_CONTINUITY_CREDENTIALS;
+      const directLlm = credentials
+        ? { stream: createDeepseekStream({ credentials, endpoint: uf.endpoint }) }
+        : llm;
+      this.unifiedProvider = typeof uf.provider === 'function'
+        ? uf.provider
+        : createLlmSummaryProvider({ llm: directLlm, provider: uf.providerId ?? 'deepseek-official', model: uf.model ?? 'deepseek-flash' });
+      this.unifiedEmbedder = typeof uf.embedder === 'function'
+        ? uf.embedder
+        : createBgeEmbedder({ model: uf.embeddingModel ?? './models/Xenova/bge-small-zh-v1.5' });
+      this.unifiedConfig = readTurnPingConfig({ ...(uf.turnPing ?? {}), enabled: true, mode: 'opt-in', boundaries: { ...(uf.turnPing?.boundaries ?? {}), allowDefaultEnable: true } });
+      this.unifiedHome = uf.home ?? continuityHome();
+    }
     /** Last turn whose active/rules line was injected, keyed by agent. */
     this.threadInjectTurn = new WeakMap();
     /** Last skill set injected into a turn, keyed by agent. */
@@ -1870,16 +1902,28 @@ export class ContinuityEngine extends BaseEngine {
       return;
     }
     let rules = { text: '', missing: true };
+    let rulesReadFailed = false;
     try {
       rules = await readRules(agent.session.id);
     } catch (error) {
+      rulesReadFailed = true;
       this.warnOnce('thread-rules-read', `dsh-continuity: rules read failed: ${error?.message ?? error}`);
+      logInjectDiag('carrier-read-failed', { sessionId: session.id, which: 'rules', error: String(error?.message ?? error) });
     }
     let habits = { text: '', missing: true };
+    let habitsReadFailed = false;
     try {
       habits = await readHabits(agent.session.id);
     } catch (error) {
+      habitsReadFailed = true;
       this.warnOnce('thread-habits-read', `dsh-continuity: habits read failed: ${error?.message ?? error}`);
+      logInjectDiag('carrier-read-failed', { sessionId: session.id, which: 'habits', error: String(error?.message ?? error) });
+    }
+    if (rulesReadFailed || habitsReadFailed) {
+      // A failed read is not an empty file. Keep the existing carrier untouched
+      // and let the next normal turn retry once the file is readable again.
+      this.threadInjectTurn.set(agent, key);
+      return;
     }
     let tagsState = null;
     try {
@@ -1926,49 +1970,41 @@ export class ContinuityEngine extends BaseEngine {
       return;
     }
     // 规则/习惯全文：首轮、内容变更、或承载消息被折叠后都必须重新注入；一份 carrier，不每轮追加。
-    const rulesSignature = rules.text.length > 0
-      ? createHash('sha256').update(rules.text, 'utf8').digest('hex')
-      : '';
-    const habitsSignature = habits.text.length > 0
-      ? createHash('sha256').update(habits.text, 'utf8').digest('hex')
-      : '';
-    const rulesChanged = rulesSignature.length > 0
-      && this.rulesSignature.get(agent) !== rulesSignature;
-    const habitsChanged = habitsSignature.length > 0
-      && this.habitsSignature.get(agent) !== habitsSignature;
+    const signature = rulesCarrierSignature(rules.text, habits.text);
+    const combinedText = [rules.text, habits.text].filter((part) => part.length > 0).join('\n');
     const surfaceSeqs = new Set(session.surface?.nodes ?? []);
-    let rulesCarrier = this.rulesMsgSeq.get(agent);
-    let staleCarriers = [];
     const foundCarriers = findRulesCarrierSeqs(session);
-    if (foundCarriers.length > 0) {
-      if (rulesCarrier === undefined || rulesCarrier === null || !surfaceSeqs.has(rulesCarrier)) {
-        rulesCarrier = foundCarriers.at(-1);
+    const selectedCarrierSeq = foundCarriers.at(-1) ?? this.rulesMsgSeq.get(agent) ?? null;
+    const selectedCarrier = selectedCarrierSeq !== null
+      ? { seq: selectedCarrierSeq, event: typeof session.eventAt === 'function' ? session.eventAt(selectedCarrierSeq) : null }
+      : null;
+    const plan = planRulesLifecycle({
+      hasContent: combinedText.length > 0,
+      signature,
+      carrier: selectedCarrier,
+      surfaceSeqs,
+    });
+    const staleCarriers = foundCarriers.filter((seq) => seq !== selectedCarrierSeq);
+    for (const seq of staleCarriers) {
+      try {
+        retireRulesCarrier(session, seq);
+      } catch (error) {
+        logInjectDiag('carrier-duplicate-retire-failed', { sessionId: session.id, seq, error: error?.message ?? String(error) });
+        throw error;
       }
-      staleCarriers = foundCarriers.filter((seq) => seq !== rulesCarrier);
-      this.rulesMsgSeq.set(agent, rulesCarrier);
     }
-    for (const seq of staleCarriers) retireRulesCarrier(session, seq);
     let rulesFull = '';
     let habitsFull = '';
-    let rulesInjected = false;
-    const combinedText = [rules.text, habits.text].filter((part) => part.length > 0).join('\n');
-    if (needsFullInjection({
-      text: combinedText,
-      carrierSeq: rulesCarrier,
-      surfaceSeqs,
-      changed: rulesChanged || habitsChanged,
-    })) {
-      if (rules.text.length > 0) {
-        rulesFull = '\n[规矩·rules.md 全文]\n'
-          + '这是你自己的规矩。AGENTS 只要求你读最新版；这份 rules 你可以改、可以删、可以拒绝。AGENTS 本身不改。\n'
-          + rules.text;
-      }
-      if (habits.text.length > 0) {
-        habitsFull = '\n[习惯·habits.md 全文]\n'
-          + '这是你自己的软偏好。它让位 rules；这份可以改，AGENTS 不改。\n'
-          + habits.text;
-      }
-      rulesInjected = true;
+    let rulesInjected = plan.action !== 'none';
+    if (rulesInjected && rules.text.length > 0) {
+      rulesFull = '\n[规矩·rules.md 全文]\n'
+        + '这是你自己的规矩。AGENTS 只要求你读最新版；这份 rules 你可以改、可以删、可以拒绝。AGENTS 本身不改。\n'
+        + rules.text;
+    }
+    if (rulesInjected && habits.text.length > 0) {
+      habitsFull = '\n[习惯·habits.md 全文]\n'
+        + '这是你自己的软偏好。它让位 rules；这份可以改，AGENTS 不改。\n'
+        + habits.text;
     }
     let text = threadContextText(line, rulesSummary, habitsSummary, { rules: rules.path, habits: habits.path }) + rulesFull + habitsFull;
     // 技能预载：按当前线头（id 或 tag 别名）确定性地选出技能文件；正文在切换时注入，折叠后自动补回。
@@ -2411,9 +2447,13 @@ export class ContinuityEngine extends BaseEngine {
     try {
       appendFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'inject-log.jsonl'), JSON.stringify({
         at: Date.now(),
+        sessionId: session.id,
         rulesInjected,
-        rulesCarrier: rulesCarrier ?? null,
-        carrierAlive: rulesCarrier === undefined || rulesCarrier === null ? null : surfaceSeqs.has(rulesCarrier),
+        action: plan.action,
+        reason: plan.reason,
+        signature,
+        rulesCarrier: selectedCarrierSeq,
+        carrierAlive: selectedCarrierSeq === null ? null : surfaceSeqs.has(selectedCarrierSeq),
         rulesChars: rulesFull.length,
         rulesCarrierCount: foundCarriers.length,
         rulesCarriers: foundCarriers,
@@ -2451,34 +2491,45 @@ export class ContinuityEngine extends BaseEngine {
       // TrainingMode=0：技能只读，不问不总结。
     }
     markThreadsSnapshot({ activeId: state.activeId, count: state.threads.length, rules: rules.text.length > 0 });
-    if (text.length === 0) {
+    if (text.length === 0 && plan.action === 'none') {
       this.threadInjectTurn.set(agent, key);
       return;
     }
-    try {
-      // Rules/habits are one logical carrier. When the carrier is still on the
-      // surface and the text changed, replace that message in place; appending
-      // would leave the previous copy visible as a competing version.
-      const previousCarrier = rulesCarrier;
-      const appended = session.append('user/message', contextMessage(text), { surfaceOp: 'append' });
+    const needsCarrierWrite = plan.action !== 'none' || skillsInjected || guiWeiNews || learningNews || groupNews;
+    if (needsCarrierWrite) try {
+      // One logical rules/habits carrier. A persisted metadata signature decides
+      // none / append / replace; replace is atomic at the surface boundary.
+      const carrierMessage = contextMessage(text, { continuityRules: rulesCarrierMetadata(signature) });
+      const writeOptions = plan.action === 'replace'
+        ? {
+            surfaceOp: { op: 'replace', startSeq: plan.seq, endSeq: plan.seq },
+            sourceEventSeqs: [plan.seq],
+          }
+        : { surfaceOp: 'append' };
+      const appended = session.append('user/message', carrierMessage, writeOptions);
       const appendedSeq = appended?.seq ?? [...(session.surface?.nodes ?? [])].at(-1);
       if (appendedSeq !== undefined) {
         if (skillsInjected) this.skillMsgSeq.set(agent, appendedSeq);
         if (rulesInjected) {
           this.rulesMsgSeq.set(agent, appendedSeq);
-          if (previousCarrier !== undefined && previousCarrier !== null && previousCarrier !== appendedSeq) {
-            retireRulesCarrier(session, previousCarrier);
-          }
           this.habitsMsgSeq.set(agent, appendedSeq);
-          this.rulesSignature.set(agent, rulesSignature);
-          this.habitsSignature.set(agent, habitsSignature);
         }
         this.headerState.set(agent, { sig: headerSig, seq: appendedSeq });
       }
       this.threadInjectTurn.set(agent, key);
     } catch (error) {
-      this.warnOnce('thread-inject', `dsh-continuity: thread context append failed: ${error?.message ?? error}`);
+      logInjectDiag('carrier-write-failed', {
+        sessionId: session.id,
+        action: plan.action,
+        reason: plan.reason,
+        signature,
+        seq: plan.seq,
+        error: error?.message ?? String(error),
+      });
+      this.warnOnce('thread-inject', `dsh-continuity: carrier ${plan.action} failed: ${error?.message ?? error}`);
+      throw error;
     }
+    else this.threadInjectTurn.set(agent, key);
   }
 
   /** Add the active thread's loaded quote to the hard suffix pins. */
@@ -2526,6 +2577,24 @@ export class ContinuityEngine extends BaseEngine {
       });
     } catch (error) {
       this.warnOnce('folds-write', `dsh-continuity: folds record failed: ${error?.message ?? error}`);
+    }
+    try {
+      const unified = this.unifiedCommitted.get(agent);
+      if (unified !== undefined && String(unified.compactionId) === String(result.compactionId)) return;
+      await turnPingOnFold({
+        sessionId: agent.session.id,
+        session: agent.session,
+        fold: {
+          compactionId: result.compactionId,
+          from: span.start,
+          to: span.end,
+          cutoff: result.summarySeq ?? span.end,
+          shadowedSeqs: result.shadowedSeqs,
+        },
+        events: typeof agent.session?.snapshotEvents === 'function' ? agent.session.snapshotEvents() : [],
+      });
+    } catch (error) {
+      this.warnOnce('turn-ping-fold', `dsh-continuity: turn-ping fold hook failed: ${error?.message ?? error}`);
     }
   }
 
@@ -2807,7 +2876,7 @@ export class ContinuityEngine extends BaseEngine {
       appendPassReceipt(agent, receipt);
       return result;
     } catch (error) {
-      recordError(error?.message ?? String(error), 'compact');
+      recordError(error?.message ?? String(error), 'compact', agent?.session?.id);
       throw error;
     } finally {
       this.headers.delete(agent);
@@ -2888,11 +2957,67 @@ export class ContinuityEngine extends BaseEngine {
   }
 
   /**
+   * Unified fold. The inherited compactSurfaceRegion transaction still owns
+   * compaction/start, summary append, checkpoint replacement, and
+   * compaction/end. This override only supplies the batch its summarize hook
+   * must return, then commits that same batch after the transaction commits.
+   */
+  async compactRegion(start, end, agent, signal) {
+    const uf = this.unifiedFold;
+    const sessionId = String(agent?.session?.id ?? '');
+    if (!uf || (uf.sessionIds !== null && !uf.sessionIds.has(sessionId)) || this.threadGist.has(agent) || this.mechanicalNote) {
+      return super.compactRegion(start, end, agent, signal);
+    }
+    if (!this.unifiedProvider || !this.unifiedEmbedder) throw new Error('unified fold: provider/embedder unavailable');
+    const events = typeof agent.session?.snapshotEvents === 'function' ? agent.session.snapshotEvents() : [];
+    const turns = buildUnifiedTurns(sessionId, events);
+    const aligned = alignUnifiedFoldEnd({
+      session: agent.session, sessionId, start, end, events, turns,
+      isBalancedAfter: (session, seq) => toolPairingBalancedAfter(session, seq),
+    });
+    if (!aligned.protectedTurn) end = aligned.end;
+    const storage = createTurnPingStorage({ home: this.unifiedHome, sessionId });
+    const stagingDir = join(turnPingRoot({ home: this.unifiedHome, sessionId }), 'fold-staging');
+    const indexAdapter = createUnifiedIndexAdapter({ home: this.unifiedHome, sessionId, storage, config: this.unifiedConfig });
+    if (indexAdapter.mode === 'legacy' || indexAdapter.mode === 'fullseed') {
+      await recoverUnifiedPending({ indexAdapter, storage, stagingDir });
+    }
+    const batch = createUnifiedFoldBatch({
+      sessionId,
+      session: agent.session,
+      start,
+      end,
+      events,
+      turns,
+      config: this.unifiedConfig,
+      provider: this.unifiedProvider,
+      embedder: this.unifiedEmbedder,
+      storage,
+      indexAdapter,
+      stagingDir,
+    });
+    this.unifiedBatches.set(agent, batch);
+    try {
+      const result = await super.compactRegion(start, end, agent, signal);
+      const commit = await batch.commit(result);
+      this.unifiedCommitted.set(agent, { compactionId: result.compactionId, result, commit });
+      return result;
+    } catch (error) {
+      await batch.fail(error);
+      throw error;
+    } finally {
+      this.unifiedBatches.delete(agent);
+    }
+  }
+
+  /**
    * Summarize through the inherited one-shot LLM call, then label the result
    * as a gist of the selected range. Retries inside one transaction see the
    * same header because it is cleared only after compactRegion settles.
    */
   async summarize(input, agent, signal) {
+    const unified = this.unifiedBatches.get(agent);
+    if (unified) return unified.summarize();
     const threadText = this.threadGist.get(agent);
     if (typeof threadText === 'string' && threadText.length > 0) {
       const config = agent?.session?.requestHeader?.()?.config;

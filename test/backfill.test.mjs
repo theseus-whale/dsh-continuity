@@ -1,76 +1,91 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  buildBackfillSegment,
-  rangeOverlaps,
-  selectBackfillEvents,
-  trimBackfillEvents,
-} from '../src/backfill.mjs';
-import { normalizeThread } from '../src/threads.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { auditBackfill } from '../src/turn-ping/backfill/audit.mjs';
+import { createBackfillStaging } from '../src/turn-ping/backfill/staging.mjs';
+import { runBackfillBatch } from '../src/turn-ping/backfill/runner.mjs';
+import { verifyBackfill } from '../src/turn-ping/backfill/verify.mjs';
+import { verifyWatermark, activationBoundary } from '../src/turn-ping/backfill/watermark.mjs';
+import { readConfig } from '../src/turn-ping/config.mjs';
 
-const ev = (seq, type, text = '') => ({
-  seq,
-  type,
-  time: 1000 + seq,
-  ...(type === 'user/message'
-    ? { data: { content: [{ type: 'text', text }], source: { kind: 'user' } } }
-    : { data: {} }),
+const events = [
+  { seq: 1, type: 'user/message', data: { source: { kind: 'user' }, content: '旧主题 A' } },
+  { seq: 2, type: 'assistant/message', data: { content: '旧主题 A 的决定' } },
+  { seq: 3, type: 'user/message', data: { source: { kind: 'user' }, content: 'active tail' } },
+];
+const turns = [
+  { turnId: 'turn-000001', seqStart: 1, seqEnd: 2, boundarySeqs: [1, 2], rawTextSha256: 'raw1' },
+  { turnId: 'turn-000003', seqStart: 3, seqEnd: 3, boundarySeqs: [3], rawTextSha256: 'raw2' },
+];
+const config = readConfig({ enabled: true, boundaries: { allowDefaultEnable: true }, vector: { dimensions: 2 } });
+
+const fixture = () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'turn-ping-backfill-'));
+  const audit = auditBackfill({ sessionId: 's1', events, turns, checkpoint: 2, activeTailStartSeq: 3, foldedSeqs: [1, 2] });
+  const staging = createBackfillStaging({ home, sessionId: 's1', backfillId: 'b1', checkpoint: 2 });
+  return { home, audit, staging };
+};
+
+test('audit starts at turn 1 and excludes active tail', () => {
+  const { audit } = fixture();
+  assert.equal(audit.eligible.length, 1);
+  assert.equal(audit.eligible[0].turnId, 'turn-000001');
+  assert.equal(audit.excludedActiveTail, 1);
+  assert.equal(audit.eligible[0].firstFoldSeq, null);
+  assert.equal(audit.eligible[0].writeOrigin, 'legacy-backfill');
 });
 
-test('selectBackfillEvents keeps only content whitelist entries in range', () => {
-  const events = [
-    ev(1, 'step/start'),
-    ev(2, 'user/message', 'u'),
-    ev(3, 'tool/call'),
-    ev(4, 'tool/result'),
-    ev(5, 'turn/end'),
-  ];
-  assert.deepEqual(selectBackfillEvents(events, 2, 4).map((row) => row.seq), [2, 3, 4]);
+test('runner writes staged summary/vector; resume does not call provider again', async () => {
+  const { audit, staging } = fixture();
+  let calls = 0;
+  const provider = async () => { calls += 1; return { text: '旧主题 A 的决定。', model: 'm', usage: { total_tokens: 1 } }; };
+  const embedder = async () => [1, 0];
+  const first = await runBackfillBatch({ audit, staging, events, provider, embedder, config, batchSize: 4 });
+  assert.equal(first.written, 1);
+  assert.equal(calls, 1);
+  const second = await runBackfillBatch({ audit, staging, events, provider, embedder, config, batchSize: 4 });
+  assert.equal(second.written, 0);
+  assert.equal(calls, 1);
+  assert.equal((await staging.summaries())[0].writeOrigin, 'legacy-backfill');
+  assert.equal((await staging.summaries())[0].firstFoldSeq, null);
 });
 
-test('trimBackfillEvents drops a leading result and trailing call', () => {
-  const events = [ev(1, 'tool/result'), ev(2, 'user/message', 'u'), ev(3, 'tool/call')];
-  assert.deepEqual(trimBackfillEvents(events).map((row) => row.seq), [2]);
+test('staging is not disclosed before activation; activation merges new formal fold boundary', async () => {
+  const { audit, staging } = fixture();
+  const provider = async () => ({ text: '旧主题 A 的决定。', model: 'm', usage: {} });
+  const embedder = async () => [1, 0];
+  await runBackfillBatch({ audit, staging, events, provider, embedder, config });
+  assert.equal(fs.existsSync(staging.paths.formalSummaryFile), false);
+  const verificationBefore = await verifyBackfill({ audit, staging });
+  assert.equal(verificationBefore.pending, 0);
+  const newFormal = { turnId: 'turn-000003', summarySha256: 'new', seqStart: 3, seqEnd: 3 };
+  fs.mkdirSync(path.dirname(staging.paths.formalSummaryFile), { recursive: true });
+  fs.writeFileSync(staging.paths.formalSummaryFile, `${JSON.stringify(newFormal)}\n`, 'utf8');
+  const summary = (await staging.summaries())[0];
+  const boundary = activationBoundary({ mode: 'onfold-formal', stagingSummaries: [summary], formalBefore: [newFormal], formalAfter: [newFormal, summary] });
+  assert.equal(boundary.ok, true);
+  const watermark = verifyWatermark({ mode: 'onfold-formal', checkpoint: 2, backfillTurns: [turns[0]], formalTurns: [newFormal] });
+  assert.equal(watermark.ok, true);
+  const activated = await staging.activate({ mode: 'onfold-formal', watermark });
+  assert.equal(activated.activated, true);
+  const formal = fs.readFileSync(staging.paths.formalSummaryFile, 'utf8').split(/\r?\n/).filter(Boolean);
+  assert.equal(formal.length, 2);
+
+  const delta = verifyWatermark({ mode: 'delta-catchup', checkpoint: 2, backfillTurns: [turns[0]], deltaTurns: [turns[1]] });
+  assert.equal(delta.ok, true);
+  const overlap = verifyWatermark({ mode: 'delta-catchup', checkpoint: 2, backfillTurns: [turns[0]], deltaTurns: [turns[0]] });
+  assert.equal(overlap.ok, false);
 });
 
-test('buildBackfillSegment uses content boundaries and estimates tokens', () => {
-  const segment = buildBackfillSegment(
-    [ev(10, 'user/message', 'hello'), ev(11, 'assistant/message', 'world')],
-    { sessionId: 's', why: 'w', next: 'n', tCoverage: 'T14' },
-  );
-  assert.equal(segment.fromSeq, 10);
-  assert.equal(segment.toSeq, 11);
-  assert.deepEqual(segment.seqs, [10, 11]);
-  assert.equal(segment.count, 2);
-  assert.equal(segment.tCoverage, 'T14');
-  assert.match(segment.archiveRef, /#seq=10-11$/);
-  assert.equal(segment.at, segment.spanEnd);
-  assert.match(segment.archivedAt, /^\d{4}-\d{2}-\d{2}T/);
-});
-
-test('rangeOverlaps is inclusive and strict', () => {
-  const segments = [{ fromSeq: 10, toSeq: 20 }];
-  assert.equal(rangeOverlaps(segments, 20, 30), true);
-  assert.equal(rangeOverlaps(segments, 21, 30), false);
-  assert.equal(rangeOverlaps(segments, 1, 9), false);
-});
-
-test('normalizeThread sorts an appended backfill segment and keeps latest metadata', () => {
-  const thread = normalizeThread({
-    id: 't',
-    label: 'T',
-    updatedAt: '2026-02-01T00:00:00.000Z',
-    segments: [
-      { fromSeq: 100, toSeq: 200, why: 'latest', next: 'next', spanStart: '2026-01-01T00:00:00.000Z', spanEnd: '2026-01-01T00:10:00.000Z' },
-      { fromSeq: 10, toSeq: 20, why: '历史回补 10..20', next: 'old', at: '2026-02-01T00:00:00.000Z', spanStart: '2025-12-31T00:00:00.000Z', spanEnd: '2025-12-31T00:10:00.000Z' },
-    ],
-  });
-  assert.deepEqual(thread.segments.map((segment) => segment.fromSeq), [10, 100]);
-  assert.equal(thread.seqStart, 10);
-  assert.equal(thread.seqEnd, 200);
-  assert.equal(thread.segments[0].at, '2025-12-31T00:10:00.000Z');
-  assert.equal(thread.segments[0].archivedAt, '2026-02-01T00:00:00.000Z');
-  assert.equal(thread.why, 'latest');
-  assert.equal(thread.next, 'next');
-  assert.equal(thread.updatedAt, '2026-01-01T00:10:00.000Z');
+test('verification catches pending and raw SHA change; correct staging passes', async () => {
+  const { audit, staging } = fixture();
+  const provider = async () => ({ text: '旧主题 A 的决定。', model: 'm', usage: {} });
+  const embedder = async () => [1, 0];
+  await runBackfillBatch({ audit, staging, events, provider, embedder, config });
+  const pass = await verifyBackfill({ audit, staging, rawTextBefore: 'raw', rawTextAfter: 'raw' });
+  assert.equal(pass.ok, true);
+  const changed = await verifyBackfill({ audit, staging, rawTextBefore: 'raw', rawTextAfter: 'changed' });
+  assert.equal(changed.ok, false);
 });

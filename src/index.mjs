@@ -11,23 +11,40 @@
  * of the config-only experiment for the configured model route.
  */
 import { createRequire } from 'node:module';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync, readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadActiveIndex } from './fullseed/cache.mjs';
+import { continuityHome } from './folds-store.mjs';
 import { DEFAULT_POLICY } from './policy.mjs';
 import { SYSTEM_CONVENTION, gistHeader } from './provenance.mjs';
 import { continuityState, rebuildDroppedRanges } from './state.mjs';
 import { buildFacetState } from './facets/panel-state.mjs';
-import { PEER_PATH, handlePeerRequest, peerAgents } from './peer.mjs';
 import { migrateThreadsFile } from './threads-store.mjs';
-import { installExtractionPreStep, recordExtractionInstallError } from './memory/extraction-pre-step.mjs';
+import { installExtractionPreStep, recordExtractionInstallError, lastUserText } from './memory/extraction-pre-step.mjs';
+import { contextMessage } from './threads.mjs';
+import { installTurnPing } from './turn-ping/install.mjs';
+import { resolveTurnPingConfig } from './turn-ping/local-config.mjs';
+import { turnPingBeforeAnswer, getTurnPingHost } from './turn-ping/registry.mjs';
+import { installTurnPingPreStep } from './turn-ping/pre-step.mjs';
+import { installRawIndexHost } from './turn-ping/raw-index-host.mjs';
+import { wireCoverageHost } from './turn-ping/coverage/host-wire.mjs';
+import { installEngineTurnStopping } from './fullseed/worker.mjs';
+import { createFullseedWorker, workerIdentityFromConfig } from './fullseed/runtime.mjs';
+import { turnPingRoot } from './turn-ping/storage.mjs';
+import { createLlmSummaryProvider, createBgeEmbedder } from './turn-ping/host-adapters.mjs';
+import { createFullseedLlmProvider } from './fullseed/llm-adapter.mjs';
+import { createDeepseekStream } from './fullseed/provider.mjs';
 import { installBCPreStep } from './memory/bc-pre-step.mjs';
 import { buildBCPanelState } from './memory/bc-panel-state.mjs';
 import { isPersonaEnabled, resolvePersona, sessionFile } from './memory/persona.mjs';
 import { installSessionGuard } from './session-guard.mjs';
 import { createRecallExactTool } from './recall-exact-tool.mjs';
+import { createMemoryRepairTool } from './memory/memory-repair-tool.mjs';
+import { createConceptTrialTool } from './memory/concept-trial-tool.mjs';
+import { createConceptProposeTool } from './memory/concept-propose-tool.mjs';
 
 export const name = 'dsh-continuity';
-export const inject = [];
+export const inject = ['sessionQuery'];
 
 const require = createRequire(import.meta.url);
 let pkg = {};
@@ -99,6 +116,21 @@ export function apply(ctx, config = {}) {
   try { installSessionGuard(ctx); } catch (error) {
     try { log.warn?.(`dsh-continuity: session guard not installed: ${error?.message ?? error}`); } catch { /* ignore */ }
   }
+  try {
+    const coverage = config.turnPing?.coverage ?? {};
+    const home = coverage.home || join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity');
+    const coverageProvider = coverage.useHostAdapters === true && typeof coverage.provider === 'string' && typeof coverage.model === 'string'
+      ? createLlmSummaryProvider({ llm: typeof ctx.get === 'function' ? ctx.get('llm') : null, provider: coverage.provider, model: coverage.model })
+      : null;
+    const coverageEmbedder = coverage.useHostAdapters === true && typeof coverage.embeddingModel === 'string'
+      ? createBgeEmbedder({ model: coverage.embeddingModel })
+      : null;
+    const wired = wireCoverageHost({ ctx, config: coverage, home, provider: coverageProvider, embedder: coverageEmbedder });
+    if (wired.wired) log.info?.('[dsh-continuity] coverage host wired (agent/created, session/created, session/event)');
+    else if (wired.reason !== 'disabled') log.warn?.(`[dsh-continuity] coverage host not wired: ${wired.reason}`);
+  } catch (error) {
+    log.warn?.(`[dsh-continuity] coverage host wiring failed: ${error?.message ?? error}`);
+  }
   // One-shot: old backfill rows stored the write moment in `at`; normalize the
   // file too, not only the in-memory view, so direct threads.json readers agree.
   try {
@@ -108,37 +140,25 @@ export function apply(ctx, config = {}) {
   } catch (error) {
     try { log.warn?.(`[dsh-continuity] threads normalization failed: ${error?.message ?? error}`); } catch { /* ignore */ }
   }
-  // Target-addressed peer delivery. An explicit `to` session id is required.
-  try {
-    ctx.on('agent/created', (payload = {}) => {
-      const agent = payload?.agent;
-      peerAgents.add(agent?.session?.id, agent);
+  // ABCK is legacy. Its tools are not part of the 5.0.0 runtime; code remains
+  // for historical rollback only.
+  const legacyAbcK = config.legacyAbcK === true;
+  if (legacyAbcK) {
+    ctx.inject(['tools', 'sessionQuery'], (scoped) => {
+      const tool = createRecallExactTool({ sessionQuery: scoped.sessionQuery });
+      scoped.effect(() => scoped.tools.register(tool));
     });
-    ctx.on('session/disposed', (session = {}) => {
-      peerAgents.remove(session?.id);
+    ctx.inject(['tools'], (scoped) => {
+      const tool = createMemoryRepairTool();
+      scoped.effect(() => scoped.tools.register(tool));
+      const trial = createConceptTrialTool();
+      scoped.effect(() => scoped.tools.register(trial));
+      const propose = createConceptProposeTool();
+      scoped.effect(() => scoped.tools.register(propose));
     });
-  } catch (error) {
-    try {
-      appendFileSync(join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.dsh', 'continuity', 'gate-errors.jsonl'), JSON.stringify({
-        at: new Date().toISOString(), name: error?.name ?? 'Error', code: 'peer-registry-failed',
-        message: String(error?.message ?? error),
-      }) + '\n', 'utf8');
-    } catch { /* registry failure is reported by the route's 404s */ }
+  } else {
+    log.info?.('[dsh-continuity] legacy ABCK tools disabled (5.0.0 runtime)');
   }
-  const peerRoute = {
-    kind: 'exact',
-    path: PEER_PATH,
-    handler: (req, res) => handlePeerRequest(req, res, { agents: peerAgents, log }),
-  };
-  ctx.inject(['webServer'], (scoped) => {
-    scoped.effect(() => scoped.webServer.register(peerRoute));
-    scoped.logger?.info?.(`[dsh-continuity] peer route mounted at ${PEER_PATH}`);
-  });
-  // recall_exact is a global read-only tool, not a preset-only feature.
-  ctx.inject(['tools', 'sessionQuery'], (scoped) => {
-    const tool = createRecallExactTool({ sessionQuery: scoped.sessionQuery });
-    scoped.effect(() => scoped.tools.register(tool));
-  });
   // Extraction is opt-in by config or environment. Default off means this
   // listener is never registered, so the normal turn path is byte-for-byte unchanged.
   try {
@@ -179,6 +199,74 @@ export function apply(ctx, config = {}) {
         message: String(error?.message ?? error),
       }) + '\n', 'utf8');
     } catch { /* registration failure must not block the plugin */ }
+  }
+  let resolvedTurnPing = null;
+  try {
+    const turnPing = resolveTurnPingConfig(config.turnPing ?? {}, { home: continuityHome() });
+    resolvedTurnPing = turnPing;
+    const llm = typeof ctx.get === 'function' ? ctx.get('llm') : null;
+    const summaryProvider = typeof turnPing.provider === 'function'
+      ? turnPing.provider
+      : (turnPing.useHostAdapters === true && typeof turnPing.provider === 'string' && typeof turnPing.model === 'string'
+        ? createLlmSummaryProvider({ llm, provider: turnPing.provider, model: turnPing.model })
+        : null);
+    const embeddingAdapter = typeof turnPing.embedder === 'function'
+      ? turnPing.embedder
+      : (turnPing.useHostAdapters === true && typeof turnPing.embeddingModel === 'string'
+        ? createBgeEmbedder({ model: turnPing.embeddingModel })
+        : null);
+    const installed = installTurnPing({
+      config: turnPing,
+      provider: summaryProvider,
+      embedder: embeddingAdapter,
+    });
+    if (installed.enabled) {
+      log.info?.(`[dsh-continuity] turn-ping host enabled (${installed.home})`);
+      const allowedSessions = Array.isArray(turnPing.sessionIds) ? new Set(turnPing.sessionIds.map(String)) : null;
+      if (turnPing.fullseedEnqueue === true) {
+        installEngineTurnStopping({
+          ctx,
+          rootForSession: (sessionId) => `${turnPingRoot({ home: installed.home, sessionId })}/fullseed`,
+          allowedSessionIds: allowedSessions,
+        });
+      }
+      const workerLlm = turnPing.credentials || process.env.DSH_CONTINUITY_CREDENTIALS
+        ? { stream: createDeepseekStream({ credentials: turnPing.credentials ?? process.env.DSH_CONTINUITY_CREDENTIALS, endpoint: turnPing.endpoint }) }
+        : llm;
+      const fullseedProvider = (turnPing.fullseedWorker === true && typeof turnPing.provider === 'string' && typeof turnPing.model === 'string' && workerLlm)
+        ? createFullseedLlmProvider({ llm: workerLlm, provider: turnPing.provider, model: turnPing.model })
+        : null;
+      if (turnPing.fullseedWorker === true && fullseedProvider && embeddingAdapter && typeof ctx.get === 'function' && ctx.get('sessionQuery')) {
+        createFullseedWorker({
+          home: installed.home,
+          sessionQuery: ctx.get('sessionQuery'),
+          provider: fullseedProvider,
+          embedder: embeddingAdapter,
+          identity: workerIdentityFromConfig(turnPing),
+          allowedSessionIds: allowedSessions,
+          log: (row) => log.info?.(`[dsh-continuity] fullseed worker ${JSON.stringify(row)}`),
+        });
+      }
+      installTurnPingPreStep({
+        ctx,
+        config: turnPing,
+        beforeAnswer: turnPingBeforeAnswer,
+        contextMessage,
+        log,
+        diagnosticPath: installed.diagnosticPath,
+      });
+      installRawIndexHost({
+        ctx,
+        config: turnPing,
+        home: installed.home,
+        diagnosticPath: installed.diagnosticPath,
+        indexFor: installed.host.rawIndexFor,
+      });
+    } else if (installed.reason !== 'disabled') {
+      log.warn?.(`[dsh-continuity] turn-ping not installed: ${installed.reason}`);
+    }
+  } catch (error) {
+    log.warn?.(`[dsh-continuity] turn-ping install failed: ${error?.message ?? error}`);
   }
   // First history-map injection must not wait for compression pressure.
   try {
@@ -332,6 +420,13 @@ export function apply(ctx, config = {}) {
     },
   };
 
+  const currentPath = '/dsh-continuity/current.json';
+  const currentRoute = {
+    kind: 'exact',
+    path: currentPath,
+    handler: createCurrentStateHandler(ctx, () => ({ turnPing: resolvedTurnPing })),
+  };
+
   const switchPath = '/dsh-continuity/switch-to-continuity';
   const readJsonBody = async (req) => {
     let raw = '';
@@ -382,11 +477,263 @@ export function apply(ctx, config = {}) {
 
   ctx.inject(['webServer'], (scoped) => {
     scoped.effect(() => scoped.webServer.register(route));
+    scoped.effect(() => scoped.webServer.register(currentRoute));
     scoped.effect(() => scoped.webServer.register(bcRoute));
     scoped.effect(() => scoped.webServer.register(facetsRoute));
     scoped.effect(() => scoped.webServer.register(switchRoute));
     scoped.logger?.info?.(`[dsh-continuity] control panel mounted at ${path} (bc: ${bcPath}, facets: ${facetsPath})`);
   });
+}
+
+export function createCurrentStateHandler(ctx, getRuntime = () => ({})) {
+  return async (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { allow: 'GET, HEAD' });
+      res.end();
+      return;
+    }
+    let payload;
+    try {
+      payload = await buildCurrentState(ctx, sessionIdFromRequest(req), getRuntime());
+    } catch (error) {
+      payload = { error: String(error?.message ?? error), generatedAt: new Date().toISOString() };
+    }
+    const text = JSON.stringify(payload, null, 2);
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-length': Buffer.byteLength(text),
+    });
+    if (req.method === 'HEAD') res.end();
+    else res.end(text);
+  };
+}
+
+function sessionIdFromRequest(req) {
+  try {
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    const query = url.searchParams.get('sessionId');
+    if (query) return query;
+  } catch { /* ignore */ }
+  const referer = String(req.headers?.referer ?? '');
+  const match = referer.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return match ? match[0] : null;
+}
+
+export async function buildCurrentState(ctx, requestedSessionId = null, runtime = {}) {
+  const home = continuityHome();
+  const agents = ctx?.get?.('agents')?.list?.() ?? [];
+  const projections = ctx?.get?.('sessionProjections');
+  const agent = requestedSessionId
+    ? agents.find((item) => String(item?.session?.id ?? item?.id) === String(requestedSessionId))
+    : agents.find((item) => currentPresetOf(item, projections) === 'continuity') ?? agents[0] ?? null;
+  const sessionId = agent === null ? null : String(agent.session?.id ?? agent.id ?? '');
+  const preset = agent === null ? null : currentPresetOf(agent, projections);
+  const engine = continuityState.engine;
+  const engineInstance = continuityState.engineInstance ?? null;
+  const lastError = continuityState.lastError;
+  const engineSession = continuityState.engineSession ?? null;
+  const engineMounted = engine !== null && engineSession !== null && String(engineSession) === String(sessionId);
+  const engineScope = engine === null ? 'none' : engineMounted ? 'session' : engineSession === null ? 'unknown' : 'other-session';
+  const current = {
+    generatedAt: new Date().toISOString(),
+    plugin: { name: pkg.name ?? 'dsh-continuity', version: pkg.version ?? '0.0.0', packageHash: process.env.DSH_CONTINUITY_PACKAGE_SHA ?? null },
+    session: { id: sessionId, preset, engineMounted, engineScope, lastError: null },
+    memoryResonance: { configured: false, enabled: false, allowed: null, active: false, readiness: 'unknown', summaries: 0, vectors: 0, checkpoint: null, availableCutoff: null, latestCue: null, retrieval: { status: 'not-observed' }, rawRead: { status: 'not-observed' } },
+    unifiedFold: { configured: false, enabled: false, sessionAllowed: false, lastFold: null, reinjection: 'not-observed', pending: 'not-observed', recovered: 'not-observed', error: null },
+    migration: { plan: null, audit: null, reusable: null, missing: null, budget: null, resume: null, verify: null, legacyActivePreserved: null },
+    diagnostics: { version: pkg.version ?? '0.0.0', packageHash: process.env.DSH_CONTINUITY_PACKAGE_SHA ?? null, node: process.version, hostServices: {}, errors: lastError ? [String(lastError.message ?? lastError)] : [], globalError: lastError ?? null },
+  };
+  if (!sessionId) return current;
+
+  try {
+    const root = join(home, 'sessions', sessionId, 'turn-ping', 'fullseed');
+    const index = loadActiveIndex(root);
+    const config = runtime.turnPing ?? null;
+    const configured = config !== null;
+    const allowed = configured && Array.isArray(config.sessionIds) && config.sessionIds.map(String).includes(String(sessionId));
+    const summaries = index?.merged?.summaries ?? [];
+    const vectors = index?.merged?.vectors ?? [];
+    const cutoff = summaries.reduce((max, row) => Math.max(max, Number(row.availableCutoff) || 0), 0);
+    current.memoryResonance = {
+      configured,
+      enabled: configured && config.enabled === true && allowed,
+      allowed: configured ? allowed : null,
+      active: index !== null,
+      readiness: index === null ? 'no-active' : 'active',
+      summaries: summaries.length,
+      vectors: vectors.length,
+      checkpoint: index?.active?.checkpoint ?? null,
+      availableCutoff: cutoff || null,
+      latestCue: readLatestCue(home, sessionId),
+      retrieval: ctx?.get?.('sessionQuery') ? { status: 'service-available', scope: 'interface', available: null } : { status: 'unavailable', available: false },
+      rawRead: ctx?.get?.('sessionQuery') ? { status: 'service-available', scope: 'interface', available: null } : { status: 'unavailable', available: false },
+    };
+  } catch (error) {
+    current.memoryResonance.error = String(error?.message ?? error);
+    current.diagnostics.errors.push(`memory: ${String(error?.message ?? error)}`);
+  }
+
+  try {
+    const fold = engineInstance?.unifiedFold ?? runtime.unifiedFold ?? null;
+    const allowed = fold?.sessionIds === null || fold?.sessionIds === undefined ? false : fold.sessionIds.has(sessionId);
+    const last = Array.isArray(continuityState.passes)
+      ? continuityState.passes.find((row) => String(row.sessionId) === String(sessionId)) ?? null
+      : null;
+    current.unifiedFold = {
+      configured: Boolean(fold),
+      enabled: Boolean(fold) && Boolean(allowed),
+      sessionAllowed: Boolean(allowed),
+      engineSession: continuityState.engineSession ?? null,
+      lastFold: last ? { selected: last.count ?? null, completed: last.completed ?? null, range: [last.start ?? null, last.end ?? null], at: last.at ?? null } : null,
+      reinjection: 'not-observed',
+      pending: 'not-observed',
+      recovered: 'not-observed',
+      error: current.diagnostics.errors.find((line) => line.startsWith('fold:')) ?? null,
+    };
+  } catch (error) {
+    current.diagnostics.errors.push(`fold: ${String(error?.message ?? error)}`);
+  }
+
+  try {
+    const dir = join(home, 'sessions', sessionId, 'migration');
+    const plans = existsSync(dir)
+      ? readdirSync(dir).filter((name) => /^plan-.*\.json$/.test(name)).map((name) => ({ name, file: join(dir, name), mtime: statSync(join(dir, name)).mtimeMs }))
+      : [];
+    if (plans.length > 0) {
+      const file = plans.sort((left, right) => right.mtime - left.mtime)[0].file;
+      const plan = JSON.parse(readFileSync(file, 'utf8'));
+      const verify = readVerifyResult(dir);
+      const staging = readStagingState(join(home, 'sessions', sessionId, 'turn-ping', 'fullseed'));
+      current.migration = {
+        plan: { file, contentSha256: plan.contentSha256 ?? null, status: plan.status ?? null, checkpoint: plan.checkpoint ?? null },
+        audit: { missing: plan.missing ?? null, reusable: plan.reusable ?? null, chunks: plan.chunkSet?.count ?? null },
+        reusable: plan.reusable ?? null,
+        missing: plan.missing ?? null,
+        budget: plan.budget ?? null,
+        staging,
+        resume: staging ? { state: 'staging-present-unverified', pending: 'unknown' } : { state: plan.status === 'plan-only-no-apply' ? 'not-approved' : plan.status ?? 'unknown' },
+        verify,
+        legacyActivePreserved: plan.active?.legacy?.preserved ?? null,
+      };
+    }
+  } catch (error) {
+    current.diagnostics.errors.push(`migration: ${String(error?.message ?? error)}`);
+  }
+
+  current.diagnostics.hostServices = {
+    agents: Boolean(ctx?.get?.('agents')),
+    sessionQuery: Boolean(ctx?.get?.('sessionQuery')),
+    sessionProjections: Boolean(ctx?.get?.('sessionProjections')),
+    locale: Boolean(ctx?.locale),
+    slots: Boolean(ctx?.slots),
+  };
+  return current;
+}
+
+function readStagingState(root) {
+  try {
+    const dir = join(root, 'staging');
+    if (!existsSync(dir)) return null;
+    let summaries = 0;
+    let vectors = 0;
+    let attempts = 0;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const base = join(dir, entry.name);
+      if (existsSync(join(base, 'summaries.jsonl'))) summaries += readFileSync(join(base, 'summaries.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).length;
+      if (existsSync(join(base, 'vectors.jsonl'))) vectors += readFileSync(join(base, 'vectors.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).length;
+      if (existsSync(join(base, 'attempts.jsonl'))) attempts += readFileSync(join(base, 'attempts.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).length;
+    }
+    return { summaries, vectors, attempts, pending: 'unknown' };
+  } catch { return null; }
+}
+
+function readLatestCue(home, sessionId) {
+  try {
+    const file = join(home, 'turn-ping-prestep-debug.jsonl');
+    if (!existsSync(file)) return null;
+    const rows = readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
+    const owned = rows.filter((row) => String(row.sessionId ?? '') === String(sessionId));
+    const returned = owned.filter((row) => row.kind === 'return' && row.appended === true).at(-1);
+    if (returned) return { at: returned.at ?? null, kind: 'return', source: returned.lastSourceKind ?? null, hash: returned.lastTextSha256 ?? null };
+    return null;
+  } catch { return null; }
+}
+
+function readVerifyResult(dir) {
+  try {
+    const file = readdirSync(dir).filter((name) => /^verify-.*\.json$/.test(name)).sort().at(-1);
+    if (!file) return null;
+    const row = JSON.parse(readFileSync(join(dir, file), 'utf8'));
+    return { ok: row.ok === true, chunks: row.chunks ?? null, at: row.at ?? null };
+  } catch { return null; }
+}
+
+export function buildGlobalPanelExtras(ctx, scopes, projection) {
+  const host = getTurnPingHost();
+  const errors = continuityState.lastError ? [continuityState.lastError] : [];
+  const ids = Array.isArray(host?.config?.sessionIds) ? host.config.sessionIds.map(String) : [];
+  const home = host?.home ?? continuityHome();
+  let vectors = 0;
+  let rawRecords = 0;
+  let reconciledSessions = 0;
+  if (host) {
+    for (const sessionId of ids) {
+      try {
+        const active = loadActiveIndex(join(turnPingRoot({ home, sessionId }), 'fullseed'));
+        vectors += active?.merged?.vectors?.length ?? 0;
+      } catch (error) {
+        errors.push({ at: Date.now(), message: `vector status ${sessionId}: ${String(error?.message ?? error)}` });
+      }
+      try {
+        const status = host.rawIndexFor(sessionId).status();
+        rawRecords += status.records;
+        if (status.lastReconcile) reconciledSessions += 1;
+      } catch (error) {
+        errors.push({ at: Date.now(), message: `raw index ${sessionId}: ${String(error?.message ?? error)}` });
+      }
+    }
+  }
+  const runtime = {
+    model: {
+      provider: projection?.provider ?? null,
+      model: projection?.model ?? null,
+      metadataResolved: projection?.available === true,
+    },
+    bge: {
+      model: host?.config?.vector?.model ?? null,
+      vectors,
+      status: host ? (vectors > 0 ? 'vectors-present' : 'not-observed') : 'disabled',
+    },
+    writeIndex: {
+      enabled: host?.config?.enabled === true && host.config.rawIndex?.enabled !== false,
+      records: rawRecords,
+      reconciledSessions,
+    },
+    authorizedSessions: ids.length,
+    recentErrors: errors.slice(-5),
+  };
+  // The catalog is package documentation, not a live-only observation. Always
+  // list the tools this package can provide; observed schemas only add status.
+  const byName = new Map([...PANEL_TOOL_NAMES].map((name) => [name, {
+    name, description: '', parameters: null, visibleSessions: new Set(),
+  }]));
+  let observed = false;
+  for (const scope of scopes ?? []) {
+    if (scope?.toolDetailsObserved === true) observed = true;
+    for (const tool of scope?.toolDetails ?? []) {
+      if (!byName.has(tool.name)) byName.set(tool.name, { ...tool, visibleSessions: new Set() });
+      if (scope.sessionId) byName.get(tool.name).visibleSessions.add(scope.sessionId);
+    }
+  }
+  const tools = [...byName.values()].map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+    visibleSessions: tool.visibleSessions.size,
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  return { runtime, toolCatalog: { observed, tools } };
 }
 
 async function buildSnapshot(ctx, path, projectionConfig, cache, scopeCache, queryCache) {
@@ -396,8 +743,13 @@ async function buildSnapshot(ctx, path, projectionConfig, cache, scopeCache, que
   const projection = await projectWindow(ctx, projectionConfig, cache, policy);
   const scopes = await inspectScopes(ctx, scopeCache);
   const sessionQuery = await probeSessionQuery(ctx, queryCache);
+  const extras = buildGlobalPanelExtras(ctx, scopes, projection);
 
   return {
+    legacy: true,
+    runtime: extras.runtime,
+    toolCatalog: extras.toolCatalog,
+    replacement: '/dsh-continuity/current.json',
     plugin: { name: pkg.name ?? 'dsh-continuity', version: pkg.version ?? '0.0.0' },
     generatedAt: new Date().toISOString(),
     panel: { path },
@@ -492,6 +844,8 @@ async function probeSessionQuery(ctx, cache) {
  * agents see `session_log`, and which see the convention section. Cached: the
  * prompt assembly is the expensive part and the panel polls every few seconds.
  */
+const PANEL_TOOL_NAMES = new Set(['read_seq_range', 'read_raw_chunk', 'session_asset', 'child_asset', 'ptc_handoff']);
+
 async function inspectScopes(ctx, cache) {
   if (Date.now() - cache.at < 15_000) return cache.value;
   const tools = ctx.get('tools');
@@ -503,7 +857,10 @@ async function inspectScopes(ctx, cache) {
     const sessionId = agent?.id === undefined ? null : String(agent.id);
     const headerPreset = agent?.session?.header?.agentPreset ?? null;
     const preset = currentPresetOf(agent, projections);
-    const toolNames = tools?.schemas?.(agent)?.map((tool) => tool.name) ?? [];
+    const schemas = typeof tools?.schemas === 'function' ? tools.schemas(agent) ?? [] : [];
+    const toolNames = schemas.map((tool) => tool.name);
+    const toolDetails = schemas.filter((tool) => PANEL_TOOL_NAMES.has(tool?.name))
+      .map((tool) => ({ name: tool.name, description: tool.description ?? '', parameters: tool.parameters ?? tool.inputSchema ?? null }));
     let convention = null;
     if (preset === 'continuity' && prompts !== undefined) {
       try {
@@ -521,6 +878,8 @@ async function inspectScopes(ctx, cache) {
       threads: toolNames.includes('continuity'),
       convention,
       toolCount: toolNames.length,
+      toolDetails,
+      toolDetailsObserved: typeof tools?.schemas === 'function',
     });
   }
   cache.at = Date.now();

@@ -178,8 +178,13 @@ export function recordPreview(preview) {
 }
 
 /** Remember the last non-fatal measurement or compaction failure. */
-export function recordError(message, key) {
-  continuityState.lastError = { at: Date.now(), message: String(message), ...(key === undefined ? {} : { key }) };
+export function recordError(message, key, sessionId = null) {
+  continuityState.lastError = {
+    at: Date.now(),
+    message: String(message),
+    ...(key === undefined ? {} : { key }),
+    ...(sessionId === null || sessionId === undefined || sessionId === '' ? {} : { sessionId: String(sessionId) }),
+  };
 }
 
 export function resetState() {

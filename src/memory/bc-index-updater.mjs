@@ -11,6 +11,7 @@ import { embedTexts } from '../facets/embedding.mjs';
 import { createBLabeler, LABELER_VERSION } from './bc-label.mjs';
 import { extractKeywords, makeRecord } from './bc-recall.mjs';
 import { loadIndexJsonl, saveIndexJsonl } from './bc-index.mjs';
+import { calibrateRecords } from './bc-calibration.mjs';
 import { loadSpecialKeywords, matchSpecialKeywords } from './special-keywords.mjs';
 import { loadCMapEntries } from './cmap-file.mjs';
 import { buildDf, chatterScore } from './chatter.mjs';
@@ -315,7 +316,7 @@ export function createIndexUpdater({
           keywords,
           conceptScores,
           confidence: label.top?.score ?? 0,
-          status: 'weak',
+          status: (label.top?.score ?? 0) >= 0.5 ? 'normal' : (label.top?.score ?? 0) >= 0.4 ? 'low' : 'weak',
           ...(Array.isArray(label.vector) ? { vec: Buffer.from(Float32Array.from(label.vector).buffer).toString('base64') } : {}),
           chatter: chatterScore(text, df),
           sessionId,
@@ -342,6 +343,7 @@ export function createIndexUpdater({
         };
       }
       const writeStarted = performance.now();
+      calibrateRecords([...records, ...added]);
       saveIndexJsonl(file, [...records, ...added]);
       saveBaseline(resolvedBaselineFile, baseline);
       const writeMs = Math.round(performance.now() - writeStarted);

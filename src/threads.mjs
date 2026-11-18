@@ -212,7 +212,7 @@ export function threadGistText(thread) {
  * `user` is accepted by v4 but renders as a human chat bubble; `runtime-context`
  * is a producer-owned kind and renders as a context block, which is where the
  * per-turn active line and rules belong. */
-export function contextMessage(text) {
+export function contextMessage(text, sourceExtra = {}) {
   return {
     id: randomUUID(),
     role: 'user',
@@ -221,6 +221,7 @@ export function contextMessage(text) {
       kind: 'runtime-context',
       form: 'snapshot',
       sections: [{ name: 'continuity:threads', text }],
+      ...sourceExtra,
     },
   };
 }

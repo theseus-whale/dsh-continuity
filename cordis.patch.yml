@@ -1,29 +1,21 @@
-﻿# ============================================================================
-# dsh-continuity 閳?DSH bundle patch
 # ============================================================================
-# Three things are declared here:
+# dsh-continuity - DSH bundle patch
+# ============================================================================
+# Declares:
 #
-#   1. The Host row `dsh-continuity`: serves the sidebar panel's JSON snapshot.
-#   2. The `band` agent preset: the shipped `standard` preset with the
-#      compaction-basic config-only override (thresholdRatio 0.92,
-#      retainRatio 0.5). This is the first experiment; it changes no engine
-#      code. `headroomTokens` is omitted on purpose: the shipped default is
-#      65536 and stays explicit in docs/EXPERIMENT.md.
-#   3. The `continuity` agent preset: the shipped `standard` preset with
-#      compaction-basic replaced by `dsh-continuity/engine`, the band
-#      controller with gist provenance.
+#   1. The Host row `dsh-continuity`: read-only current Host state route and
+#      the left-sidebar panel.
+#   2. The `continuity` agent preset: stock tools plus the continuity engine,
+#      unified fold, and memory-resonance support. Public defaults are off;
+#      local overlays enable features explicitly.
+#   3. The `continuity-ptc` preset: the same engine with the PTC executor.
 #
-# The shipped `standard` preset is deliberately NOT overridden: existing and
-# default sessions keep the stock backend. Pick either new preset for a new
-# session to test it. Rollback = select another preset, or remove the bundle.
+# The shipped `standard` preset is deliberately NOT overridden. Existing and
+# default sessions keep the stock backend. Rollback = select another preset or
+# remove the bundle.
 #
-# Measured loader ids on this desktop profile (DSH 0.2.1-rc.3):
-#   - base row:  entryId "include:compaction-basic", patchId "compaction-basic"
-#   - preset:    entryId "include:preset-standard" -> group "compaction"
-#                (isolate: compaction, toolResultPruner) -> child "compaction-basic"
-# A patch cannot address the preset child directly; it must override or copy
-# the whole preset declaration, which is why the two presets below restate the
-# shipped plugin list.
+# The values below are the resolved 5.0 defaults; changing them is a policy
+# change, not an installation step.
 # ============================================================================
 
 - insert:
@@ -32,24 +24,43 @@
       required: false
       config:
         safeMode: true
+        legacyAbcK: false
+        turnPing:
+          enabled: false
+          mode: shadow
+          # Local-only Host enablement; no ids in the published package.
+          localConfig: ./local/memory-resonance.json
+          boundaries:
+            allowDefaultEnable: false
+            allowLiveInjection: false
+          foldWrites: false
+          diagnostics:
+            enabled: true
+          useHostAdapters: true
+          provider: ''
+          model: ''
+          embeddingModel: './models/Xenova/bge-small-zh-v1.5'
+          coverage:
+            enabled: false
+            autoActivate: false
         panel:
           enabled: true
-          path: /dsh-continuity/state.json
+          path: /@theseus-whale/dsh-continuity/state.json
         projection:
           provider: deepseek-official
           model: deepseek-flash
         extraction:
           mode: "off"
         bcRecall:
-          enabled: true
+          enabled: false
 
-    # 閳光偓閳光偓 config-only experiment 閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
+    # Continuity preset: unified fold + memory resonance
     - id: preset-continuity
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: continuity
         name: Continuity
-        description: Band-controlled compaction with gist headers and one standing provenance convention.
+        description: Unified fold with memory resonance, current Host state, and explicit local overlays.
         order: 21
         plugins:
           - id: persona
@@ -84,13 +95,22 @@
             name: '@deepseek-ai/dsh-tool-skill'
           # Retrieval tool: scoped to this preset; standard and band do not get it.
           - id: session-log-tool
-            name: dsh-continuity/session-log-tool
+            name: '@theseus-whale/dsh-continuity/session-log-tool'
+            config:
+              legacyAbcK: false
           # Thread scaffolding: save/load/active/list. The save commit runs at
           # the next pre-step so the tool call/result pair is never split.
           - id: threads-tool
-            name: dsh-continuity/threads-tool
+            name: '@theseus-whale/dsh-continuity/threads-tool'
             config:
               safeMode: true
+              legacyAbcK: false
+          # Raw-range readback for prior-turn claims; preset-scoped so the PTC SDK
+          # is rebuilt with this tool in the agent's catalog.
+          - id: read-seq-range-tool
+            name: '@theseus-whale/dsh-continuity/read-seq-range-tool'
+          - id: read-raw-chunk-tool
+            name: '@theseus-whale/dsh-continuity/read-raw-chunk-tool'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal
@@ -105,7 +125,7 @@
                 name: '@deepseek-ai/dsh-plan-mode'
                 config:
                   section: |
-                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement 閳?including an answer confirming something you asked 閳?approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
                     Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
 
@@ -127,7 +147,7 @@
               # inside the same isolate realm. command-compact and the pruner
               # stay so /compact and overflow recovery keep working.
               - id: continuity-engine
-                name: dsh-continuity/engine
+                name: '@theseus-whale/dsh-continuity/engine'
                 config:
                   # Continuity balanced band (4.9.122):
                   # setpoint = high = 0.48, low 0.32, emergency 0.65,
@@ -135,7 +155,7 @@
                   # minAction 24000.
                   #
                   # On the measured 0b window (W 792,576, baseline 133,272):
-                  #   high 380,436 路 low 253,624 路 floor 244,233
+                  #   high 380,436 — low 253,624 — floor 244,233
                   #   band 126,812 < maxPerBatch 190k -> cap does not bite
                   #   emergencyTo is 182,292 below emergency; 140k would
                   #   leave emergency short of its target, so keep 190k.
@@ -156,7 +176,7 @@
                   # detach the responsible active result into a pause handle.
                   # 0.2.5: handles/pauses/previews are never previewed again;
                   # pass records include a post-pass measurement; manual
-                  # /compact gets a follow-up gist header and a manual record.
+                  # /compact gets a follow-up summary header and a manual record.
                   # 0.2.6: emergency 0.85 is 673,690 (85% full).
                   # 0.2.7: high .76 / low .38 / emergencyTo .62 / protect .20.
                   # band-high budget = .4 * (.76-.38)W = 120,472 < maxPerBatch.
@@ -175,7 +195,7 @@
                     k: 0.4
                   mechanicalNote: false
                   # Stage switches: stage 1 (save/load/active/list + state) is
-                  # always on; stage 2 injects the per-turn [绾縘 line + rules;
+                  # always on; stage 2 injects the per-turn [记忆共振] line + rules;
                   # stage 3 pins the active loadSeq against automatic folds.
                   threads:
                     inject: true
@@ -188,6 +208,12 @@
                   compactionBasic:
                     thresholdRatio: 0.8
                     retainRatio: 0.5
+                  # Public default: disabled. Session ids live only in the
+                  # unpublished local overlay below; missing overlay = disabled.
+                  unifiedFold:
+                    enabled: false
+                    localConfig: ./local/unified-fold.json
+                    embeddingModel: ./models/Xenova/bge-small-zh-v1.5
               - id: command-compact
                 name: '@deepseek-ai/dsh-command-compact'
               - id: tool-result-pruner
@@ -281,13 +307,22 @@
             name: '@deepseek-ai/dsh-tool-skill'
           # Retrieval tool: scoped to this preset; standard and band do not get it.
           - id: session-log-tool
-            name: dsh-continuity/session-log-tool
+            name: '@theseus-whale/dsh-continuity/session-log-tool'
+            config:
+              legacyAbcK: false
           # Thread scaffolding: save/load/active/list. The save commit runs at
           # the next pre-step so the tool call/result pair is never split.
           - id: threads-tool
-            name: dsh-continuity/threads-tool
+            name: '@theseus-whale/dsh-continuity/threads-tool'
             config:
               safeMode: true
+              legacyAbcK: false
+          # Raw-range readback for prior-turn claims; preset-scoped so the PTC SDK
+          # is rebuilt with this tool in the agent's catalog.
+          - id: read-seq-range-tool
+            name: '@theseus-whale/dsh-continuity/read-seq-range-tool'
+          - id: read-raw-chunk-tool
+            name: '@theseus-whale/dsh-continuity/read-raw-chunk-tool'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal
@@ -302,7 +337,7 @@
                 name: '@deepseek-ai/dsh-plan-mode'
                 config:
                   section: |
-                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement 閳?including an answer confirming something you asked 閳?approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+                    You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement —including an answer confirming something you asked —approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
     
                     Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
     
@@ -324,7 +359,7 @@
               # inside the same isolate realm. command-compact and the pruner
               # stay so /compact and overflow recovery keep working.
               - id: continuity-engine
-                name: dsh-continuity/engine
+                name: '@theseus-whale/dsh-continuity/engine'
                 config:
                   # Continuity balanced band (4.9.122):
                   # setpoint = high = 0.48, low 0.32, emergency 0.65,
@@ -332,7 +367,7 @@
                   # minAction 24000.
                   #
                   # On the measured 0b window (W 792,576, baseline 133,272):
-                  #   high 380,436 路 low 253,624 路 floor 244,233
+                  #   high 380,436 —low 253,624 —floor 244,233
                   #   band 126,812 < maxPerBatch 190k -> cap does not bite
                   #   emergencyTo is 182,292 below emergency; 140k would
                   #   leave emergency short of its target, so keep 190k.
@@ -353,7 +388,7 @@
                   # detach the responsible active result into a pause handle.
                   # 0.2.5: handles/pauses/previews are never previewed again;
                   # pass records include a post-pass measurement; manual
-                  # /compact gets a follow-up gist header and a manual record.
+                  # /compact gets a follow-up summary header and a manual record.
                   # 0.2.6: emergency 0.85 is 673,690 (85% full).
                   # 0.2.7: high .76 / low .38 / emergencyTo .62 / protect .20.
                   # band-high budget = .4 * (.76-.38)W = 120,472 < maxPerBatch.
@@ -372,7 +407,7 @@
                     k: 0.4
                   mechanicalNote: false
                   # Stage switches: stage 1 (save/load/active/list + state) is
-                  # always on; stage 2 injects the per-turn [绾縘 line + rules;
+                  # always on; stage 2 injects the per-turn [记忆共振] line + rules;
                   # stage 3 pins the active loadSeq against automatic folds.
                   threads:
                     inject: true
@@ -385,6 +420,12 @@
                   compactionBasic:
                     thresholdRatio: 0.8
                     retainRatio: 0.5
+                  # Public default: disabled. Session ids live only in the
+                  # unpublished local overlay below; missing overlay = disabled.
+                  unifiedFold:
+                    enabled: false
+                    localConfig: ./local/unified-fold.json
+                    embeddingModel: ./models/Xenova/bge-small-zh-v1.5
               - id: command-compact
                 name: '@deepseek-ai/dsh-command-compact'
               - id: tool-result-pruner

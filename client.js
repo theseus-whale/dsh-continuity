@@ -21,23 +21,17 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const NS = 'dsh-continuity';
     const STATE_URL = '/dsh-continuity/state.json';
-    const TAGS_URL = '/dsh-continuity/tags.json';
-const BC_URL = '/dsh-continuity/bc.json';
-const FACETS_URL = '/dsh-continuity/facets.json';
-    const TAGS_TAB_ID = 'continuity-tags';
-    const TAGS_TAB_KIND = 'continuityTags';
 
     const EN = {
       'panel.eyebrow': 'DSH CONTINUITY',
       'panel.title': 'Continuity',
-      'tags.title': 'Tags',
-      'panel.subtitle': 'Band-controlled compaction with labeled memory. Keep a verbatim recent window, remove a small oldest slice per pass, and tag every summary as a gist with a pointer to its original.',
+      'panel.subtitle': 'Memory resonance and unified fold. Keep a verbatim recent window, with every summary linked to its canonical raw records.',
       'status.engine': 'Engine mounted',
       'status.inert': 'Engine not mounted',
       'status.host': 'Host {version}',
       'status.updated': 'Updated {time}',
-      'band.title': 'Band controller',
-      'band.hint': 'Measure → plan → the oldest balanced range. One small pass per step, never into the protected tail.',
+      'band.title': 'Compaction waterlines',
+      'band.hint': 'Measure → plan → fold the oldest balanced range, never the protected tail.',
       'band.setpoint': 'setpoint',
       'band.high': 'high',
       'band.low': 'low',
@@ -45,52 +39,56 @@ const FACETS_URL = '/dsh-continuity/facets.json';
       'band.protect': 'protect',
       'band.max': 'max / pass',
       'band.min': 'min action',
-      'projection.title': 'Config-only projection',
-      'projection.hint': 'Computed from the live model route. The shipped backend triggers at min(0.92·W, W − O − headroom) and keeps retainRatio × (W − O) verbatim.',
+      'projection.title': 'Current model window',
+      'projection.hint': 'Measured from the active model route and the current compaction policy.',
       'projection.context': 'context window',
       'projection.reserved': 'reserved output',
       'projection.message': 'message budget',
-      'projection.threshold': 'base threshold',
-      'projection.retain': 'base retain',
-      'projection.pass': 'base pass',
-      'projection.setpoint': 'band setpoint',
-      'projection.protect': 'band protect',
+      'projection.threshold': 'stock threshold',
+      'projection.retain': 'stock retain',
+      'projection.pass': 'stock pass',
+      'projection.setpoint': 'current setpoint',
+      'projection.protect': 'current protect',
       'projection.source': 'source',
       'projection.invalid': 'retain ≥ threshold — this config would be rejected',
-      'provenance.title': 'Provenance is part of the policy',
-      'provenance.hint': 'A label on the memory itself, not a banner per event.',
-      'provenance.convention': 'Standing convention (one system section)',
-      'provenance.sample': 'Checkpoint header',
-      'passes.title': 'Recent passes',
-      'passes.empty': 'No pass recorded yet. Select the Continuity preset for a new session; passes appear here as they happen.',
-      'passes.range': 'range',
-      'passes.count': 'messages',
-      'passes.tokens': 'tokens',
-      'passes.reason': 'reason',
-      'facts.title': 'Measured at runtime',
-      'facts.hint': 'Recorded from the live 0.2.1-rc.3 Host, not from npm types.',
-      'try.title': 'Try it',
-      'try.one': 'Start a new session and pick the preset "Band (config-only)" to test thresholdRatio 0.92 / retainRatio 0.5 on the shipped backend.',
-      'try.two': 'Pick "Continuity" to test the band engine, gist headers, and the standing convention.',
-      'try.three': 'Ask about a detail that only exists in a compacted range. Expected: the model cites the [gist] header and says it only remembers the gist.',
-      'try.four': 'Existing sessions keep the preset revision they started with; rollback is one preset selection or disabling the bundle.',
+      'runtime.title': 'Runtime status',
+      'runtime.hint': 'Observed capabilities and evidence; not a success claim without an observation.',
+      'runtime.model': 'Model route',
+      'runtime.bge': 'BGE / vectors',
+      'runtime.writeIndex': 'Write-time index',
+      'runtime.sessions': 'Authorized sessions',
+      'runtime.errors': 'Recent errors',
+      'runtime.noErrors': 'No recorded error',
+      'runtime.resolved': 'metadata resolved',
+      'runtime.unresolved': 'metadata unavailable',
+      'runtime.vectors': 'vectors present',
+      'runtime.notObserved': 'not observed',
+      'runtime.enabled': 'enabled',
+      'runtime.disabled': 'disabled',
+      'runtime.records': 'raw records',
+      'runtime.reconciled': 'sessions reconciled',
+      'tools.title': 'Tool catalog',
+      'tools.hint': 'Tools provided by this package, with usage notes; current visibility is reported separately.',
+      'tools.empty': 'No tool catalog data is available yet.',
+      'tools.visible': 'visible in sessions',
+      'tools.notObserved': 'current visibility not observed',
+      'tools.parameters': 'Parameters',
       'error.title': 'The state route is not answering',
       'error.body': 'The sidebar entry is registered, but the Host route returned: {message}',
       'error.reload': 'Reload page',
-      'footer': 'The seam is policy, not personhood.',
+      'footer': 'Read-only runtime indicators. This panel does not modify raw history.',
     };
 
     const ZH = {
       'panel.eyebrow': 'DSH 连续性',
       'panel.title': '连续性',
-      'tags.title': '标签',
-      'panel.subtitle': '带标签记忆的带宽压缩：保留最近的逐字窗口，每次只移除最旧的一小片，并把每份摘要标成 [gist]，附回原文的指针。',
+      'panel.subtitle': '记忆共振与统一折叠：保留最近的逐字窗口，摘要与原文保持可核验的对应关系。',
       'status.engine': '引擎已挂载',
       'status.inert': '引擎未挂载',
       'status.host': '宿主 {version}',
       'status.updated': '更新于 {time}',
-      'band.title': '带宽控制器',
-      'band.hint': '测量 → 规划 → 最旧且边界平衡的区间。每步只做一小刀，绝不折进受保护的尾部。',
+      'band.title': '折叠水位',
+      'band.hint': '测量 → 规划 → 折叠最旧且边界平衡的区间，绝不折进受保护的尾部。',
       'band.setpoint': '设定点',
       'band.high': '高水位',
       'band.low': '低水位',
@@ -98,39 +96,44 @@ const FACETS_URL = '/dsh-continuity/facets.json';
       'band.protect': '保护',
       'band.max': '单次上限',
       'band.min': '最小动作',
-      'projection.title': '仅配置实验投影',
-      'projection.hint': '按当前模型路由计算。自带后端在 min(0.92·W, W − O − headroom) 触发，并保留 retainRatio × (W − O) 的逐字尾部。',
+      'projection.title': '当前模型窗口',
+      'projection.hint': '根据当前模型路由与当前折叠策略计算。',
       'projection.context': '上下文窗口',
       'projection.reserved': '输出预留',
       'projection.message': '消息预算',
-      'projection.threshold': '基线阈值',
-      'projection.retain': '基线保留',
-      'projection.pass': '单次压缩量',
-      'projection.setpoint': '带宽设定点',
-      'projection.protect': '带宽保护',
+      'projection.threshold': '自带后端阈值',
+      'projection.retain': '自带后端保留',
+      'projection.pass': '自带后端单次压缩量',
+      'projection.setpoint': '当前设定点',
+      'projection.protect': '当前保护',
       'projection.source': '来源',
       'projection.invalid': '保留 ≥ 阈值 —— 该配置会被拒绝',
-      'provenance.title': '出处也是策略的一部分',
-      'provenance.hint': '标签贴在记忆本身上，而不是每条事件前的横幅。',
-      'provenance.convention': '常驻约定（单条系统段）',
-      'provenance.sample': '检查点标题',
-      'passes.title': '最近压缩',
-      'passes.empty': '还没有记录。用「Continuity」预设新建会话，压缩发生后会出现在这里。',
-      'passes.range': '区间',
-      'passes.count': '消息',
-      'passes.tokens': 'tokens',
-      'passes.reason': '原因',
-      'facts.title': '运行时实测',
-      'facts.hint': '来自运行中的 0.2.1-rc.3 宿主，而不是 npm 类型声明。',
-      'try.title': '怎么试',
-      'try.one': '新建会话并选择「Band（仅配置）」预设，在自带后端上测试 thresholdRatio 0.92 / retainRatio 0.5。',
-      'try.two': '选择「Continuity」预设，测试带宽引擎、gist 标题与常驻约定。',
-      'try.three': '追问一个只存在于被压缩区间里的细节。预期：模型引用 [gist] 标题并说明只记得概要。',
-      'try.four': '已有会话保留它们启动时的预设版本；回滚只需改选预设或停用插件。',
+      'runtime.title': '运行状态',
+      'runtime.hint': '只展示实际观测；没有观测时不宣称成功。',
+      'runtime.model': '模型路由',
+      'runtime.bge': 'BGE／向量',
+      'runtime.writeIndex': '写入即索引',
+      'runtime.sessions': '授权会话数',
+      'runtime.errors': '最近错误',
+      'runtime.noErrors': '没有记录错误',
+      'runtime.resolved': '元数据已解析',
+      'runtime.unresolved': '元数据不可用',
+      'runtime.vectors': '已有向量',
+      'runtime.notObserved': '尚未观测',
+      'runtime.enabled': '已开启',
+      'runtime.disabled': '未开启',
+      'runtime.records': '原文索引记录',
+      'runtime.reconciled': '已补扫会话',
+      'tools.title': '工具汇总',
+      'tools.hint': '这里列出本包提供的工具及用途；当前是否可见另行标注。',
+      'tools.empty': '暂时没有工具目录数据。',
+      'tools.visible': '个会话可见',
+      'tools.notObserved': '当前可见性尚未观测',
+      'tools.parameters': '参数',
       'error.title': '状态路由没有响应',
       'error.body': '侧栏入口已注册，但宿主路由返回：{message}',
       'error.reload': '刷新页面',
-      'footer': '接缝是策略，不是人格。',
+      'footer': '只读运行状态。本面板不会修改原始历史。',
     };
 
     const S = {
@@ -219,6 +222,29 @@ const FACETS_URL = '/dsh-continuity/facets.json';
         color: 'var(--dsw-alias-label-primary)',
         fontSize: 12,
         cursor: 'pointer',
+      },
+    };
+
+    const TOOL_NOTES = {
+      read_seq_range: {
+        note: '按当前会话的 seq 范围读取原始对话，用来核对旧消息和精确措辞。',
+        params: 'fromSeq、toSeq（起止都包含）；返回有字节上限，截断时必须明确标记。',
+      },
+      read_raw_chunk: {
+        note: '按 chunkId 和字节偏移读取对应的 canonical raw 分段，适合长原文续读。',
+        params: 'chunkId 必填；byteOffset、maxBytes 可选；用 nextByteOffset 续读。',
+      },
+      session_asset: {
+        note: '查找当前会话已折叠的非文本附件，返回登记路径和元数据，不把文件内容塞进上下文。',
+        params: 'action=get/list；get 需要 seq 或 path，list 可用 limit。',
+      },
+      child_asset: {
+        note: '读取子会话／PTC 交给父会话的产物登记信息，保持父子会话边界。',
+        params: 'action=get/list；可用 runId、path 或 limit 定位。',
+      },
+      ptc_handoff: {
+        note: '把 PTC 子任务的结果登记为父会话可见产物，并保留决策、未完成项和来源 seq。',
+        params: 'childSessionId、runId、summary 必填；decisions、open、artifacts 等可选。',
       },
     };
 
@@ -354,20 +380,47 @@ const FACETS_URL = '/dsh-continuity/facets.json';
           : null);
     }
 
-    function Passes({ t, passes }) {
-      if (!Array.isArray(passes) || passes.length === 0) {
-        return h('p', { style: { ...S.hint, marginTop: 10 } }, t('passes.empty'));
-      }
-      return h('div', { style: { marginTop: 8 } }, ...passes.map((pass, index) => h('div', {
-        key: `${pass.at}-${index}`,
-        style: S.row,
-      },
-      h('span', { style: S.rowLabel }, new Date(pass.at).toLocaleTimeString()),
-      h('span', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px 14px' } },
-        h('span', { style: S.mono }, `seq ${pass.start}–${pass.end}`),
-        h('span', null, `${t('passes.count')} ${pass.count}`),
-        h('span', null, `${t('passes.tokens')} ${formatNumber(pass.tokens)}`),
-        h('span', { style: S.rowLabel }, pass.reason)))));
+    function RuntimeStatus({ t, runtime }) {
+      const value = runtime ?? {};
+      const model = value.model ?? {};
+      const bge = value.bge ?? {};
+      const write = value.writeIndex ?? {};
+      const errors = Array.isArray(value.recentErrors) ? value.recentErrors : [];
+      const modelRoute = [model.provider, model.model].filter(Boolean).join('/') || '—';
+      const bgeStatus = bge.vectors > 0
+        ? `${formatNumber(bge.vectors)} ${t('runtime.vectors')}`
+        : t(bge.status === 'not-observed' ? 'runtime.notObserved' : 'runtime.disabled');
+      return h('div', null,
+        h('div', { style: S.grid },
+          h(KV, { label: t('runtime.model'), value: `${modelRoute} · ${t(model.metadataResolved ? 'runtime.resolved' : 'runtime.unresolved')}`, mono: true }),
+          h(KV, { label: t('runtime.bge'), value: `${bge.model ?? '—'} · ${bgeStatus}` }),
+          h(KV, { label: t('runtime.writeIndex'), value: `${t(write.enabled ? 'runtime.enabled' : 'runtime.disabled')} · ${formatNumber(write.records)} ${t('runtime.records')} · ${formatNumber(write.reconciledSessions)} ${t('runtime.reconciled')}` }),
+          h(KV, { label: t('runtime.sessions'), value: formatNumber(value.authorizedSessions) })),
+        h('p', { style: { ...S.k, marginTop: 12 } }, t('runtime.errors')),
+        errors.length === 0
+          ? h('p', { style: S.hint }, t('runtime.noErrors'))
+          : h('div', { style: { maxHeight: 180, overflowY: 'auto', overscrollBehavior: 'contain' } },
+            errors.map((error, index) => h('div', { key: index, style: S.row },
+              h('span', { style: S.mono }, `${error?.sessionId ? `${error.sessionId} · ` : ''}${String(error?.message ?? error)}`)))),
+      );
+    }
+
+    function ToolCatalog({ t, catalog }) {
+      const tools = Array.isArray(catalog?.tools) ? catalog.tools : [];
+      if (tools.length === 0) return h('p', { style: { ...S.hint, marginTop: 10 } }, t('tools.empty'));
+      return h('div', { style: S.list }, ...tools.map((tool) => {
+        const note = TOOL_NOTES[tool.name];
+        const schemaParams = Object.keys(tool.parameters?.properties ?? {}).join('、');
+        return h('div', { key: tool.name, style: { ...S.row, gridTemplateColumns: 'minmax(150px, 190px) minmax(0, 1fr)' } },
+          h('span', { style: S.mono }, tool.name),
+          h('div', null,
+            h('div', null, note?.note ?? tool.description ?? '—'),
+            h('div', { style: { ...S.hint, marginTop: 4 } }, `${t('tools.parameters')}：${note?.params ?? schemaParams ?? '—'}`),
+            h('div', { style: { ...S.k, marginTop: 3 } }, catalog?.observed === true
+              ? `${tool.visibleSessions ?? 0} ${t('tools.visible')}`
+              : t('tools.notObserved'))),
+        );
+      }));
     }
 
     function PanelIcon({ size = 18, active = false }) {
@@ -393,169 +446,6 @@ const FACETS_URL = '/dsh-continuity/facets.json';
         opacity: 0.45,
       }),
       h('circle', { cx: 12, cy: 8.2, r: 2.1, fill: 'currentColor' }));
-    }
-
-    /**
-     * 开始页「更多工具」里的入口。
-     * 注意：组件在 factory 作用域里，拿不到 apply(ctx) 的 ctx；
-     * 所以真正的打开动作由 apply 通过 inject 传进来（它才持有 ctx）。
-     */
-    function GuideTagsRow({ open }) {
-      const [status, setStatus] = React.useState('');
-      const onClick = () => {
-        try {
-          setStatus(String(open()));
-        } catch (error) {
-          setStatus('失败：' + String(error?.message ?? error));
-        }
-      };
-      return h('button', {
-        type: 'button',
-        style: {
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '8px 10px', background: 'transparent', border: 'none',
-          color: 'inherit', cursor: 'pointer', textAlign: 'left', fontSize: 12,
-        },
-        onClick,
-      },
-        h('span', { style: { opacity: 0.7 } }, 'B'),
-        h('span', null, 'A / B / C / K 记忆标签'),
-        status ? h('span', { style: { marginLeft: 'auto', opacity: 0.65, fontSize: 10 } }, status) : null);
-    }
-
-    function FacetView({ panel, onShowTags }) {
-      const box = { padding: '8px 10px', fontSize: 12, lineHeight: 1.5 };
-      const row = { display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0' };
-      const pair = { display: 'flex', gap: 6, alignItems: 'baseline', marginRight: 8 };
-      const current = panel?.currentTopic;
-      const curve = panel?.curve ?? [];
-      const max = Math.max(0.0001, ...curve.map((point) => point.smoothed ?? 0));
-      const points = curve.map((point, index) => {
-        const x = curve.length <= 1 ? 0 : (index / (curve.length - 1)) * 300;
-        const y = 54 - ((point.smoothed ?? 0) / max) * 48;
-        return x.toFixed(1) + ',' + y.toFixed(1);
-      }).join(' ');
-      return h('div', { style: box },
-        h('div', { style: { fontWeight: 600, marginBottom: 4 } },
-          '当前话题：' + (current?.alias ?? '—')),
-        h('div', { style: { display: 'flex', flexWrap: 'wrap', marginBottom: 8 } },
-          ...(current?.pairs ?? []).map((item) => h('span', { key: item.slot + ':' + item.value, style: pair },
-            h('span', { style: { opacity: 0.7 } }, item.slot), h('span', null, item.value),
-            h('span', { style: { opacity: 0.55 } }, item.turns + ' 轮')))),
-        h('div', { style: { opacity: 0.6, marginBottom: 8 } },
-          '总 ' + (panel?.totalTurns ?? 0) + ' turn · facet 计数 ' + (panel?.facetSum ?? 0) + ' · unknown ' + (panel?.unknown ?? 0)),
-        curve.length > 0 ? h('svg', { viewBox: '0 0 300 60', width: '100%', height: 60, style: { display: 'block', marginBottom: 8 } },
-          h('polyline', { points, fill: 'none', stroke: 'var(--dsw-alias-accent, #4ea1ff)', strokeWidth: 2 })) : null,
-        h('div', { style: { opacity: 0.55, fontSize: 11 } }, '曲线：当前话题在历史窗口的敏感度'),
-        h('button', {
-          type: 'button',
-          style: { ...S.button, marginTop: 8 },
-          onClick: onShowTags,
-        }, '显示 B / C / K 标签'));
-    }
-
-    /** 右侧栏「B / C / K 标签」页：只读计数。 */
-    function TagsPanel({ sessionId, useTabInfo } = {}) {
-      const [state, setState] = React.useState({ status: 'loading', data: null, error: null });
-      const tabInfo = typeof useTabInfo === 'function' ? useTabInfo() : null;
-      const closedRef = React.useRef(false);
-      React.useEffect(() => {
-        if (closedRef.current) return;
-        if (state.status !== 'ready' || !['not-continuity-session', 'persona-disabled'].includes(state.data?.error)) return;
-        closedRef.current = true;
-        try { tabInfo?.tab?.actions?.close?.(); } catch { /* ignore */ }
-      }, [state.status, state.data, tabInfo]);
-      React.useEffect(() => {
-        let alive = true;
-        const load = async () => {
-          try {
-            const url = sessionId ? `${BC_URL}?sessionId=${encodeURIComponent(sessionId)}` : BC_URL;
-            const response = await fetch(url, { cache: 'no-store', headers: { accept: 'application/json' } });
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            const data = await response.json();
-            if (alive) setState({ status: 'ready', data, error: null });
-          } catch (error) {
-            if (alive) setState({ status: 'error', data: null, error: String(error?.message ?? error) });
-          }
-        };
-        load();
-        const timer = setInterval(load, 5000);
-        return () => { alive = false; clearInterval(timer); };
-      }, [sessionId]);
-
-      const box = {
-        padding: '8px 10px',
-        fontSize: 12,
-        lineHeight: 1.5,
-        maxHeight: '100%',
-        minHeight: 0,
-        overflowY: 'auto',
-        overscrollBehavior: 'contain',
-        boxSizing: 'border-box',
-        scrollbarGutter: 'stable',
-      };
-      const row = { display: 'flex', gap: 6, alignItems: 'baseline', padding: '2px 0' };
-      const count = { marginLeft: 'auto', opacity: 0.55, fontVariantNumeric: 'tabular-nums' };
-
-      if (state.status === 'loading') return h('div', { style: box }, '读取中…');
-      if (state.status === 'error') return h('div', { style: box }, '读不到 bc-index.json：' + state.error);
-      const data = state.data;
-      if (data && data.available === false) {
-        return h('div', { style: box },
-          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'A / B / C / K 标签'),
-          h('div', { style: { opacity: 0.65 } }, '还没有 B 索引：' + (data.error ?? 'unknown')));
-      }
-      return h('div', { style: box },
-        h('div', { style: { marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid rgba(127,127,127,0.25)' } },
-          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'A 概念（轮数=索引实算）'),
-          ...(data?.aLabels ?? []).length > 0
-            ? (data.aLabels ?? []).map((item) => h('div', {
-              key: 'A:' + item.label,
-              style: { ...row, flexDirection: 'column', alignItems: 'stretch', gap: 2 },
-            },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', gap: 6 } },
-              h('span', null, item.label),
-              h('span', { style: count }, (item.turns ?? 0) + ' 轮')),
-            h('div', { style: { opacity: 0.55, fontSize: 10 } }, item.description ?? '')))
-            : [h('div', { style: { opacity: 0.6 } }, '空表 · 本 session 还没有 A 概念')]),
-        h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'B 通用标签'),
-        h('div', { style: { opacity: 0.6, marginBottom: 8 } },
-          '覆盖 turn ' + (data?.firstTurn ?? '?') + '–' + (data?.lastTurn ?? '?')
-          + ' · 截至 ' + (data?.updatedAt ? new Date(data.updatedAt).toLocaleString() : '?')
-          + ' · ' + (data?.totalTurns ?? 0) + ' 轮 · weak ' + (data?.weakTurns ?? 0)),
-        ...((data?.labels ?? []).length > 0
-          ? (data.labels ?? []).map((item) => h('div', {
-            key: 'B:' + item.label,
-            style: { ...row, justifyContent: 'space-between' },
-          }, h('span', null, item.label), h('span', { style: count }, item.turns + ' 轮')))
-          : [h('div', { style: { opacity: 0.6 } }, '空表 · 本 session 还没有 B 标签')]),
-        h('div', { style: { marginTop: 10, paddingTop: 6, borderTop: '1px solid rgba(127,127,127,0.25)' } },
-          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'K 特殊关键词'),
-          ...((data?.kLabels ?? []).length > 0
-            ? (data.kLabels ?? []).map((item) => h('div', {
-              key: 'K:' + item.label,
-              style: { ...row, justifyContent: 'space-between' },
-            }, h('span', null, item.label), h('span', { style: count }, item.turns + ' 轮')))
-            : [h('div', { style: { opacity: 0.6 } }, '空表 · 本 session 还没有 K 关键词')])),
-        h('div', { style: { marginTop: 10, paddingTop: 6, borderTop: '1px solid rgba(127,127,127,0.25)' } },
-          h('div', { style: { fontWeight: 600, marginBottom: 4 } }, 'C 用户词'),
-          ...((data?.cLabels ?? []).length > 0
-            ? (data.cLabels ?? []).map((item) => h('div', {
-              key: 'C:' + item.label,
-              style: { ...row, flexDirection: 'column', alignItems: 'stretch', gap: 2 },
-            },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', gap: 6 } },
-              h('span', null, item.label), h('span', { style: count }, item.turns + ' 轮')),
-            h('div', { style: { opacity: 0.55, fontSize: 10 } },
-              (item.concepts ?? []).join(' / ') + (item.summary ? ' (摘要)' : '')),
-            item.summary ? h('div', { style: { opacity: 0.5, fontSize: 10 } }, item.summary) : null))
-            : [h('div', { style: { opacity: 0.6 } }, '空表 · 本 session 还没有 C 用户词')])),
-        h('div', { style: { marginTop: 10, paddingTop: 6, borderTop: '1px solid rgba(127,127,127,0.25)', opacity: 0.7 } },
-          'A / B / C / K 均为本 session 自己的表；空表是合法初始状态；点击追忆时再由 recall() 返回候选。'));
-    }
-
-    function TagsTitle() {
-      return h('span', null, 'A / B / C / K 标签');
     }
 
     function makePanel(ctx) {
@@ -602,15 +492,6 @@ const FACETS_URL = '/dsh-continuity/facets.json';
         return h('div', { style: S.page },
           h('div', { style: S.inner },
             header,
-
-            h(Card, { title: 'A / B / C / K 记忆标签', hint: 'A 展示 + B 通用概念 + C 用户词 + K 特殊关键词· 只读' },
-              h(TagsPanel, { compact: true }),
-              h('button', {
-                type: 'button',
-                style: { ...S.button, marginTop: 8 },
-                onClick: () => { try { ctx.sidebarRight?.openTab?.('continuityTags'); } catch { /* 右侧栏不可用时忽略 */ } },
-              }, '在右侧栏打开')),
-
             h(Card, { title: t('band.title'), hint: t('band.hint') },
               h(BandBar, { t, policy }),
               h('div', { style: S.grid },
@@ -621,34 +502,12 @@ const FACETS_URL = '/dsh-continuity/facets.json';
                 h(KV, { label: t('band.protect'), value: pct(policy.protect) }),
                 h(KV, { label: t('band.max'), value: formatNumber(policy.maxPerBatch) }),
                 h(KV, { label: t('band.min'), value: formatNumber(policy.minAction) }))),
-
             h(Card, { title: t('projection.title'), hint: t('projection.hint') },
               h(Projection, { t, projection: data?.projection ?? null })),
-
-            h(Card, { title: t('provenance.title'), hint: t('provenance.hint') },
-              h('p', { style: { ...S.k, marginTop: 10 } }, t('provenance.convention')),
-              h('pre', { style: S.pre }, data?.provenance?.convention ?? '—'),
-              h('p', { style: { ...S.k, marginTop: 12 } }, t('provenance.sample')),
-              h('pre', { style: S.pre }, data?.provenance?.sample ?? '—')),
-
-            h(Card, { title: t('passes.title'), hint: null },
-              h(Passes, { t, passes: data?.passes ?? [] })),
-
-            h(Card, { title: t('facts.title'), hint: t('facts.hint') },
-              h('div', { style: S.list }, ...(data?.facts ?? []).map((fact, index) => h('div', {
-                key: `${fact.label}-${index}`,
-                style: { ...S.row, ...(index === 0 ? { borderTop: 'none' } : {}) },
-              },
-              h('span', { style: S.rowLabel }, fact.label),
-              h('span', { style: S.mono }, fact.value))))),
-
-            h(Card, { title: t('try.title'), hint: null },
-              h('ol', { style: S.steps },
-                h('li', null, t('try.one')),
-                h('li', null, t('try.two')),
-                h('li', null, t('try.three')),
-                h('li', null, t('try.four')))),
-
+            h(Card, { title: t('runtime.title'), hint: t('runtime.hint') },
+              h(RuntimeStatus, { t, runtime: data?.runtime ?? null })),
+            h(Card, { title: t('tools.title'), hint: t('tools.hint') },
+              h(ToolCatalog, { t, catalog: data?.toolCatalog ?? null })),
             h('p', { style: { ...S.hint, textAlign: 'center', margin: '4px 0 0' } }, t('footer'))));
       };
     }
@@ -671,18 +530,10 @@ const FACETS_URL = '/dsh-continuity/facets.json';
     });
 
     return {
-      // 必须声明：inject 是"等这些服务就绪再 apply"的机制。
-      // 去掉它（我试过）会让 apply 跑在服务注册之前，能力检测看到 undefined，
-      // 右侧栏标签整块被跳过——标签页就消失了（2026-10-29 实测）。
-      // 真正的防崩措施在 apply 内部：每项注册单独兜底，一项失败不连坐。
-      inject: ['slots', 'locale', 'sidebarRightTabs', 'sidebarRight'],
+      inject: ['slots', 'locale'],
       apply(ctx) {
         const hasSlots = ctx?.slots !== undefined && ctx.slots !== null && typeof ctx.slots.inject === 'function';
         const hasLocale = ctx?.locale !== undefined && ctx.locale !== null && typeof ctx.locale.register === 'function';
-        const hasTabs = ctx?.sidebarRightTabs !== undefined
-          && ctx.sidebarRightTabs !== null
-          && typeof ctx.sidebarRightTabs.register === 'function';
-
         if (hasLocale) {
           effect(ctx, () => {
             const disposeEn = ctx.locale.register(NS, 'en', EN);
@@ -693,63 +544,16 @@ const FACETS_URL = '/dsh-continuity/facets.json';
             };
           });
         }
-
-        // 没有 slots 就什么都做不了：安静退出，不抛。
         if (!hasSlots) return;
-
         const translate = hasLocale && typeof ctx.locale.bind === 'function'
           ? ctx.locale.bind(NS)
           : (key) => key;
-
         safe('sidebar.panellist', () => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
           name: 'sidebar.panellist',
           id: 'continuity',
           order: 20,
           label: () => translate('panel.title'),
         }, PanelIcon)));
-
-        // 右侧栏：宿主没有这个服务就整块跳过。
-        if (hasTabs) {
-          effect(ctx, () => ctx.sidebarRightTabs.register({
-            id: TAGS_TAB_ID,
-            kind: TAGS_TAB_KIND,
-            priority: 'builtin',
-            title: () => 'A / B / C / K 标签',
-          }));
-        }
-
-        // 开始页「更多工具」入口
-        safe('sidebar.right.tab.guide.actions', () => ctx.slots.inject('sidebar.right.tab.guide.actions', () => ctx.slots.register({
-          name: 'sidebar.right.tab.guide.actions',
-          id: 'continuity-tags-open',
-          order: 10,
-          locale: NS,
-          inject: () => ({
-            open: () => {
-              if (ctx.sidebarRight === undefined || typeof ctx.sidebarRight.openTab !== 'function') {
-                return '右侧栏服务不可用（这个宿主版本没有 sidebarRight）';
-              }
-              try {
-                ctx.sidebarRight.openTab(TAGS_TAB_KIND);
-                return '已调用 openTab(' + TAGS_TAB_KIND + ')';
-              } catch (error) {
-                return '失败：' + String(error?.message ?? error);
-              }
-            },
-          }),
-        }, GuideTagsRow)));
-
-        // tab 正文 + 标题（宿主没有 sidebarRightTabs 时这两个 seat 也没意义，但注册不抛就留着）
-        safe('sidebar.right.pane.tab', () => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
-          name: 'sidebar.right.pane.tab',
-          key: TAGS_TAB_ID,
-          locale: NS,
-        }, TagsPanel)));
-        safe('sidebar.right.pane.tab.title', () => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
-          name: 'sidebar.right.pane.tab.title',
-          key: TAGS_TAB_ID,
-          locale: NS,
-        }, TagsTitle)));
         safe('main', () => ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main',
           key: 'continuity',

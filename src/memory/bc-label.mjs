@@ -64,10 +64,26 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
   const confidenceOf = (score) => (score >= 0.5 ? 'normal' : score >= 0.4 ? 'low' : 'weak');
   async function prepare() {
     if (ready !== null) return ready;
-    const vectors = names.length > 0 ? await embed(names.map((concept) => labels[concept])) : [];
-    ready = { labels: names, vectors: vectors.map(normalizeVector) };
+    const prototypes = names.map((concept) => {
+      const value = labels[concept];
+      return (Array.isArray(value) ? value : String(value ?? '').split(';;'))
+        .map((item) => String(item).trim())
+        .filter(Boolean);
+    });
+    const flat = prototypes.flat();
+    const vectors = flat.length > 0 ? await embed(flat) : [];
+    let cursor = 0;
+    const grouped = prototypes.map((items) => {
+      const slice = vectors.slice(cursor, cursor + items.length).map(normalizeVector);
+      cursor += items.length;
+      return slice;
+    });
+    ready = { labels: names, vectors: grouped };
     return ready;
   }
+  const conceptScore = (vector, vectors) => vectors.length === 0
+    ? 0
+    : Math.max(...vectors.map((candidate) => cosine(vector, candidate)));
   function decide(scored, {
     topK = 3,
     minScore = 0.25,
@@ -184,7 +200,7 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
       }
       const scored = prepared.labels.map((concept, index) => ({
         concept,
-        score: cosine(vector, prepared.vectors[index]),
+        score: conceptScore(vector, prepared.vectors[index]),
       })).sort((a, b) => b.score - a.score);
       return decide(scored, { ...options, vector, chunks: 1 });
     },
@@ -202,7 +218,7 @@ export function createBLabeler({ embed = null, concepts = GENERIC_CONCEPTS, labe
         vectors.push(vector);
         for (let index = 0; index < prepared.labels.length; index += 1) {
           const concept = prepared.labels[index];
-          const score = cosine(vector, prepared.vectors[index]);
+          const score = conceptScore(vector, prepared.vectors[index]);
           if (!best.has(concept) || score > best.get(concept)) best.set(concept, score);
         }
       }

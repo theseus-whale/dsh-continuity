@@ -1,10 +1,25 @@
 {
-  "name": "dsh-continuity",
-  "version": "4.12.11",
-  "description": "Band-controlled compaction with session-scoped pointer indexes, persona-scoped A/B/C/K memory, verifiable pass receipts, and read-only retrieval for DeepSeek Harness",
+  "name": "@theseus-whale/dsh-continuity",
+  "version": "5.0.0",
+  "description": "Continuity host core with default-off turn-ping coverage, bounded raw retrieval, and DSH fold/session adapters",
   "type": "module",
   "license": "MIT",
+  "author": "theseus-whale",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theseus-whale/dsh-continuity.git"
+  },
+  "homepage": "https://github.com/theseus-whale/dsh-continuity#readme",
+  "bugs": {
+    "url": "https://github.com/theseus-whale/dsh-continuity/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./src/index.mjs",
+  "bin": {
+    "dsh-continuity": "bin/continuity-migrate.mjs"
+  },
   "exports": {
     ".": "./src/index.mjs",
     "./engine": "./src/engine.mjs",
@@ -59,8 +74,10 @@
     "./memory/extraction-provider": "./src/memory/extraction-provider.mjs",
     "./memory/extraction-composite": "./src/memory/extraction-composite.mjs",
     "./memory/extraction-pre-step": "./src/memory/extraction-pre-step.mjs",
-    "./peer": "./src/peer.mjs",
-    "./peer-tool": "./src/peer-tool.mjs"
+    "./read-seq-range-tool": "./src/turn-ping/read-tool-plugin.mjs",
+    "./rules-lifecycle": "./src/rules-lifecycle.mjs",
+    "./read-raw-chunk-tool": "./src/fullseed/read-raw-chunk-plugin.mjs",
+    "./raw-index": "./src/turn-ping/raw-index.mjs"
   },
   "files": [
     "src",
@@ -70,8 +87,10 @@
     "icon.svg",
     "README.md",
     "RELEASE-NOTES.md",
-    "bin",
-    "models",
+    "LICENSE",
+    "MANIFEST-v5.json",
+    "!docs/archive",
+    "!**/*.bak*",
     "templates/rules-safe.md",
     "templates/cmap.md",
     "templates/keywords.md",
@@ -80,9 +99,11 @@
     "templates/concepts.md",
     "templates/rebuild.md",
     "docs/*.md",
-    "guides",
     "PANEL.md",
-    "INSTALL.md"
+    "INSTALL.md",
+    "bin/fullseed-run.mjs",
+    "bin/fullseed-repair.mjs",
+    "bin/continuity-migrate.mjs"
   ],
   "dsh": {
     "bundle": {
@@ -99,21 +120,58 @@
     }
   },
   "scripts": {
-    "test": "node test/policy.test.mjs && node test/provenance.test.mjs && node test/range.test.mjs && node test/session-log.test.mjs && node test/tool-preview.test.mjs && node test/stats.test.mjs && node test/threads.test.mjs && node test/tags.test.mjs && node test/tag-reject.test.mjs && node test/tag-detect.test.mjs && node test/user-turn.test.mjs && node test/save-start.test.mjs && node test/backfill.test.mjs && node test/migrate.test.mjs && node test/dispatch-probe.test.mjs && node test/t0.test.mjs && node test/topic.test.mjs && node test/inject-policy.test.mjs && node test/tag-confirm.test.mjs && node test/recheck.test.mjs && node test/tag-maintenance.test.mjs && node test/facets.test.mjs && node test/recall-cue.test.mjs && node test/recall-tool.test.mjs && node test/pointer-only.test.mjs && node test/bc-pre-step.test.mjs && node test/bc-store.test.mjs && node test/bc-recall.test.mjs && node test/special-keywords.test.mjs && node test/peer-smoke.test.mjs && node test/bc-panel-state.test.mjs && node test/recall-source-filter.test.mjs && node test/cmap-file.test.mjs && node test/recall-width.test.mjs && node test/bc-index-updater.test.mjs && node test/session-guard.test.mjs && node test/recall-exact.test.mjs && node test/mechanical-note.test.mjs",
-    "check": "node --check src/index.mjs && node --check src/engine.mjs && node --check src/range.mjs && node --check src/state.mjs && node --check src/session-log.mjs && node --check src/session-log-tool.mjs && node --check src/threads.mjs && node --check src/threads-store.mjs && node --check src/threads-backend.mjs && node --check src/threads-core.mjs && node --check src/threads-tool.mjs && node --check src/tags.mjs && node --check src/tags-store.mjs && node --check src/folds-store.mjs && node --check src/deleted-store.mjs && node --check src/backfill.mjs && node --check src/save-start.mjs && node --check src/user-turn.mjs && node --check src/tag-reject.mjs && node --check src/tag-detect.mjs && node --check src/tool-preview.mjs && node --check client.js && node --check src/tag-maintenance.mjs && node --check src/facets/schema.mjs && node --check src/facets/extract.mjs && node --check src/facets/index.mjs && node --check src/facets/scanner.mjs && node --check bin/facet-mvp.mjs && node --check src/facets/classifier.mjs && node --check src/facets/hybrid.mjs && node --check bin/facet-validate.mjs && node --check bin/facet-scan.mjs && node --check bin/facet-train.mjs && node --check src/facets/worker.mjs && node --check src/facets/service.mjs && node --check src/facets/random.mjs && node --check bin/facet-random-validate.mjs && node --check src/facets/sensitivity.mjs && node --check bin/facet-curve.mjs && node --check src/facets/panel.mjs && node --check src/facets/panel-state.mjs && node --check bin/facet-panel.mjs && node --check src/facets/load.mjs && node --check bin/facet-load.mjs && node --check src/facets/fold-plan.mjs && node --check bin/facet-fold.mjs && node --check src/facets/online-knn.mjs && node --check bin/facet-online-validate.mjs && node --check src/facets/linear-probe.mjs && node --check src/facets/mlp-probe.mjs && node --check src/facets/mlp-worker.mjs && node --check src/facets/mlp-service.mjs && node --check bin/facet-mlp-scan.mjs && node --check src/memory/event-log.mjs && node --check src/memory/bm25.mjs && node --check src/memory/summary-tree.mjs && node --check src/memory/vector-index.mjs && node --check src/memory/planner.mjs && node --check src/memory/tokenize.mjs && node --check bin/memory-build.mjs && node --check bin/memory-build-summary.mjs && node --check bin/memory-build-vector.mjs && node --check bin/memory-query.mjs && node --check bin/memory-eval.mjs && node --check bin/memory-bench.mjs && node --check bin/memory-scale.mjs && node --check bin/memory-dry-run.mjs && node --check bin/memory-loop-test.mjs && node --check bin/memory-replay-hints.mjs && node --check bin/memory-load-gate-replay.mjs && node --check bin/memory-closed-loop.mjs && node --check bin/memory-scenario-test.mjs && node --check bin/memory-event-alias-test.mjs && node --check src/memory/event-model.mjs && node --check src/memory/term-extractor.mjs && node --check src/memory/referent-ledger.mjs && node --check src/memory/event-summary-tree.mjs && node --check src/memory/calibration.mjs && node --check bin/memory-calibration.mjs && node --check src/memory/pre-turn.mjs && node --check bin/memory-pre-turn-harness.mjs && node --check src/memory/language-router.mjs && node --check src/memory/extraction-core.mjs && node --check src/memory/extraction-score.mjs && node --check src/memory/referent-candidates.mjs && node --check src/memory/structured-adapters.mjs && node --check src/memory/extraction-adapter.mjs && node --check bin/memory-extraction-bench.mjs && node --check bin/memory-user-loop.mjs && node --check src/recall-tool.mjs && node --check src/memory/bc-recall.mjs && node --check src/memory/bc-label.mjs && node --check src/memory/bc-pre-step.mjs && node --check src/memory/bc-store.mjs && node --check src/memory/bc-index.mjs && node --check src/memory/bc-shift.mjs && node --check src/memory/bc-panel-state.mjs && node --check src/memory/recall-cue.mjs && node --check bin/plugin-integrity.mjs && node --check src/peer.mjs && node --check src/peer-tool.mjs && node --check src/memory/special-keywords.mjs && node --check bin/bc-add-keywords.mjs && node --check bin/bc-ingest-index.mjs && node --check src/memory/cmap-file.mjs && node --check src/memory/bc-index-updater.mjs && node --check bin/eval-label-rules.mjs && node --check bin/relabel-dry-run.mjs && node -e \"import('./src/memory/relabel-migrate.mjs')\" && node --check src/recall-exact-tool.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:review": "node test/bc-calibration.test.mjs && node test/concept-propose-tool.test.mjs && node test/concept-trial-tool.test.mjs && node test/concept-quality.test.mjs && node test/memory-repair-tool.test.mjs && node test/bc-review-repair.test.mjs",
+    "check": "node --check src/index.mjs && node --check src/engine.mjs && node --check src/range.mjs && node --check src/state.mjs && node --check src/session-log.mjs && node --check src/session-log-tool.mjs && node --check src/threads.mjs && node --check src/threads-store.mjs && node --check src/threads-backend.mjs && node --check src/threads-core.mjs && node --check src/threads-tool.mjs && node --check src/tags.mjs && node --check src/tags-store.mjs && node --check src/folds-store.mjs && node --check src/deleted-store.mjs && node --check src/backfill.mjs && node --check src/save-start.mjs && node --check src/user-turn.mjs && node --check src/tag-reject.mjs && node --check src/tag-detect.mjs && node --check src/tool-preview.mjs && node --check client.js && node --check src/tag-maintenance.mjs && node --check src/facets/schema.mjs && node --check src/facets/extract.mjs && node --check src/facets/index.mjs && node --check src/facets/scanner.mjs && node --check bin/facet-mvp.mjs && node --check src/facets/classifier.mjs && node --check src/facets/hybrid.mjs && node --check bin/facet-validate.mjs && node --check bin/facet-scan.mjs && node --check bin/facet-train.mjs && node --check src/facets/worker.mjs && node --check src/facets/service.mjs && node --check src/facets/random.mjs && node --check bin/facet-random-validate.mjs && node --check src/facets/sensitivity.mjs && node --check bin/facet-curve.mjs && node --check src/facets/panel.mjs && node --check src/facets/panel-state.mjs && node --check bin/facet-panel.mjs && node --check src/facets/load.mjs && node --check bin/facet-load.mjs && node --check src/facets/fold-plan.mjs && node --check bin/facet-fold.mjs && node --check src/facets/online-knn.mjs && node --check bin/facet-online-validate.mjs && node --check src/facets/linear-probe.mjs && node --check src/facets/mlp-probe.mjs && node --check src/facets/mlp-worker.mjs && node --check src/facets/mlp-service.mjs && node --check bin/facet-mlp-scan.mjs && node --check src/memory/event-log.mjs && node --check src/memory/bm25.mjs && node --check src/memory/summary-tree.mjs && node --check src/memory/vector-index.mjs && node --check src/memory/planner.mjs && node --check src/memory/tokenize.mjs && node --check bin/memory-build.mjs && node --check bin/memory-build-summary.mjs && node --check bin/memory-build-vector.mjs && node --check bin/memory-query.mjs && node --check bin/memory-eval.mjs && node --check bin/memory-bench.mjs && node --check bin/memory-scale.mjs && node --check bin/memory-dry-run.mjs && node --check bin/memory-loop-test.mjs && node --check bin/memory-replay-hints.mjs && node --check bin/memory-load-gate-replay.mjs && node --check bin/memory-closed-loop.mjs && node --check bin/memory-scenario-test.mjs && node --check bin/memory-event-alias-test.mjs && node --check src/memory/event-model.mjs && node --check src/memory/term-extractor.mjs && node --check src/memory/referent-ledger.mjs && node --check src/memory/event-summary-tree.mjs && node --check src/memory/calibration.mjs && node --check bin/memory-calibration.mjs && node --check src/memory/pre-turn.mjs && node --check bin/memory-pre-turn-harness.mjs && node --check src/memory/language-router.mjs && node --check src/memory/extraction-core.mjs && node --check src/memory/extraction-score.mjs && node --check src/memory/referent-candidates.mjs && node --check src/memory/structured-adapters.mjs && node --check src/memory/extraction-adapter.mjs && node --check bin/memory-extraction-bench.mjs && node --check bin/memory-user-loop.mjs && node --check src/recall-tool.mjs && node --check src/memory/bc-recall.mjs && node --check src/memory/bc-label.mjs && node --check src/memory/bc-pre-step.mjs && node --check src/memory/bc-store.mjs && node --check src/memory/bc-index.mjs && node --check src/memory/bc-shift.mjs && node --check src/memory/bc-panel-state.mjs && node --check src/memory/recall-cue.mjs && node --check bin/plugin-integrity.mjs && node --check src/memory/special-keywords.mjs && node --check bin/bc-add-keywords.mjs && node --check bin/bc-ingest-index.mjs && node --check src/memory/cmap-file.mjs && node --check src/memory/bc-index-updater.mjs && node --check bin/eval-label-rules.mjs && node --check bin/relabel-dry-run.mjs && node -e \"import('./src/memory/relabel-migrate.mjs')\" && node --check src/recall-exact-tool.mjs",
+    "test:turn-ping": "node --test test/turn-ping-host.test.mjs",
+    "check:turn-ping": "node --check src/turn-ping/host.mjs && node --check src/turn-ping/storage.mjs && node --check src/turn-ping/read-tool.mjs && node --check src/engine.mjs && node --check src/index.mjs",
+    "test:backfill": "node --test test/backfill.test.mjs",
+    "check:backfill": "node --check src/turn-ping/backfill/audit.mjs && node --check src/turn-ping/backfill/staging.mjs && node --check src/turn-ping/backfill/runner.mjs && node --check src/turn-ping/backfill/watermark.mjs && node --check src/turn-ping/backfill/verify.mjs",
+    "test:coverage": "node --test test/coverage.test.mjs",
+    "check:coverage": "node --check src/turn-ping/coverage/audit.mjs && node --check src/turn-ping/coverage/planner.mjs && node --check src/turn-ping/coverage/journal.mjs && node --check src/turn-ping/coverage/staging.mjs && node --check src/turn-ping/coverage/runner.mjs && node --check src/turn-ping/coverage/watermark.mjs && node --check src/turn-ping/coverage/verify.mjs && node --check src/turn-ping/coverage/index.mjs",
+    "test:coverage-negative": "node --test test/coverage-negative.test.mjs",
+    "test:coverage-boundary": "node --test test/coverage-boundary.test.mjs",
+    "test:coverage-lifecycle": "node --test test/coverage-lifecycle.test.mjs",
+    "test:coverage-host-wire": "node --test test/coverage-host-wire.test.mjs",
+    "test:host-wire": "node --test test/coverage-host-wire.test.mjs",
+    "test:package-config": "node --test test/package-config.test.mjs",
+    "test:peer-pre-step": "node --test test/peer-pre-step.test.mjs",
+    "test:prestep-diagnostics": "node --test test/prestep-diagnostics.test.mjs",
+    "test:prestep-ttl": "node --test test/prestep-ttl.test.mjs",
+    "test:read-tool-inject": "node --test test/read-tool-inject.test.mjs",
+    "test:read-tool-preset": "node --test test/read-tool-preset.test.mjs",
+    "test:rules-lifecycle": "node --test test/rules-lifecycle.test.mjs",
+    "fullseed:run": "node bin/fullseed-run.mjs",
+    "fullseed:repair": "node bin/fullseed-repair.mjs",
+    "test:migration": "node --test test/migration-*.test.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "*",
-    "@deepseek-ai/dsh-agent": "*",
-    "@deepseek-ai/dsh-compaction": "*",
-    "@deepseek-ai/dsh-compaction-basic": "*",
-    "@deepseek-ai/dsh-llm": "*",
-    "@deepseek-ai/dsh-session": "*",
-    "@deepseek-ai/dsh-token-meter": "*",
-    "@deepseek-ai/dsh-tools": "*"
+    "@deepseek-ai/cordis": ">=4.1.0 <5",
+    "@deepseek-ai/dsh-agent": ">=0.2.2-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-compaction": ">=0.2.2-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-compaction-basic": ">=0.2.2-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-llm": ">=0.2.2-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-session": ">=0.2.2-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-token-meter": ">=0.2.2-rc.3 <0.3.0",
+    "@deepseek-ai/dsh-tools": ">=0.2.2-rc.3 <0.3.0"
   },
   "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-agent": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-compaction": {
+      "optional": true
+    },
     "@deepseek-ai/dsh-compaction-basic": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-llm": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-session": {
       "optional": true
     },
     "@deepseek-ai/dsh-token-meter": {
@@ -124,7 +182,8 @@
     }
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "npm": ">=11"
   },
   "keywords": [
     "dsh",

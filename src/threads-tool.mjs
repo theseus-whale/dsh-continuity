@@ -12,7 +12,6 @@ import { getThreadsBackend } from './threads-backend.mjs';
 import { makeApi, ThreadsCore } from './threads-core.mjs';
 import { markThreadsTool } from './state.mjs';
 import { loadFacetQuery } from './facets/load.mjs';
-import { createPeerTool } from './peer-tool.mjs';
 import { createRecallTool } from './recall-tool.mjs';
 
 export const name = 'dsh-continuity/threads-tool';
@@ -505,7 +504,8 @@ export function createThreadsTool({ sessionQuery, tokenMeter, getBackend = getTh
 }
 
 export function apply(ctx, config = {}) {
-  if (config?.safeMode !== true) {
+  const legacyAbcK = config?.legacyAbcK === true;
+  if (legacyAbcK && config?.safeMode !== true) {
     const tool = createThreadsTool({ sessionQuery: ctx.sessionQuery, tokenMeter: ctx.tokenMeter });
     ctx.effect(() => {
       const dispose = ctx.tools.register(tool);
@@ -513,10 +513,10 @@ export function apply(ctx, config = {}) {
       return dispose;
     });
   } else {
-    try { ctx.logger?.info?.('[dsh-continuity] safe mode: continuity/T tool not registered'); } catch { /* ignore */ }
+    try { ctx.logger?.info?.('[dsh-continuity] legacy continuity/recall disabled (5.0.0 runtime)'); } catch { /* ignore */ }
   }
-  const recallTool = createRecallTool({ sessionQuery: ctx.sessionQuery });
-  ctx.effect(() => ctx.tools.register(recallTool));
-  const peer = createPeerTool();
-  ctx.effect(() => ctx.tools.register(peer));
+  if (legacyAbcK) {
+    const recallTool = createRecallTool({ sessionQuery: ctx.sessionQuery });
+    ctx.effect(() => ctx.tools.register(recallTool));
+  }
 }

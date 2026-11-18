@@ -41,19 +41,42 @@ function isUsefulTerm(value) {
   return CJK.test(term) || term.length >= 3;
 }
 
+function topEntry(record) {
+  return Object.entries(record?.conceptScores ?? {})
+    .sort((a, b) => Number(b[1]) - Number(a[1]))[0] ?? ['', 0];
+}
+
 function topConcept(record) {
-  const scores = record?.conceptScores ?? {};
-  let best = '';
-  let bestScore = 0;
-  for (const [label, score] of Object.entries(scores)) {
-    if (Number(score) > bestScore) { best = label; bestScore = Number(score); }
-  }
-  return best;
+  return topEntry(record)[0];
+}
+
+function marginOf(record) {
+  if (Number.isFinite(Number(record?.scoreMargin))) return Number(record.scoreMargin);
+  const entries = Object.entries(record?.conceptScores ?? {})
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+  return Number(entries[0]?.[1] ?? 0) - Number(entries[1]?.[1] ?? 0);
 }
 
 function segmentFeatures(members, conceptLabels, newConcepts) {
   const size = Math.max(1, members.length);
-  const empty = members.filter((m) => Number(m.confidence ?? 0) === 0 || Object.keys(m.conceptScores ?? {}).length === 0).length;
+  const isWeak = (m) => Number(m.confidence ?? 0) === 0 || Object.keys(m.conceptScores ?? {}).length === 0;
+  const empty = members.filter(isWeak).length;
+  let emptyTail = 0;
+  for (let i = members.length - 1; i >= 0 && isWeak(members[i]); i -= 1) emptyTail += 1;
+  let uncertainTail = 0;
+  for (let i = members.length - 1; i >= 0; i -= 1) {
+    if (marginOf(members[i]) < 0.03) uncertainTail += 1;
+    else break;
+  }
+  const prior = members.at(-2);
+  const last = members.at(-1);
+  const priorTop = Number(topEntry(prior)[1]);
+  const lastTop = Number(topEntry(last)[1]);
+  const sharpDrop = priorTop >= 0.55 && lastTop > 0 && lastTop < 0.4;
+  const priorLabel = topConcept(prior);
+  const lastLabel = topConcept(last);
+  const topicShift = Boolean(priorLabel && lastLabel && priorLabel !== lastLabel
+    && priorTop >= 0.4 && lastTop >= 0.4);
   const bleed = members.filter((m) => newConcepts.has(topConcept(m))).length;
   const vocab = new Set(conceptLabels.map(termKey));
   const newTermTurns = members.filter((m) => {
@@ -62,6 +85,10 @@ function segmentFeatures(members, conceptLabels, newConcepts) {
   }).length;
   return {
     emptyRate: empty / size,
+    emptyTail,
+    uncertainTail,
+    sharpDrop,
+    topicShift,
     bleedRate: bleed / size,
     newTermRate: newTermTurns / size,
   };
@@ -115,6 +142,31 @@ function reviewPaths(indexFile) {
 }
 
 /**
+ * Review is a repair turn, not a report. `memory_repair` is the write side;
+ * a reply without a write (or an explicit blocked reason) is not a pass.
+ */
+function reviewDirective(start, end, flags, details = {}) {
+  const aLabels = Array.isArray(details.aLabels) ? details.aLabels : [];
+  const recentTop = Array.isArray(details.recentTop) ? details.recentTop : [];
+  const emptyTurns = Array.isArray(details.emptyTurns) ? details.emptyTurns : [];
+  return `[continuity:review] 快速校验 turn ${start}-${end}（${flags.join(' / ') || 'weak'}）。\n`
+    + `现有 A：${aLabels.length > 0 ? aLabels.join(' / ') : '（空）'}\n`
+    + `最近 top：${recentTop.length > 0 ? recentTop.join('；') : '（无）'}\n`
+    + `空/低 turns：${emptyTurns.length > 0 ? emptyTurns.join(',') : '（无）'}\n`
+    + `先诊断，不要直接新建。按顺序判断：\n`
+    + `1 旧 A 在旧段仍成立，且新段明显不同 -> concept_add 1 条新 A，旧 A 保留。\n`
+    + `2 旧 A 在旧段也不成立，或新段与旧 A 大面积重叠 -> concept_update 修旧 A，或 concept_merge；不要新建。\n`
+    + `3 证据不足，或这段本身没有可分离话题 -> review: abstain <原因>；不要为了覆盖硬建 A。\n`
+    + `同域前缀默认 update/merge；一次 review 最多 add 1 条 A；多原型用 ";;" 分隔。\n`
+    + `先用 concept_propose 看目标 turn 的独特词与现有 A；再写 2-3 个候选原型。\n`
+    + `新建/重写前逐个 concept_trial(label, description, startTurn, endTurn)；passed=false 就 abstain 或改候选，passed=true 才 memory_repair。\n`
+    + `memory_repair 也传同一个 startTurn/endTurn；质量门现在按 target + held-out + 兄弟 A 验收。\n`
+    + `memory_repair 改 A 后会自动 relabel 并验收；quality.passed=false 表示已回退或分不开。\n`
+    + `修完只回：review: fixed <实际改了什么；失败就写 blocked/blocked-relabel>。\n`
+    + `不要展开、不要另开 turn；回完继续用户请求。`;
+}
+
+/**
  * Cheap per-turn gate. No kmeans, no embeddings.
  * Returns a short one-shot review directive only when the recent window is
  * clearly weak, and at most once per cooldown turns.
@@ -133,22 +185,49 @@ export function buildRecentReview({ indexFile, conceptsFile = null, records = []
     : new Set();
   const features = segmentFeatures(recent, concepts, newConcepts);
   const bleedTurns = Math.round(features.bleedRate * recent.length);
-  const strong = features.emptyRate >= 0.3 || (newConcepts.size > 0 && bleedTurns >= 2);
+  const urgent = features.emptyTail >= 4 || features.uncertainTail >= 2 || features.sharpDrop;
+  const strong = features.emptyRate >= 0.3 || urgent || features.topicShift
+    || (newConcepts.size > 0 && bleedTurns >= 2);
   if (!strong) return null;
 
   const reviewState = readJson(reviewPaths(indexFile).stateFile, null);
+  const signature = recent.slice(-8).map((row) => {
+    const [label, score] = topEntry(row);
+    return `${row.turn}:${label}:${Number(score).toFixed(3)}:${marginOf(row).toFixed(3)}`;
+  }).join('|');
+  // Same unresolved window, same evidence: don't ask the same question again.
+  if (reviewState?.signature === signature) return null;
   const lastReviewTurn = Number(reviewState?.lastTurn ?? 0);
-  if (Number.isFinite(lastReviewTurn) && lastTurn - lastReviewTurn < cooldown) return null;
+  // A short unstable tail is urgent, but still has a floor so an unresolved
+  // review is not repeated every single turn.
+  const effectiveCooldown = urgent ? Math.min(4, cooldown) : cooldown;
+  if (Number.isFinite(lastReviewTurn) && lastTurn - lastReviewTurn < effectiveCooldown) return null;
 
   const flags = [];
   if (features.emptyRate >= 0.3) flags.push(`empty ${features.emptyRate.toFixed(2)}`);
+  if (features.emptyTail >= 4) flags.push(`empty-tail ${features.emptyTail}`);
+  if (features.uncertainTail >= 2) flags.push(`uncertain-tail ${features.uncertainTail}`);
+  if (features.sharpDrop) flags.push('sharp-drop');
+  if (features.topicShift) flags.push('topic-shift');
   if (bleedTurns >= 2) flags.push(`bleed ${bleedTurns}轮`);
   const start = recent[0]?.turn ?? lastTurn;
-  const text = `[continuity:review] 快速校验 turn ${start}-${lastTurn}（${flags.join(' / ')}）。\n`
-    + `只回答三行：1 实际在做什么；2 top label 是漏标还是错标（对就写对）；3 最小修改（追加/降权/不修）。\n`
-    + `不展开、不另开 turn；三行后立刻继续用户请求。`;
-  writeJson(reviewPaths(indexFile).stateFile, { lastTurn, at: new Date().toISOString() });
-  return { text, range: [start, lastTurn], emptyRate: features.emptyRate, bleedTurns };
+  const isWeak = (row) => Number(row?.confidence ?? 0) === 0 || Object.keys(row?.conceptScores ?? {}).length === 0;
+  const recentTop = recent.slice(-8).map((row) => {
+    const [label, score] = topEntry(row);
+    return `${row.turn}:${label || '-'}:${Number(score).toFixed(2)}/m${marginOf(row).toFixed(2)}`;
+  });
+  const emptyTurns = recent.filter(isWeak).slice(-8).map((row) => row.turn);
+  const text = reviewDirective(start, lastTurn, flags, { aLabels: concepts, recentTop, emptyTurns });
+  writeJson(reviewPaths(indexFile).stateFile, { lastTurn, at: new Date().toISOString(), signature });
+  return {
+    text,
+    range: [start, lastTurn],
+    emptyRate: features.emptyRate,
+    emptyTail: features.emptyTail,
+    uncertainTail: features.uncertainTail,
+    sharpDrop: features.sharpDrop,
+    bleedTurns,
+  };
 }
 
 const AUDIT_RUNNING_TTL_MS = 15 * 60 * 1000;
@@ -364,9 +443,7 @@ export async function runAudit({ indexFile, conceptsFile } = {}) {
     if (strongest.emptyRate >= 0.3) flags.push(`empty ${strongest.emptyRate.toFixed(2)}`);
     if (strongest.bleedRate >= 0.15) flags.push(`bleed ${strongest.bleedRate.toFixed(2)}`);
     if (strongest.newTermRate >= 0.2) flags.push(`newTerm ${strongest.newTermRate.toFixed(2)}`);
-    const text = `[continuity:review] 快速校验 turn ${strongest.start}-${strongest.end}（${flags.join(' / ') || 'weak'}）。\n`
-      + `只回答三行：1 实际在做什么；2 top label 是漏标还是错标（对就写对）；3 最小修改（追加/降权/不修）。\n`
-      + `不展开、不另开 turn；三行后立刻继续用户请求。`;
+    const text = reviewDirective(strongest.start, strongest.end, flags, { aLabels: concepts });
     writeJson(auditPaths(indexFile).pendingFile, { at, text, review: true, range: [strongest.start, strongest.end] });
   }
   writeJson(auditPaths(indexFile).stateFile, {
