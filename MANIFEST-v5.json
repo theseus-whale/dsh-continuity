@@ -1,6 +1,6 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "files": [
     {
       "path": "INSTALL.md",
@@ -24,8 +24,8 @@
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 2530,
-      "sha256": "3baa569d974521e70abc8f329351229676bdb6c5c25bb14c2739c0902227ea45"
+      "bytes": 3656,
+      "sha256": "0df97eea53f83e245e84636454babf767438373a6eb2bc616c9369cd711d5e82"
     },
     {
       "path": "bin/continuity-migrate.mjs",
@@ -44,13 +44,13 @@
     },
     {
       "path": "client.js",
-      "bytes": 25882,
-      "sha256": "fbc48bd19d58a64fcbd3e89bb24d813430af7ed1ebbe166aafafae46f345900e"
+      "bytes": 26150,
+      "sha256": "994f7f9c21ef927755e865e0cff412b03fd47400fac921c6862b435437b7ae8e"
     },
     {
       "path": "cordis.patch.yml",
-      "bytes": 24976,
-      "sha256": "93b9333535a912ac0e9270c8166af7841fee0fe60bd9cd582e30f702435441f9"
+      "bytes": 25169,
+      "sha256": "d98eedcec7dba28dc214d039fb9768b65a0b749d3fd4ffb00eefc776305f0571"
     },
     {
       "path": "docs/API-NOTES.md",
@@ -99,8 +99,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 12760,
-      "sha256": "0c1d48281b722d76bede9197928acafde02908b5ce56cc5f20e46cd354e8c35a"
+      "bytes": 12830,
+      "sha256": "d18a00983727e832825d70e6f035e1ad294dad26b02685b55fd4696a0dec86c4"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -404,8 +404,8 @@
     },
     {
       "path": "src/index.mjs",
-      "bytes": 43111,
-      "sha256": "bae66c03bf5a582b18f204b06b2bb7bf8413a14cd7374d92b8bddac9bd88633d"
+      "bytes": 43236,
+      "sha256": "a47867fef12a590663eb7434adaad6d4f05d189ced6d8f4752b431f546bf58fb"
     },
     {
       "path": "src/inject-policy.mjs",
@@ -1013,6 +1013,11 @@
       "sha256": "3f40a18639860648880d71f2387a72580c08171decfca4f116a5b2c433a9ad5e"
     },
     {
+      "path": "src/turn-ping/memory-recall-tool.mjs",
+      "bytes": 2786,
+      "sha256": "40f2abef6b6ec6a2ce59cb80013571fd8df1fc936ccc5844569f46015b103ca2"
+    },
+    {
       "path": "src/turn-ping/ping.mjs",
       "bytes": 2648,
       "sha256": "758f8a9cfee62a6b575f967d4cf46456ca38b2aa4e576a44aac9167c76ad548a"
@@ -1039,8 +1044,8 @@
     },
     {
       "path": "src/turn-ping/raw-index.mjs",
-      "bytes": 8370,
-      "sha256": "8796aa4687edc0bafbbaa966f29873fd07a540a6d63750a6335c713f62fa4f20"
+      "bytes": 8472,
+      "sha256": "7c4b44abb3330a866f582193564601e63148371f1bf251d28d5683a47674e3a6"
     },
     {
       "path": "src/turn-ping/raw-read.mjs",
@@ -1079,8 +1084,8 @@
     },
     {
       "path": "src/turn-ping/source-view.mjs",
-      "bytes": 2696,
-      "sha256": "c8489ed3a4880e00cc5ab34c68ae6a64d160954c6ab4702936c1bda16cd2f575"
+      "bytes": 2892,
+      "sha256": "e3e3764f77f7219b3939d6e1b02d404a635427ff564e737335758c54fcb6ceda"
     },
     {
       "path": "src/turn-ping/storage.mjs",

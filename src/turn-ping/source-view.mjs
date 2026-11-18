@@ -41,6 +41,10 @@ export function buildSourceView(events, config) {
       continue;
     }
     const raw = eventText(event);
+    if (event.type === 'tool/result' && /^\[(?:记忆共振|memory_recall)\]/.test(raw.trim())) {
+      excluded.push({ type: event.type, reason: 'derived-memory-recall' });
+      continue;
+    }
     if (!raw.trim()) continue;
     const cap = event.type === 'user/message' ? caps.userChars : event.type === 'assistant/message' ? caps.assistantChars : caps.toolChars;
     const clipped = clipHeadTail(raw, cap);

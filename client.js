@@ -7,7 +7,7 @@
  * The data comes from the Host route registered by `src/index.mjs`.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-continuity',
+  id: '@theseus-whale/dsh-continuity',
   factory(require) {
     // 宿主没给 react（或加载器变了）时安静退出：宁可没有 UI，也不能让 renderer 起不来。
     let React = null;
@@ -226,6 +226,10 @@ window.__ModuleLoader__.load({
     };
 
     const TOOL_NOTES = {
+      memory_recall: {
+        note: '用自己的话主动去回忆；与自动 memory_cue 共用 Xenova 语义检索，返回相关摘要和原文指针。',
+        params: 'query 必填；不是 BM25、精确匹配或 seq 坐标读取。',
+      },
       read_seq_range: {
         note: '按当前会话的 seq 范围读取原始对话，用来核对旧消息和精确措辞。',
         params: 'fromSeq、toSeq（起止都包含）；返回有字节上限，截断时必须明确标记。',

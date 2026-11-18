@@ -1,4 +1,22 @@
-# Release notes — 5.0.0 candidate
+# Release notes — 5.0.1
+
+## Active semantic recall
+
+- Add `memory_recall({ query })` to both Continuity presets, using the same `beforeAnswer` memory-resonance path as automatic `memory_cue`.
+- Respect current-session enablement and cutoff; report disabled and no-hit states without fabricating memories.
+- Exclude derived recall tool results from future summary source views and raw fallback indexing.
+- Include `memory_recall` in the panel tool catalog with its purpose and `query` parameter notes.
+- No BM25, RRF, exact-search substitution, or second retrieval index.
+
+## Scoped UI repair
+
+- Keep the panel state route stable at `/dsh-continuity/state.json` for scoped and unscoped package names.
+- Treat unavailable Host `locale` and `slots` injections as diagnostic false values instead of failing the current-state route.
+- Quote every scoped `name` scalar in `cordis.patch.yml` so the bundle passes YAML parsing.
+- Register the web client factory as `@theseus-whale/dsh-continuity`, preventing collision with the legacy `dsh-continuity` factory during cold startup.
+- No memory, fold, migration, model, or default-policy changes.
+
+## 5.0.0 architecture
 
 ## Current architecture
 

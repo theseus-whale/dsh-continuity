@@ -625,8 +625,8 @@ export async function buildCurrentState(ctx, requestedSessionId = null, runtime 
     agents: Boolean(ctx?.get?.('agents')),
     sessionQuery: Boolean(ctx?.get?.('sessionQuery')),
     sessionProjections: Boolean(ctx?.get?.('sessionProjections')),
-    locale: Boolean(ctx?.locale),
-    slots: Boolean(ctx?.slots),
+    locale: (() => { try { return Boolean(ctx?.locale); } catch { return false; } })(),
+    slots: (() => { try { return Boolean(ctx?.slots); } catch { return false; } })(),
   };
   return current;
 }
@@ -844,7 +844,7 @@ async function probeSessionQuery(ctx, cache) {
  * agents see `session_log`, and which see the convention section. Cached: the
  * prompt assembly is the expensive part and the panel polls every few seconds.
  */
-const PANEL_TOOL_NAMES = new Set(['read_seq_range', 'read_raw_chunk', 'session_asset', 'child_asset', 'ptc_handoff']);
+const PANEL_TOOL_NAMES = new Set(['memory_recall', 'read_seq_range', 'read_raw_chunk', 'session_asset', 'child_asset', 'ptc_handoff']);
 
 async function inspectScopes(ctx, cache) {
   if (Date.now() - cache.at < 15_000) return cache.value;

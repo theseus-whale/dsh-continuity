@@ -1,6 +1,6 @@
 {
   "name": "@theseus-whale/dsh-continuity",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Continuity host core with default-off turn-ping coverage, bounded raw retrieval, and DSH fold/session adapters",
   "type": "module",
   "license": "MIT",
@@ -77,6 +77,7 @@
     "./read-seq-range-tool": "./src/turn-ping/read-tool-plugin.mjs",
     "./rules-lifecycle": "./src/rules-lifecycle.mjs",
     "./read-raw-chunk-tool": "./src/fullseed/read-raw-chunk-plugin.mjs",
+    "./memory-recall-tool": "./src/turn-ping/memory-recall-tool.mjs",
     "./raw-index": "./src/turn-ping/raw-index.mjs"
   },
   "files": [

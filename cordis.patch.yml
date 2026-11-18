@@ -45,7 +45,7 @@
             autoActivate: false
         panel:
           enabled: true
-          path: /@theseus-whale/dsh-continuity/state.json
+          path: /dsh-continuity/state.json
         projection:
           provider: deepseek-official
           model: deepseek-flash
@@ -111,6 +111,8 @@
             name: '@theseus-whale/dsh-continuity/read-seq-range-tool'
           - id: read-raw-chunk-tool
             name: '@theseus-whale/dsh-continuity/read-raw-chunk-tool'
+          - id: memory-recall-tool
+            name: '@theseus-whale/dsh-continuity/memory-recall-tool'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal
@@ -323,6 +325,8 @@
             name: '@theseus-whale/dsh-continuity/read-seq-range-tool'
           - id: read-raw-chunk-tool
             name: '@theseus-whale/dsh-continuity/read-raw-chunk-tool'
+          - id: memory-recall-tool
+            name: '@theseus-whale/dsh-continuity/memory-recall-tool'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal

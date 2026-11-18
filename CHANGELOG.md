@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.0.1
+
+- Add `memory_recall({ query })` to both Continuity presets using the existing memory-resonance retrieval path
+- Exclude derived recall tool results from future summary source views and raw fallback indexing
+- Fix scoped panel routing, Host diagnostic access without `locale`/`slots`, YAML scoped names, and client factory registration
+- Show `memory_recall` and its query parameter in the panel tool catalog
+
 ## 4.9.110
 
 - `audit.lock` carries an owner token; release only deletes its own lock

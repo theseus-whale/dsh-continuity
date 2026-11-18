@@ -16,6 +16,7 @@ export function rawIndexRecord(sessionId, event) {
   const sourceKind = userSourceKind(event);
   if (type === 'user/message' && !['user', 'peer'].includes(sourceKind)) return null;
   const text = eventText(event);
+  if (type === 'tool/result' && /^\[(?:记忆共振|memory_recall)\]/.test(text.trim())) return null;
   if (!text.trim()) return null;
   return {
     version: RAW_INDEX_VERSION,
