@@ -42,6 +42,13 @@ export const DEFAULT_CONFIG = Object.freeze({
     maxSeqRefsPerFacet: 8,
     maxPingUtf8Bytes: 16384,
   }),
+  autoRecall: Object.freeze({
+    mode: 'quiet',
+    tau: 0.55,
+    delta: 0.04,
+    noveltyThreshold: 0.75,
+    historyWindowMs: 1_800_000,
+  }),
   raw: Object.freeze({
     maxReadsPerAnswer: 2,
     maxBytesPerRead: 4096,

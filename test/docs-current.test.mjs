@@ -32,7 +32,7 @@ test('README names Node/host requirements without inventing a support matrix', (
   assert.ok(text.includes('Node.js >=22'));
   assert.ok(text.includes('tested baseline'));
   assert.ok(text.includes('not a claim of support for every future Host'));
-  assert.ok(text.includes('theseus-whale-dsh-continuity-5.0.2.tgz'));
+  assert.ok(text.includes('theseus-whale-dsh-continuity-5.0.3.tgz'));
 });
 
 test('current docs contain no Node CLI, direct credential path, or old architecture', () => {

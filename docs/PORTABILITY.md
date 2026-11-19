@@ -24,6 +24,13 @@ Local-only example; never publish real IDs or model directories:
     "allowDefaultEnable": true,
     "allowLiveInjection": true
   },
+  "autoRecall": {
+    "mode": "quiet",
+    "tau": 0.55,
+    "delta": 0.04,
+    "noveltyThreshold": 0.75,
+    "historyWindowMs": 1800000
+  },
   "provider": "deepseek-official",
   "model": "deepseek-flash",
   "embeddingModel": "<absolute-local-model-directory>",

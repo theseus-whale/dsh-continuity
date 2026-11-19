@@ -1,4 +1,4 @@
-# @theseus-whale/dsh-continuity 5.0.2
+# @theseus-whale/dsh-continuity 5.0.3
 
 DSH Host 内的连续性插件。公开默认均为 **off**；只有本地 overlay 中明确列出的会话才会启用记忆共振、轮末归档和统一折叠。
 
@@ -36,6 +36,10 @@ unifiedFold:
 
 本地 overlay 缺失即禁用，格式错误会报告错误；启用时必须提供明确的 `sessionIds`，不会自动扩展到全部会话。
 
+## Quiet automatic recall
+
+自动共振默认使用 `quiet`：只有回溯意图明确的输入才检索；当前可见或近期推过的记忆会被去重；候选按向量新颖度动态筛选，不固定为一条。`autoRecall.mode` 支持 `quiet / off / legacy`，主动 `memory_recall` 不受影响。决策写入会话本地 `cue-decisions.jsonl`。
+
 ## Requirements and verified Host
 
 ```text
@@ -48,7 +52,7 @@ Verified against the installed DSH desktop runtime `0.2.2-rc.3`, Cordis `4.1.0`,
 ## Install
 
 ```text
-npm install <path-to-theseus-whale-dsh-continuity-5.0.2.tgz>
+npm install <path-to-theseus-whale-dsh-continuity-5.0.3.tgz>
 ```
 
 安装、备份、overlay、重建与回滚步骤见 [INSTALL.md](INSTALL.md)。

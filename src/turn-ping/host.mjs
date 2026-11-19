@@ -13,6 +13,7 @@ import { queryIndex } from '../fullseed/query.mjs';
 import { buildChunkPing } from '../fullseed/ping.mjs';
 import { createRawIndex, buildRawIndexPing, RAW_INDEX_VERSION } from './raw-index.mjs';
 import { groupTurnEvents } from './turn-groups.mjs';
+import { extractVisibleMemoryIds, markCueHistory, memoryIdentity, readQuietConfig, recentCueIds, recordCueDecision, selectNovelHits } from './quiet.mjs';
 
 const tokenText = (event) => eventText(event).trim();
 
@@ -97,11 +98,26 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
     return { enabled: true, ...result };
   }
 
-  async function beforeAnswer({ sessionId, query, cutoff, turns, events }) {
+  async function beforeAnswer({ sessionId, query, cutoff, turns, events, quiet = false, visibleMemoryIds = new Set() }) {
     if (!config.enabled || !allowedSession(sessionId)) return { enabled: false, ping: null, H: 0 };
     const empty = { text: '', bytes: 0, sha256: sha256(''), clipped: false, omittedHigh: 0 };
+    const quietConfig = readQuietConfig(config);
+    const historyRoot = turnPingRoot({ home, sessionId });
+    const referenceIds = quiet ? new Set([...visibleMemoryIds, ...recentCueIds(historyRoot, Date.now(), quietConfig.historyWindowMs)]) : new Set();
+    const finishQuiet = ({ ping, candidates }) => {
+      if (!quiet) return [];
+      const shownIds = ping?.text ? [...extractVisibleMemoryIds(ping.text)] : [];
+      recordCueDecision(historyRoot, {
+        mode: quietConfig.mode, query, injected: Boolean(ping?.text),
+        candidates: candidates.map(hit => ({ id: memoryIdentity(hit.summary ?? hit), score: hit.score })),
+        referenceIds: [...referenceIds], acceptedIds: shownIds,
+        reason: candidates.length === 0 ? 'no-candidate' : shownIds.length === 0 ? 'duplicate-or-not-novel' : 'accepted',
+      });
+      if (shownIds.length) markCueHistory(historyRoot, shownIds);
+      return shownIds;
+    };
     const rawFallback = () => {
-      if (config.rawIndex?.enabled === false) return null;
+      if (quiet || config.rawIndex?.enabled === false) return null;
       const hits = rawIndexFor(sessionId).search(query, { beforeSeq: cutoff });
       const ping = buildRawIndexPing(hits);
       if (!ping) return null;
@@ -121,10 +137,17 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
         const index = { summaries: eligible.map((row) => row.summary), vectors: eligible.map((row) => row.vector) };
         const scored = await queryIndex({ index, embedder, query, limit: config.retrieval.maxCandidatesPerFacet });
         const top = scored[0]?.score ?? 0;
-        const threshold = Math.max(Number(config.retrieval.tau ?? 0), top - Number(config.retrieval.delta ?? 0));
-        const high = scored.filter((row) => row.score >= threshold);
+        const tau = quiet ? quietConfig.tau : Number(config.retrieval.tau ?? 0);
+        const delta = quiet ? quietConfig.delta : Number(config.retrieval.delta ?? 0);
+        const threshold = Math.max(tau, top - delta);
+        let high = scored.filter((row) => row.score >= threshold);
+        if (quiet) {
+          const references = eligible.filter(row => referenceIds.has(memoryIdentity(row.summary)) || referenceIds.has(row.summary.turnId)).map(row => row.vector);
+          high = selectNovelHits(high.filter(row => !referenceIds.has(memoryIdentity(row.summary)) && !referenceIds.has(row.summary.turnId)), references, quietConfig.noveltyThreshold);
+        }
         const ping = buildChunkPing({ summaries: eligible.map((row) => row.summary), scored: high, cutoff, config });
-        const result = { enabled: true, retrieval: { chunks: high, cutoff, top, threshold }, ping, H: high.length, indexVersion: active.identity, checkpoint: active.checkpoint };
+        const shownIds = finishQuiet({ ping, candidates: high });
+        const result = { enabled: true, retrieval: { chunks: high, cutoff, top, threshold, quiet }, ping, H: high.length, shownIds, indexVersion: active.identity, checkpoint: active.checkpoint };
         return high.length > 0 ? result : (rawFallback() ?? result);
       }
     }
@@ -133,14 +156,22 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
     if (summaries.length === 0) return rawFallback() ?? { enabled: true, ping: empty, H: 0 };
     const records = await storage.vectors();
     if (records.length === 0) return rawFallback() ?? { enabled: true, ping: empty, H: 0 };
-    const index = createVectorIndex({ config, embedder, records });
-    const retrieval = await retrieve({ query, cutoff, index, config });
+    const activeConfig = quiet ? { ...config, retrieval: { ...config.retrieval, tau: quietConfig.tau, delta: quietConfig.delta } } : config;
+    const index = createVectorIndex({ config: activeConfig, embedder, records });
+    const retrieval = await retrieve({
+      query, cutoff, index, config: activeConfig,
+      ...(quiet ? { quiet: {
+        referenceIds, referenceVectors: records.filter(record => referenceIds.has(record.turnId)).map(record => record.vector),
+        noveltyThreshold: quietConfig.noveltyThreshold,
+      } } : {}),
+    });
     const summaryByTurn = new Map(summaries.filter((summary) => summary.availableCutoff <= cutoff).map((summary) => [summary.turnId, summary]));
     const turnList = turns ?? buildTurnsFromEvents(sessionId, events ?? []);
-    const ping = buildPing({ summaryByTurn, retrieval, turns: turnList, config });
+    const ping = buildPing({ summaryByTurn, retrieval, turns: turnList, config: activeConfig });
     const H = retrieval.facets.reduce((sum, facet) => sum + facet.H, 0);
+    const shownIds = finishQuiet({ ping, candidates: retrieval.facets.flatMap(facet => facet.high) });
     await storage.appendLedger({ at: new Date().toISOString(), kind: 'retrieval', querySha256: sha256(String(query)), cutoff, H, pingBytes: ping.bytes });
-    const result = { enabled: true, retrieval, ping, H };
+    const result = { enabled: true, retrieval, ping, H, shownIds };
     return H > 0 ? result : (rawFallback() ?? result);
   }
 

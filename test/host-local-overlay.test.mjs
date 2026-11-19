@@ -8,7 +8,7 @@ import { installTurnPing } from '../src/turn-ping/install.mjs';
 import { installTurnPingPreStep } from '../src/turn-ping/pre-step.mjs';
 
 const publicConfig = { enabled: false, mode: 'shadow', localConfig: './local/memory-resonance.json' };
-const local = { enabled: true, mode: 'opt-in', boundaries: { allowDefaultEnable: true, allowLiveInjection: true }, provider: 'local-provider', model: 'local-model', embeddingModel: './models/Xenova/bge-small-zh-v1.5', sessionIds: ['session-local-a', 'session-local-b'] };
+const local = { enabled: true, mode: 'opt-in', boundaries: { allowDefaultEnable: true, allowLiveInjection: true }, autoRecall: { mode: 'legacy' }, provider: 'local-provider', model: 'local-model', embeddingModel: './models/Xenova/bge-small-zh-v1.5', sessionIds: ['session-local-a', 'session-local-b'] };
 function overlayHome() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'host-overlay-'));
   fs.mkdirSync(path.join(home, 'local'), { recursive: true });

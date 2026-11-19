@@ -1,6 +1,6 @@
 {
   "name": "@theseus-whale/dsh-continuity",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "description": "Continuity host core with default-off turn-ping coverage, bounded raw retrieval, and DSH fold/session adapters",
   "type": "module",
   "license": "MIT",

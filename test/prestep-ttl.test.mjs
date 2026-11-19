@@ -55,7 +55,7 @@ function makePreStep({ session, answer, debugPath }) {
   const ctx = { on: (name, fn) => listeners.set(name, fn) };
   installTurnPingPreStep({
     ctx,
-    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, diagnostics: { enabled: true } },
+    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, autoRecall: { mode: 'legacy' }, diagnostics: { enabled: true } },
     beforeAnswer: typeof answer === 'function' ? answer : async () => answer,
     contextMessage: () => ({ role: 'user', content: [{ type: 'text', text: 'unused' }], source: { kind: 'runtime-context' } }),
     diagnosticPath: debugPath,

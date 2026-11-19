@@ -21,7 +21,7 @@ export async function queryIndex({ index, embedder, query, limit = 8 }) {
     let a = 0;
     let b = 0;
     for (let j = 0; j < q.length; j += 1) { dot += q[j] * vector[j]; a += q[j] * q[j]; b += vector[j] * vector[j]; }
-    return { summary: index.summaries[i], score: dot / Math.sqrt(a * b || 1) };
+    return { summary: index.summaries[i], score: dot / Math.sqrt(a * b || 1), vector: Array.from(vector) };
   }).sort((left, right) => right.score - left.score).slice(0, limit);
   return scored;
 }

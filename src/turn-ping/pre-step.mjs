@@ -2,6 +2,7 @@ import { memoryCueMessage, retiredMemoryCueMessage, isMemoryCueMessage } from '.
 import { turnPingQueryInfo } from './query.mjs';
 import { appendDiagnostic } from './diagnostics.mjs';
 import { sha256 } from './config.mjs';
+import { extractVisibleMemoryIds, hasMemoryIntent, readQuietConfig } from './quiet.mjs';
 
 export function installTurnPingPreStep({ ctx, config = {}, beforeAnswer, contextMessage, log = console, diagnosticPath = null }) {
   if (!ctx || typeof ctx.on !== 'function') throw new Error('turn-ping pre-step: ctx.on required');
@@ -63,6 +64,17 @@ export function installTurnPingPreStep({ ctx, config = {}, beforeAnswer, context
       }
       const info = turnPingQueryInfo(decision?.messages ?? []);
       const text = info.text;
+      const quiet = readQuietConfig(config);
+      const visibleMemoryIds = new Set(pingSeqs(session).flatMap(item => [...extractVisibleMemoryIds(item.text)]));
+      debug({ kind: 'auto-recall-mode', sessionId: session?.id ?? null, mode: quiet.mode, visibleMemoryIds: visibleMemoryIds.size });
+      if (quiet.mode === 'off') {
+        clearPings(session, { kind: 'quiet-off' });
+        return decision;
+      }
+      if (quiet.mode === 'quiet' && !hasMemoryIntent(text)) {
+        clearPings(session, { kind: 'no-memory-intent' });
+        return decision;
+      }
       const allowed = Array.isArray(config.sessionIds) && config.sessionIds.length > 0 ? new Set(config.sessionIds.map(String)) : null;
       if (allowed && !allowed.has(String(session?.id))) {
         debug({ kind: 'skipped', reason: 'session-not-allowed', sessionId: session?.id ?? null });
@@ -87,7 +99,7 @@ export function installTurnPingPreStep({ ctx, config = {}, beforeAnswer, context
         return decision;
       }
       const events = typeof session?.snapshotEvents === 'function' ? session.snapshotEvents() : [];
-      const result = await beforeAnswer({ sessionId: String(session.id), query: text, cutoff, events });
+      const result = await beforeAnswer({ sessionId: String(session.id), query: text, cutoff, events, quiet: quiet.mode === 'quiet', visibleMemoryIds });
       debug({
         kind: 'before-answer',
         enabled: result?.enabled === true,

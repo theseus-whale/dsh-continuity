@@ -1,3 +1,5 @@
+import { selectNovelHits } from './quiet.mjs';
+
 const normalize = (vector) => {
   const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
   return norm === 0 ? vector.slice() : vector.map((value) => value / norm);
@@ -124,13 +126,19 @@ export function allocateFacets(facets, config) {
   return { facets: selected.filter((facet) => facet.show > 0), omissions };
 }
 
-export async function retrieve({ query, cutoff, index, config }) {
+export async function retrieve({ query, cutoff, index, config, quiet = null }) {
   const facetResult = await buildFacets({ query, embedder: index.embedder, config });
   const { perFacet, availableCount } = await index.query({ queries: facetResult.facets.map((facet) => facet.text), cutoff });
+  const selectedVectors = quiet ? quiet.referenceVectors.map(vector => [...vector]) : [];
   const facets = perFacet.map((facet, indexKey) => {
-    const high = highScore(facet.candidates, config);
+    let high = highScore(facet.candidates, config);
+    if (quiet) {
+      high = high.filter(candidate => !quiet.referenceIds.has(candidate.turnId));
+      high = selectNovelHits(high, selectedVectors, quiet.noveltyThreshold);
+      for (const hit of high) selectedVectors.push(hit.vector);
+    }
     return { index: indexKey, query: facet.query, high, H: high.length, desired: disclosureCount(high.length) };
   }).filter((facet) => facet.H > 0);
   const allocation = allocateFacets(facets, config);
-  return { availableCount, facets: allocation.facets, omissions: allocation.omissions, facetFallback: facetResult.fallback, tau: config.retrieval.tau, delta: config.retrieval.delta };
+  return { availableCount, facets: allocation.facets, omissions: allocation.omissions, facetFallback: facetResult.fallback, tau: config.retrieval.tau, delta: config.retrieval.delta, quiet: Boolean(quiet) };
 }

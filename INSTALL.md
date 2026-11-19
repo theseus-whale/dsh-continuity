@@ -1,4 +1,4 @@
-# Install and operate 5.0.2
+# Install and operate 5.0.3
 
 ## Requirements
 
@@ -12,11 +12,11 @@
 2. Install the reviewed package without forcing peer dependencies:
 
 ```text
-npm install <path-to-theseus-whale-dsh-continuity-5.0.2.tgz> --ignore-scripts --no-audit --no-fund
+npm install <path-to-theseus-whale-dsh-continuity-5.0.3.tgz> --ignore-scripts --no-audit --no-fund
 ```
 
 3. Point the Host bundle and scoped client module to `@theseus-whale/dsh-continuity`.
-4. Cold-start DSH and verify `plugin.version = 5.0.2`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
+4. Cold-start DSH and verify `plugin.version = 5.0.3`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
 
 There is no `dsh-continuity` command to run. The package has no Node CLI, separate API-key prompt, external provider module or independent DeepSeek transport.
 
@@ -44,6 +44,12 @@ Public defaults remain off. Create an unpublished overlay only for the intended 
 `Index-only` keeps retrieval/index work separate from natural injection. `Live natural cue` additionally requires the reviewed live boundary. Installing a package or setting model names does **not** enable Host memory resonance or live injection.
 
 All summary generation uses Host `ctx.llm`. Existing provider credentials remain in DSH's own configuration; no credential is read from this plugin's overlay.
+
+## Quiet automatic recall
+
+The default `autoRecall.mode` is `quiet`: ordinary chat without retrospective intent does not retrieve or inject memories. Currently visible and recently shown cues are deduplicated, and candidates are selected by vector novelty without a fixed one-hit cap. Manual `memory_recall` remains ungated.
+
+Set `autoRecall.mode` to `off` to disable automatic cue generation or `legacy` to restore the previous behavior. Optional local tuning fields are `tau`, `delta`, `noveltyThreshold` and `historyWindowMs`. Decisions are recorded in the session-local `cue-decisions.jsonl`.
 
 ## Rebuild the current session
 

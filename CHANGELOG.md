@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.0.3
+
+- Add quiet/off/legacy automatic-recall modes, defaulting to quiet
+- Gate automatic retrieval on retrospective intent and prevent raw fallback from bypassing it
+- Deduplicate visible/recent cues and select dynamically by vector novelty rather than a fixed one-hit rule
+- Keep manual `memory_recall` unchanged and record local cue decisions/history for replay
+- Add regression tests for quiet intent, switches, fullseed novelty, history expiry and pre-step gating
+
 ## 5.0.2
 
 - Require Vector-L turn-summary prompts to request one line, one Chinese sentence, a 100-character target and a 256-character limit

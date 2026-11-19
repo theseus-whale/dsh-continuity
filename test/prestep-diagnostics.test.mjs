@@ -17,7 +17,7 @@ test('pre-step diagnostics record peer ping append without message text', async 
   let calls = 0;
   installTurnPingPreStep({
     ctx,
-    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, diagnostics: { enabled: true } },
+    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, autoRecall: { mode: 'legacy' }, diagnostics: { enabled: true } },
     beforeAnswer: async () => { calls += 1; return { enabled: true, H: 1, ping: { text: '[记忆共振] turn-001981', bytes: 20 } }; },
     contextMessage: (text) => ({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'system-prompt' } }),
     diagnosticPath: debugPath,
@@ -41,7 +41,7 @@ test('pre-step diagnostics record no-query and do not call beforeAnswer', async 
   let calls = 0;
   installTurnPingPreStep({
     ctx,
-    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, diagnostics: { enabled: true } },
+    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, autoRecall: { mode: 'legacy' }, diagnostics: { enabled: true } },
     beforeAnswer: async () => { calls += 1; return { enabled: true, H: 1, ping: { text: 'x', bytes: 1 } }; },
     contextMessage: () => ({}),
     diagnosticPath: debugPath,

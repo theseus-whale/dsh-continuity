@@ -1,11 +1,11 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "files": [
     {
       "path": "INSTALL.md",
-      "bytes": 3738,
-      "sha256": "8780a55893d3cb4470a7db2970795855df75ea53a99a97b6876ec5ec527ccb66"
+      "bytes": 4336,
+      "sha256": "3aaad85ca678d34ad6401feb2969f47abc8b999ebcb449827ff3f2b07e213130"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 3111,
-      "sha256": "c2f6d1f80324d6a4caf765788689f1f760c170992356fde1b1b5f3f8d082fd2b"
+      "bytes": 3468,
+      "sha256": "5ebdd13262309c970254e4826d176cbaf5d4b59c6aaca69f30a8230df151e7f7"
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 3263,
-      "sha256": "b8b0ca5301d6408825c6ee888e641e9e55ac6676070981730fa08a0fbc4f80f4"
+      "bytes": 4029,
+      "sha256": "3306efeb0d91e0cb984440f640e284678f0e71fc1709f84a259dff377b13cfcc"
     },
     {
       "path": "client.js",
@@ -49,8 +49,8 @@
     },
     {
       "path": "docs/PORTABILITY.md",
-      "bytes": 2228,
-      "sha256": "0fea06e069f8f828e3bcc637e23373d19b62290b058d5e9d21c8f90056d253e4"
+      "bytes": 2369,
+      "sha256": "6e1a2e4a9db6795eb45be9390cbd17a356c8044e7746743c666da90bb37d98bc"
     },
     {
       "path": "docs/README.md",
@@ -80,7 +80,7 @@
     {
       "path": "package.json",
       "bytes": 12656,
-      "sha256": "7b9aed27ada554f1731a14d88d815888ad7c2d571b942eb4182f2bc25f9df103"
+      "sha256": "1e3a057bdad5664dd8a720d2f8c6311679339f30669853a6a6740763b598a836"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -314,8 +314,8 @@
     },
     {
       "path": "src/fullseed/query.mjs",
-      "bytes": 1429,
-      "sha256": "a40300c3eeb5d5bbf58a489e0e6c3f6ba6443e6cf9f7f06a39a00778268f17a8"
+      "bytes": 1457,
+      "sha256": "691356c2cb5b26534b360847b9df86210a9d64a304bd0b8cc043d1bb914fd2ca"
     },
     {
       "path": "src/fullseed/read-raw-chunk-canonical.mjs",
@@ -879,8 +879,8 @@
     },
     {
       "path": "src/turn-ping/config.mjs",
-      "bytes": 2549,
-      "sha256": "2fd7d6a34350f3bd0888facd76cdb1bcf3a1ca5d0639b9c7d7bfdea5996e8543"
+      "bytes": 2696,
+      "sha256": "1139b3f85d7b61c7fde90bf689b1195f901b842b2fa461a1366582fb0692a131"
     },
     {
       "path": "src/turn-ping/coverage/audit.mjs",
@@ -949,8 +949,8 @@
     },
     {
       "path": "src/turn-ping/host.mjs",
-      "bytes": 7828,
-      "sha256": "bd799dbf3656df24ec8ee4b86bc9d25624a00b0390eb280d2e9acdae8dbe6719"
+      "bytes": 10068,
+      "sha256": "2b52c2f43e3018c0ad916d5277c1e44221b421fcd325d39b86062750ede779ff"
     },
     {
       "path": "src/turn-ping/index.mjs",
@@ -984,8 +984,8 @@
     },
     {
       "path": "src/turn-ping/pre-step.mjs",
-      "bytes": 6207,
-      "sha256": "e436739a34138cd3279c53765579a7e8d538da119fd3145e6029d8a817d14700"
+      "bytes": 6913,
+      "sha256": "24adecb5382dc24b9d2fc2196f5edb8ac295bb0db0c125d5ac332df5a5a949be"
     },
     {
       "path": "src/turn-ping/providers.mjs",
@@ -996,6 +996,11 @@
       "path": "src/turn-ping/query.mjs",
       "bytes": 2400,
       "sha256": "bd398efeb3fdfe2894017394a174a10ecd1e38e6f8773b9e63b9c3a872edcd08"
+    },
+    {
+      "path": "src/turn-ping/quiet.mjs",
+      "bytes": 4389,
+      "sha256": "e1b531a587401e90a6e4a92dd46f941b1a315672e28c53e7061a08b36e7560c7"
     },
     {
       "path": "src/turn-ping/raw-index-host.mjs",
@@ -1034,8 +1039,8 @@
     },
     {
       "path": "src/turn-ping/retrieval.mjs",
-      "bytes": 6270,
-      "sha256": "f139aca6d16da4e53d7fa60ef1ad5ac75a9c0635e35f754f2270e078d2a245fe"
+      "bytes": 6689,
+      "sha256": "98b77110c5372f35e81ad697015d5e51eab73c3b348338bdc57cc08bffb8b154"
     },
     {
       "path": "src/turn-ping/shadow.mjs",

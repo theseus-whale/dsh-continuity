@@ -1,6 +1,15 @@
-# Release notes — 5.0.2
+# Release notes — 5.0.3
 
-## Host-only full rebuild
+## Quiet automatic recall
+
+- Add `autoRecall.mode`: `quiet` by default, `off` for no automatic cues, and `legacy` for the previous behavior.
+- Quiet mode retrieves only when the current input expresses retrospective intent; raw fallback cannot bypass this gate.
+- Deduplicate currently visible and recently injected memories, then select candidates by vector novelty against visible/recent/already-selected vectors.
+- Do not impose a one-hit limit; multiple distinct relevant memories can remain. Manual `memory_recall` is unchanged.
+- Persist local cue history and decision logs for replay and diagnosis without creating another memory source.
+- Regression tests cover intent, switches, fullseed novelty/dedup, pre-step behavior and unchanged manual recall.
+
+## 5.0.2 Host-only full rebuild
 
 - Add `memory_rebuild({ action: 'probe' | 'start' | 'status' | 'cancel' | 'resume', jobId? })` to both Continuity presets.
 - The calling LLM only submits or controls a job; DSH Host writes summaries through configured `ctx.llm` and local BGE.
