@@ -30,10 +30,11 @@ import { installRawIndexHost } from './turn-ping/raw-index-host.mjs';
 import { wireCoverageHost } from './turn-ping/coverage/host-wire.mjs';
 import { installEngineTurnStopping } from './fullseed/worker.mjs';
 import { createFullseedWorker, workerIdentityFromConfig } from './fullseed/runtime.mjs';
+import { createHostRebuildService } from './fullseed/host-rebuild.mjs';
+import { setHostRebuildService } from './fullseed/host-rebuild-tool.mjs';
 import { turnPingRoot } from './turn-ping/storage.mjs';
 import { createLlmSummaryProvider, createBgeEmbedder } from './turn-ping/host-adapters.mjs';
 import { createFullseedLlmProvider } from './fullseed/llm-adapter.mjs';
-import { createDeepseekStream } from './fullseed/provider.mjs';
 import { installBCPreStep } from './memory/bc-pre-step.mjs';
 import { buildBCPanelState } from './memory/bc-panel-state.mjs';
 import { isPersonaEnabled, resolvePersona, sessionFile } from './memory/persona.mjs';
@@ -230,11 +231,8 @@ export function apply(ctx, config = {}) {
           allowedSessionIds: allowedSessions,
         });
       }
-      const workerLlm = turnPing.credentials || process.env.DSH_CONTINUITY_CREDENTIALS
-        ? { stream: createDeepseekStream({ credentials: turnPing.credentials ?? process.env.DSH_CONTINUITY_CREDENTIALS, endpoint: turnPing.endpoint }) }
-        : llm;
-      const fullseedProvider = (turnPing.fullseedWorker === true && typeof turnPing.provider === 'string' && typeof turnPing.model === 'string' && workerLlm)
-        ? createFullseedLlmProvider({ llm: workerLlm, provider: turnPing.provider, model: turnPing.model })
+      const fullseedProvider = (turnPing.fullseedWorker === true && typeof turnPing.provider === 'string' && typeof turnPing.model === 'string' && llm)
+        ? createFullseedLlmProvider({ llm, provider: turnPing.provider, model: turnPing.model })
         : null;
       if (turnPing.fullseedWorker === true && fullseedProvider && embeddingAdapter && typeof ctx.get === 'function' && ctx.get('sessionQuery')) {
         createFullseedWorker({
@@ -246,6 +244,18 @@ export function apply(ctx, config = {}) {
           allowedSessionIds: allowedSessions,
           log: (row) => log.info?.(`[dsh-continuity] fullseed worker ${JSON.stringify(row)}`),
         });
+      }
+      if (turnPing.useHostAdapters === true && llm && embeddingAdapter && typeof ctx.get === 'function' && ctx.get('sessionQuery')) {
+        setHostRebuildService(createHostRebuildService({
+          home: installed.home,
+          sessionQuery: ctx.get('sessionQuery'),
+          provider: createFullseedLlmProvider({ llm, provider: turnPing.provider, model: turnPing.model }),
+          embedder: embeddingAdapter,
+          allowedSessionIds: allowedSessions,
+          providerName: turnPing.provider,
+          model: turnPing.model,
+        }));
+        log.info?.('[dsh-continuity] Host memory_rebuild service ready (ctx.llm)');
       }
       installTurnPingPreStep({
         ctx,
@@ -844,7 +854,7 @@ async function probeSessionQuery(ctx, cache) {
  * agents see `session_log`, and which see the convention section. Cached: the
  * prompt assembly is the expensive part and the panel polls every few seconds.
  */
-const PANEL_TOOL_NAMES = new Set(['memory_recall', 'read_seq_range', 'read_raw_chunk', 'session_asset', 'child_asset', 'ptc_handoff']);
+const PANEL_TOOL_NAMES = new Set(['memory_rebuild', 'memory_recall', 'read_seq_range', 'read_raw_chunk', 'session_asset', 'child_asset', 'ptc_handoff']);
 
 async function inspectScopes(ctx, cache) {
   if (Date.now() - cache.at < 15_000) return cache.value;

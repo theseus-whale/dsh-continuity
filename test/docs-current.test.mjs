@@ -5,13 +5,12 @@ import path from 'node:path';
 
 const currentDocs = [
   'README.md', 'INSTALL.md', 'PANEL.md', 'RELEASE-NOTES.md',
-  'docs/API-NOTES.md', 'docs/EXPERIMENT.md', 'docs/PORTABILITY.md',
-  'docs/unified-fold.md', 'guides/README.md',
+  'docs/API-NOTES.md', 'docs/PORTABILITY.md', 'docs/unified-fold.md',
 ];
 
-test('INSTALL has complete upgrade/apply/resume/verify flow and separate host credentials', () => {
+test('INSTALL documents Host-only rebuild and recovery without CLI credentials', () => {
   const text = fs.readFileSync(path.resolve('INSTALL.md'), 'utf8');
-  for (const marker of ['migrate apply --plan', '--approve', 'migrate resume --plan', 'migrate verify --plan', 'Back up', 'allowLiveInjection', 'plan is NOT approval', 'ctx.llm', 'DSH_CONTINUITY_CREDENTIALS']) {
+  for (const marker of ['memory_rebuild', 'probe', 'start', 'status', 'cancel', 'resume', 'Back up', 'allowLiveInjection', 'ctx.llm']) {
     assert.ok(text.includes(marker), `INSTALL missing ${marker}`);
   }
   assert.ok(text.includes('Index-only') && text.includes('Live natural cue'));
@@ -33,16 +32,14 @@ test('README names Node/host requirements without inventing a support matrix', (
   assert.ok(text.includes('Node.js >=22'));
   assert.ok(text.includes('tested baseline'));
   assert.ok(text.includes('not a claim of support for every future Host'));
-  assert.ok(text.includes('npm install <path-to-dsh-continuity-5.0.0-<hash>.tgz>'));
+  assert.ok(text.includes('theseus-whale-dsh-continuity-5.0.2.tgz'));
 });
 
-test('current docs describe current migration commands and no old architecture', () => {
-  const forbidden = [/session_log/i, /\bgist\b/i, /\bBand\b/i, /\bABCK\b/i, /A \/ B \/ C \/ K/, /0\.2\.1-rc\.3/];
+test('current docs contain no Node CLI, direct credential path, or old architecture', () => {
+  const forbidden = [/session_log/i, /\bgist\b/i, /\bBand\b/i, /\bABCK\b/i, /A \/ B \/ C \/ K/, /0\.2\.1-rc\.3/, /dsh-continuity\s+migrate/i, /fullseed:(run|repair)/, /bin\/fullseed/, /provider-module/, /DSH_CONTINUITY_CREDENTIALS/, /fullseedDirect/];
   const joined = currentDocs.map((file) => fs.readFileSync(path.resolve(file), 'utf8')).join('\n');
   for (const pattern of forbidden) assert.equal(pattern.test(joined), false, `current docs still contain ${pattern}`);
-  for (const command of ['migrate audit', 'migrate plan', 'migrate apply', 'migrate resume', 'migrate verify']) {
-    assert.ok(joined.includes(command), `current docs missing ${command}`);
-  }
+  for (const command of ['memory_rebuild', 'memory_recall', 'ctx.llm']) assert.ok(joined.includes(command), `current docs missing ${command}`);
 });
 
 test('current docs contain no local user path or real session id', () => {

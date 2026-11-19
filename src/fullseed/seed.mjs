@@ -65,7 +65,7 @@ export function dryRun({ chunks, acceptedKeys = new Set(), maxAttempts = 2, vect
 
 export async function runSeed({
   chunks, root, provider, embedder, maxAttempts = 2, identity, checkpoint, snapshotBoundary,
-  concurrency = 4, callProvider = null, log = () => {}, deferBase = false, maxProviderCalls = Infinity,
+  concurrency = 4, callProvider = null, log = () => {}, deferBase = false, maxProviderCalls = Infinity, shouldStop = null,
 }) {
   fs.mkdirSync(root, { recursive: true });
   const lock = acquireLock(root);
@@ -92,8 +92,10 @@ export async function runSeed({
     };
     let pending = chunks.filter((chunk) => !staged.byChunk.has(chunk.chunkId));
     for (let offset = 0; offset < pending.length; offset += concurrency) {
+      if (shouldStop?.()) throw new Error('fullseed cancelled');
       const batch = pending.slice(offset, offset + concurrency);
       const results = await Promise.all(batch.map(async (chunk) => {
+        if (shouldStop?.()) throw new Error('fullseed cancelled');
         const attemptBase = { chunkId: chunk.chunkId, turnId: chunk.turnId, at: new Date().toISOString(), providerAttempts: 0 };
         appendJsonl(p.attempts, { ...attemptBase, status: 'reserved' });
         const summary = await summarizeChunk({

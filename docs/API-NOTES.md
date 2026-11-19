@@ -1,28 +1,30 @@
-# API notes — current 5.0.0
+# API notes — 5.0.2
 
 ## Web routes
 
 ```text
 GET /dsh-continuity/current.json
-GET /dsh-continuity/state.json        old diagnostic shape, not used by panel
+GET /dsh-continuity/state.json        diagnostic state
 GET /dsh-continuity/bc.json           legacy, not used by panel
 GET /dsh-continuity/facets.json       legacy, not used by panel
 ```
 
-The current panel must use `/dsh-continuity/current.json`. It is read-only.
+The current panel uses `/dsh-continuity/state.json`; routes are read-only and never start provider work.
 
-## CLI
+## Host tools
 
 ```text
-dsh-continuity migrate audit [--session <id>] [--dsh-home <dir>]
-dsh-continuity migrate plan --session <id> [--out <file>]
-dsh-continuity migrate apply --plan <file> --approve --provider-module <file>
-dsh-continuity migrate resume --plan <file> --approve --provider-module <file>
-dsh-continuity migrate verify --plan <file> --query <text> --embedder-module <file>
+memory_recall({ query })
+memory_rebuild({ action: "probe" })
+memory_rebuild({ action: "start" })
+memory_rebuild({ action: "status", jobId? })
+memory_rebuild({ action: "cancel", jobId? })
+memory_rebuild({ action: "resume", jobId? })
+read_seq_range({ fromSeq, toSeq, maxBytes? })
+read_raw_chunk({ chunkId, byteOffset?, maxBytes? })
 ```
 
-`apply`/`resume` require explicit approval. `verify` can use an offline
-embedder module and does not call a summary provider.
+`memory_rebuild` is scoped to the calling session and delegates all summary generation to Host `ctx.llm`. `probe` writes nothing. `start` creates one shadow job; complete catch-up coverage is required before live activation. There is no Node CLI or external provider module boundary.
 
 ## Host state fields
 
@@ -32,14 +34,7 @@ session.id / preset / engineMounted / lastError
 memoryResonance.enabled / summaries / vectors / checkpoint / availableCutoff
 memoryResonance.latestCue / retrieval / rawRead
 unifiedFold.enabled / sessionAllowed / lastFold / reinjection / pending
-migration.plan / audit / reusable / missing / budget / resume / verify
-migration.legacyActivePreserved
 diagnostics.version / packageHash / node / hostServices / errors
 ```
 
-These are diagnostics, not policy claims.
-
-## Removed from current UI/docs
-
-The panel does not use the old tag table, config projection, rc-specific facts,
-or legacy try-it guidance. Historical files are archived.
+These are diagnostics, not policy claims. The panel does not expose migration approval or provider actions.

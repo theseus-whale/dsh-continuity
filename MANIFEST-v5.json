@@ -1,11 +1,11 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "files": [
     {
       "path": "INSTALL.md",
-      "bytes": 6380,
-      "sha256": "f40cd956aba1aa0ce7fa78b63fbc80caddfe692f171b0e236e4595c42cb4ca18"
+      "bytes": 3738,
+      "sha256": "8780a55893d3cb4470a7db2970795855df75ea53a99a97b6876ec5ec527ccb66"
     },
     {
       "path": "LICENSE",
@@ -19,48 +19,28 @@
     },
     {
       "path": "README.md",
-      "bytes": 4862,
-      "sha256": "5caa75c680e243a48c9e78511602d6f5d1d1be4c7dce4301c5a9a24c6a470145"
+      "bytes": 3111,
+      "sha256": "c2f6d1f80324d6a4caf765788689f1f760c170992356fde1b1b5f3f8d082fd2b"
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 3656,
-      "sha256": "0df97eea53f83e245e84636454babf767438373a6eb2bc616c9369cd711d5e82"
-    },
-    {
-      "path": "bin/continuity-migrate.mjs",
-      "bytes": 4459,
-      "sha256": "1efa41bff066b58514d7826ce14989c7774916f63ed8fc151aa5c78787d4bd79"
-    },
-    {
-      "path": "bin/fullseed-repair.mjs",
-      "bytes": 2939,
-      "sha256": "45045037d375073a1bd0bb64f4563bce93e38e8b0ee6cb1be239404fa8e1032c"
-    },
-    {
-      "path": "bin/fullseed-run.mjs",
-      "bytes": 3641,
-      "sha256": "0badbe3f38335d43cb1d7bea7410ca245f2157ea0c8fac6b5788b47fb8c94dd1"
+      "bytes": 3263,
+      "sha256": "b8b0ca5301d6408825c6ee888e641e9e55ac6676070981730fa08a0fbc4f80f4"
     },
     {
       "path": "client.js",
-      "bytes": 26150,
-      "sha256": "994f7f9c21ef927755e865e0cff412b03fd47400fac921c6862b435437b7ae8e"
+      "bytes": 26469,
+      "sha256": "dde27f2f61cd9b9cc04f276a36f23438fd528192b1df7da051591a6b2463c516"
     },
     {
       "path": "cordis.patch.yml",
-      "bytes": 25169,
-      "sha256": "d98eedcec7dba28dc214d039fb9768b65a0b749d3fd4ffb00eefc776305f0571"
+      "bytes": 25381,
+      "sha256": "33595bf97b484cbcc5ca82ce00023232fd0635cee261c02792e619060d0308f7"
     },
     {
       "path": "docs/API-NOTES.md",
-      "bytes": 1578,
-      "sha256": "8d4ee9bbd3ca8b409c3a6dc49cc3c29ff74c73f1824367a8403f46fd122f9aed"
-    },
-    {
-      "path": "docs/EXPERIMENT.md",
-      "bytes": 1550,
-      "sha256": "b94d6deb682a67465553b021e550d98f0669b42af116880d2f3dd54e2fdb6a70"
+      "bytes": 1498,
+      "sha256": "33d29d4ad576249d5d0fd091fee1f8d8dd1444b0a868b77a7184882eb3b40253"
     },
     {
       "path": "docs/MODEL.md",
@@ -69,13 +49,13 @@
     },
     {
       "path": "docs/PORTABILITY.md",
-      "bytes": 2847,
-      "sha256": "8e1147b4da121ce8b97fd5587cf2501b2ecacdd89c4d89c07c539fd0671c5644"
+      "bytes": 2228,
+      "sha256": "0fea06e069f8f828e3bcc637e23373d19b62290b058d5e9d21c8f90056d253e4"
     },
     {
       "path": "docs/README.md",
-      "bytes": 324,
-      "sha256": "7189a1896a1e48ff3c9f614e43150d4260a6c1364b1b0826548a92d40dac1817"
+      "bytes": 276,
+      "sha256": "c5de308e0a757fae0b718ec198ba3203e656b1f0a2c5c6f5a196e34b70e683ec"
     },
     {
       "path": "docs/unified-fold.md",
@@ -99,8 +79,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 12830,
-      "sha256": "d18a00983727e832825d70e6f035e1ad294dad26b02685b55fd4696a0dec86c4"
+      "bytes": 12656,
+      "sha256": "7b9aed27ada554f1731a14d88d815888ad7c2d571b942eb4182f2bc25f9df103"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -134,8 +114,8 @@
     },
     {
       "path": "src/engine.mjs",
-      "bytes": 137870,
-      "sha256": "b8087f5e90e681186916897ff3b10437894068a5b48aa6fdf608b214ad093060"
+      "bytes": 137577,
+      "sha256": "bcdfc4b5641f33f043cf6ad46a776031ebfc2f5fc9d423c47f0c4fa3a90a4044"
     },
     {
       "path": "src/facets/classifier.mjs",
@@ -298,6 +278,16 @@
       "sha256": "b536586aea8d610878dcc83a1f8f14d90137ff125a68fa9457deb4e5308de71a"
     },
     {
+      "path": "src/fullseed/host-rebuild-tool.mjs",
+      "bytes": 2773,
+      "sha256": "5d7fe5706465126b96a85936a1112e2e31f1cc5c34c196f1c4b48bfa56c92901"
+    },
+    {
+      "path": "src/fullseed/host-rebuild.mjs",
+      "bytes": 12018,
+      "sha256": "0280ed949167b63afb599416d5bf43523b72ec7f2330f84d23ed62b7d3173473"
+    },
+    {
       "path": "src/fullseed/increment.mjs",
       "bytes": 1370,
       "sha256": "5db9259b433a94e97b040edab5cfd326f4f036591cfa8541f2f9eba0ef136055"
@@ -314,18 +304,13 @@
     },
     {
       "path": "src/fullseed/llm-adapter.mjs",
-      "bytes": 1417,
-      "sha256": "d45c779ce493c6bc71be2a62db5bbf3f2985840f4ac559c5a0fbfa34566a4ded"
+      "bytes": 2422,
+      "sha256": "bafd77f2322e85aead83ade2c0ee7f767f92fa2835affa685c954918c449434b"
     },
     {
       "path": "src/fullseed/ping.mjs",
       "bytes": 1625,
       "sha256": "931a42c23c2a72c0c844600c5a08ee20ad45c0a317073fa0fd59c98d7346d1c8"
-    },
-    {
-      "path": "src/fullseed/provider.mjs",
-      "bytes": 4274,
-      "sha256": "a9b057d5bd08156890146da3a45d71345ec0be7bebe5e4534df1630b2a829a5a"
     },
     {
       "path": "src/fullseed/query.mjs",
@@ -348,24 +333,14 @@
       "sha256": "0b49b17cb5d7e6a6adc9083d0494edbe15b28b98d46f7ae0fda608a12e10aaea"
     },
     {
-      "path": "src/fullseed/repair-provider.mjs",
-      "bytes": 5219,
-      "sha256": "f6b1398358f7ed04571c21104edf01eaee5472092de57c8a4d2e1f5700a79310"
-    },
-    {
-      "path": "src/fullseed/repair.mjs",
-      "bytes": 12449,
-      "sha256": "f3c299413f6c0bec8124440179c44909b7b9ba65a0c2d76513411dba9da0a2df"
-    },
-    {
       "path": "src/fullseed/runtime.mjs",
-      "bytes": 3458,
-      "sha256": "4ee2727e61e4a7feeeb321eadafbc2390e22a7d343a761d07870727daf306663"
+      "bytes": 3678,
+      "sha256": "19ad1332fd3d30ead9ea028bbe7501236819def4ca8f45660274cf80c1fc3d9e"
     },
     {
       "path": "src/fullseed/seed.mjs",
-      "bytes": 8246,
-      "sha256": "27c45181995ee610c8ebddf7f01982b22770a5017c9d78ba64d03c88b7e62353"
+      "bytes": 8397,
+      "sha256": "e1087d80a6ec3cbd6b1b26c6473e345f27e8c8df925b6e415a3f8c1877ddabee"
     },
     {
       "path": "src/fullseed/sonar-adapter.mjs",
@@ -379,8 +354,8 @@
     },
     {
       "path": "src/fullseed/summary.mjs",
-      "bytes": 6332,
-      "sha256": "417985de4511b6f6c38d5314142b9f90f4dcb2b8ca38b344650b750bef80872c"
+      "bytes": 6964,
+      "sha256": "4cbb96436aa12ba5062e5c3bb2bdd05675145e25fe17e1b168488e9864f2a8f3"
     },
     {
       "path": "src/fullseed/worker.mjs",
@@ -404,8 +379,8 @@
     },
     {
       "path": "src/index.mjs",
-      "bytes": 43236,
-      "sha256": "a47867fef12a590663eb7434adaad6d4f05d189ced6d8f4752b431f546bf58fb"
+      "bytes": 43709,
+      "sha256": "90ad47bf9434d201d9f670d38e6753a4deba97f42967ca02fe7931ffb2f1159e"
     },
     {
       "path": "src/inject-policy.mjs",
@@ -703,34 +678,19 @@
       "sha256": "8bd63a87daac5b44f6e54f87619732db42bd7639b47e4acbf86d8285d49de684"
     },
     {
-      "path": "src/migration/apply.mjs",
-      "bytes": 8182,
-      "sha256": "5b892a580b33f628bcdffabf75499570ea88dc17ab8c99a5b26e786e7b70033f"
-    },
-    {
-      "path": "src/migration/audit.mjs",
-      "bytes": 8876,
-      "sha256": "a453e21a0f69251c1bd4e9aa8ed0eb6fa4ce65ebad410826cf3d3e01640c8b2b"
-    },
-    {
-      "path": "src/migration/plan.mjs",
-      "bytes": 3170,
-      "sha256": "fdce6b4edb9db8f23733d2c801bb0b9c4fb652fee4a5726c73dfe070cbd75da4"
-    },
-    {
-      "path": "src/migration/raw.mjs",
-      "bytes": 4206,
-      "sha256": "0f46369617619eb50bfd786cf26fb3aaf1042a8dc3b14293e28cf29a5c8051c4"
-    },
-    {
-      "path": "src/migration/verify.mjs",
-      "bytes": 5407,
-      "sha256": "b8d328f76609087112486030e175d227df31f3031229bff84883719a72780a3d"
-    },
-    {
       "path": "src/mood.mjs",
       "bytes": 6033,
       "sha256": "3eca1d11cfc56f062aed803383a98ab6d94e1fb8e663213e0ed036570ac0d4b5"
+    },
+    {
+      "path": "src/peer-tool.mjs",
+      "bytes": 2361,
+      "sha256": "9699610fb1121832851f54ea2302ced05d7f2e3eebf3b48ff5fcbb468d2be141"
+    },
+    {
+      "path": "src/peer.mjs",
+      "bytes": 5022,
+      "sha256": "1c04fd8882d45af802abfbf311291f8e3acbede1dff4c46300d1edee26f0aeff"
     },
     {
       "path": "src/policy.mjs",
@@ -919,8 +879,8 @@
     },
     {
       "path": "src/turn-ping/config.mjs",
-      "bytes": 2537,
-      "sha256": "68715c8abe37b72cb36d4d40b6c21e2737ff5ba3d193ebeaf70f9b76d90e805e"
+      "bytes": 2549,
+      "sha256": "2fd7d6a34350f3bd0888facd76cdb1bcf3a1ca5d0639b9c7d7bfdea5996e8543"
     },
     {
       "path": "src/turn-ping/coverage/audit.mjs",
@@ -984,8 +944,8 @@
     },
     {
       "path": "src/turn-ping/host-adapters.mjs",
-      "bytes": 3704,
-      "sha256": "08cbfc318673816673e02fe5a46203b99bbce230a79a467e7fcf7fb5e2d34f76"
+      "bytes": 4604,
+      "sha256": "0c7eaf79caa33dba26fdb7ec6576ca962be7f553050a854663caf02ec95c7f04"
     },
     {
       "path": "src/turn-ping/host.mjs",

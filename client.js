@@ -226,6 +226,10 @@ window.__ModuleLoader__.load({
     };
 
     const TOOL_NOTES = {
+      memory_rebuild: {
+        note: '让 Host 从当前会话第一条可归档原始轮次全量重建语义记忆；调用方 LLM 不逐条写摘要。',
+        params: 'action 必填：probe、start、status、cancel、resume；jobId 可选。使用 Host flash 与本地 BGE，只影响当前会话。',
+      },
       memory_recall: {
         note: '用自己的话主动去回忆；与自动 memory_cue 共用 Xenova 语义检索，返回相关摘要和原文指针。',
         params: 'query 必填；不是 BM25、精确匹配或 seq 坐标读取。',

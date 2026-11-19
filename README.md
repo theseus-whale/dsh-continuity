@@ -1,18 +1,25 @@
-# @theseus-whale/dsh-continuity 5.0.0
+# @theseus-whale/dsh-continuity 5.0.2
 
-Current architecture release candidate. Public defaults are **off**; local overlays explicitly enable memory resonance, turn-end archival and unified fold for allowlisted sessions.
+DSH Host 内的连续性插件。公开默认均为 **off**；只有本地 overlay 中明确列出的会话才会启用记忆共振、轮末归档和统一折叠。
 
-## Current capabilities
+## 当前能力
 
 ```text
 memory resonance    Host-turn summaries/vectors for allowlisted sessions
-turn-end archival   stable queue + background worker + atomic summary/vector deltas
-raw write index     immediate lexical pointers from canonical events; no fold/model needed
-unified fold        exact-evidence summary reuse with fold-time fallback for missing coverage
-exact readback      bounded seq reads and verified raw-chunk/raw-turn reads
-migration           audit / plan / apply / resume / verify
-panel               waterlines, model window, runtime status, and Host-reported tool catalog
+memory_recall       LLM 主动调用同一语义共振路径
+memory_rebuild      Host 后台全量重建、补增量、验证并原子激活
+turn-end archival   stable queue + background worker + atomic deltas
+raw write index     canonical events 的即时词法指针，无需模型
+unified fold        精确证据复用，缺失覆盖在折叠时补齐
+exact readback      bounded seq reads and verified raw-chunk reads
+panel               waterlines, model window, runtime and tool catalog
 ```
+
+## Host-only 模型调用
+
+所有摘要请求都在 DSH Host 内通过 `ctx.llm` 发出，并使用宿主配置的 provider/model。`memory_rebuild` 的调用方只提交或控制任务，不逐条编写摘要，不创建子代理或额外会话。
+
+本包**不包含 Node CLI、独立 DeepSeek transport、external provider module 或 API Key 输入路径**。全量重建使用 shadow staging，补到最新 checkpoint 后才切换 live；失败或取消保留旧索引。
 
 ## Public defaults
 
@@ -27,7 +34,7 @@ unifiedFold:
   localConfig: ./local/unified-fold.json
 ```
 
-Missing local overlay means disabled. A malformed overlay is an error. The worker flags `fullseedEnqueue` and `fullseedWorker` also default off publicly. A migration plan is not an approval.
+本地 overlay 缺失即禁用，格式错误会报告错误；启用时必须提供明确的 `sessionIds`，不会自动扩展到全部会话。
 
 ## Requirements and verified Host
 
@@ -36,64 +43,29 @@ Node.js >=22
 DSH host supplies the peer packages
 ```
 
-Verified against the installed DSH desktop runtime `0.2.2-rc.3`, Cordis `4.1.0`, and Host peer packages `0.2.2-rc.3`. The package declares measured peer ranges; this is a tested baseline, not a claim of support for every future Host.
+Verified against the installed DSH desktop runtime `0.2.2-rc.3`, Cordis `4.1.0`, and Host peer packages `0.2.2-rc.3`. This is a tested baseline, not a claim of support for every future Host.
 
 ## Install
 
 ```text
-npm install <path-to-dsh-continuity-5.0.0-<hash>.tgz>
+npm install <path-to-theseus-whale-dsh-continuity-5.0.2.tgz>
 ```
 
-For an existing installation, audit and plan before apply:
+安装、备份、overlay、重建与回滚步骤见 [INSTALL.md](INSTALL.md)。
 
-```text
-dsh-continuity migrate audit
-dsh-continuity migrate plan --session <id>
-dsh-continuity migrate apply --plan <plan.json> --approve --provider-module <file>
-dsh-continuity migrate resume --plan <plan.json> --approve --provider-module <file>
-dsh-continuity migrate verify --plan <plan.json> --query <text> --embedder-module <file>
-```
+## Vector-L 摘要约定
 
-See [INSTALL.md](INSTALL.md) for backup, rollback and the complete review order.
-
-## Turn-end archival and fold reuse
-
-When explicitly enabled, `agent/turn-stopping` records a completed Host turn with a stable queue ID. The background worker generates its summary and vector, then writes and activates an atomic delta. Duplicate events and already-covered checkpoints do not repeat model work.
-
-Unified fold reuses a complete unified summary or a complete set of raw-evidence chunks. It does not reuse a partial summary merely because its `turnId` matches. Missing or stale coverage is still generated at fold time, and open turns remain protected.
-
-This spreads model latency across normal turns instead of concentrating it in one fold. Per-turn summaries generally consume more total output tokens than one global summary; the benefit is incremental archival and fold-time reuse, not token minimization.
+生成提示要求一行、一个中文句子、目标约 100 字、256 字以内，可用分号；历史原文只作为待摘要资料，不作为当前对话回答。生产收录仍是软约束：超长、多行、多句会保留并记录警告，不重试、不拒绝；共振展示不截断。
 
 ## Data and cost boundary
 
 ```text
 raw write index           local derived full-text/pointer cache; no model call
 local BGE embedding       local model; no text leaves the machine for embedding
-turn-end summary worker   explicit opt-in; sends completed-turn text to the configured provider
-unified fold              reuses exact coverage; generates only missing/stale turns
-migration apply           provider calls only for frozen missing items
+turn-end summary worker   explicit opt-in; Host ctx.llm generates summaries
+unified fold              reuses exact coverage; generates missing/stale turns
+memory_rebuild            explicit tool action; Host writes shadow before activation
 panel                     read-only; never calls provider
 ```
 
-Provider credentials belong in local environment/overlay only. The public package contains no credentials, real session IDs, user-home paths or private overlays. Explicit direct-provider configuration is documented in [docs/PORTABILITY.md](docs/PORTABILITY.md).
-
-## Local overlay
-
-```text
-~/.dsh/continuity/local/memory-resonance.json
-~/.dsh/continuity/local/unified-fold.json
-```
-
-These are never published. See [INSTALL.md](INSTALL.md), [docs/PORTABILITY.md](docs/PORTABILITY.md), and [docs/unified-fold.md](docs/unified-fold.md).
-
-## Panel
-
-The panel preserves the waterline bar and model-window projection, then adds observed runtime status and a Host-reported tool catalog with usage notes. Session-local fold history is not shown in this global panel. The panel never writes indexes or raw records. See [PANEL.md](PANEL.md).
-
-## Package contents
-
-The production package excludes tests, historical guides/archives, source backup files and model weights. Historical material is not part of current installation or compatibility claims.
-
-## Model and project license
-
-The project license is in `LICENSE`. The Xenova model is a required local prerequisite for embedding-enabled features, but its files are not bundled. Set `embeddingModel` to an absolute user-supplied directory; missing files fail before model execution. See [docs/MODEL.md](docs/MODEL.md) for the distribution decision and verified artifact identity.
+公开包不含凭据、真实会话 ID、用户 home 路径、私有 overlay、测试或模型权重。模型准备见 [docs/MODEL.md](docs/MODEL.md)，本地配置见 [docs/PORTABILITY.md](docs/PORTABILITY.md)。

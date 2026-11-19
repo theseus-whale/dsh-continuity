@@ -33,7 +33,7 @@ test('current UI state reports real session/disabled defaults, not hardcoded exa
     assert.equal(state.memoryResonance.enabled, false);
     assert.equal(state.unifiedFold.enabled, false);
     assert.equal(state.migration.plan, null);
-    assert.equal(state.plugin.version, '5.0.0');
+    assert.equal(state.plugin.version, '5.0.2');
     assert.equal(state.diagnostics.hostServices.sessionQuery, true);
   } finally {
     if (previous === undefined) delete process.env.DSH_CONTINUITY_HOME; else process.env.DSH_CONTINUITY_HOME = previous;
@@ -212,11 +212,11 @@ test('runtime and tool catalog use observed host state without claiming unobserv
     assert.equal(result.runtime.authorizedSessions, 1);
     assert.equal(result.runtime.recentErrors.length, 0);
     assert.equal(result.toolCatalog.observed, true);
-    assert.equal(result.toolCatalog.tools.length, 5);
+    assert.equal(result.toolCatalog.tools.length, 7);
     assert.equal(result.toolCatalog.tools.find((tool) => tool.name === 'read_seq_range').visibleSessions, 1);
     const unobserved = buildGlobalPanelExtras(null, [], { provider: 'deepseek-official', model: 'deepseek-flash', available: true });
     assert.equal(unobserved.toolCatalog.observed, false);
-    assert.equal(unobserved.toolCatalog.tools.length, 5);
+    assert.equal(unobserved.toolCatalog.tools.length, 7);
     assert.equal(unobserved.toolCatalog.tools.every((tool) => tool.visibleSessions === 0), true);
   } finally {
     setTurnPingHost(previous);

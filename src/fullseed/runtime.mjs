@@ -4,6 +4,7 @@ import { loadActiveIndex } from './cache.mjs';
 import { processIncrement, readQueue } from './worker.mjs';
 import { buildIdentity } from './seed.mjs';
 import { PROMPT_TEXT_SHA256, EXTRACTION_RULE_SHA256 } from './summary.mjs';
+import { isHostRebuildActive } from './host-rebuild.mjs';
 
 function sessionRoots(home) {
   const root = path.join(home, 'sessions');
@@ -27,6 +28,7 @@ export function createFullseedWorker({ home, sessionQuery, provider, embedder, i
     try {
       for (const { sessionId, fullseed } of sessionRoots(home)) {
         if (allowedSessionIds && !allowedSessionIds.has(String(sessionId))) continue;
+        if (isHostRebuildActive(String(sessionId))) continue;
         const active = loadActiveIndex(fullseed);
         if (!active) continue;
         const allQueue = readQueue(fullseed);
@@ -34,7 +36,11 @@ export function createFullseedWorker({ home, sessionQuery, provider, embedder, i
         const pending = allQueue.filter((row) => row.sessionId === sessionId && row.status === 'pending' && !doneIds.has(row.queueId));
         if (!firstTick && pending.length === 0) continue;
         const session = await sessionQuery.readSession(String(sessionId));
-        const result = await processIncrement({ root: fullseed, sessionId, events: session?.events ?? [], watermark: active.active.checkpoint, provider, embedder, identity: active.active.identity ?? identity });
+        const result = await processIncrement({
+          root: fullseed, sessionId, events: session?.events ?? [], watermark: active.active.checkpoint,
+          provider: args => provider({ ...args, sessionId: String(sessionId) }),
+          embedder, identity: active.active.identity ?? identity,
+        });
         // A successful no-op also settles the queue: another fold may already
         // have covered this checkpoint. Errors still leave pending work intact.
         for (const row of pending) {

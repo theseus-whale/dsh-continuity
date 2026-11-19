@@ -99,7 +99,6 @@ import { createUnifiedIndexAdapter } from './fold/index-adapter.mjs';
 import { buildTurnsFromEvents as buildUnifiedTurns } from './turn-ping/host.mjs';
 import { createTurnPingStorage, turnPingRoot } from './turn-ping/storage.mjs';
 import { createLlmSummaryProvider, createBgeEmbedder } from './turn-ping/host-adapters.mjs';
-import { createDeepseekStream } from './fullseed/provider.mjs';
 import { readConfig as readTurnPingConfig } from './turn-ping/config.mjs';
 import {
   activeCallIds,
@@ -322,13 +321,9 @@ export class ContinuityEngine extends BaseEngine {
     if (this.unifiedFold) {
       const llm = typeof ctx.get === 'function' ? ctx.get('llm') : null;
       const uf = this.unifiedFold;
-      const credentials = uf.credentials ?? process.env.DSH_CONTINUITY_CREDENTIALS;
-      const directLlm = credentials
-        ? { stream: createDeepseekStream({ credentials, endpoint: uf.endpoint }) }
-        : llm;
       this.unifiedProvider = typeof uf.provider === 'function'
         ? uf.provider
-        : createLlmSummaryProvider({ llm: directLlm, provider: uf.providerId ?? 'deepseek-official', model: uf.model ?? 'deepseek-flash' });
+        : createLlmSummaryProvider({ llm, provider: uf.providerId ?? 'deepseek-official', model: uf.model ?? 'deepseek-flash' });
       this.unifiedEmbedder = typeof uf.embedder === 'function'
         ? uf.embedder
         : createBgeEmbedder({ model: uf.embeddingModel ?? './models/Xenova/bge-small-zh-v1.5' });

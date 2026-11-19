@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.0.2
+
+- Require Vector-L turn-summary prompts to request one line, one Chinese sentence, a 100-character target and a 256-character limit
+- Add `memory_rebuild({ action })` so the Host—not the calling LLM—runs full rebuilds through `ctx.llm` with start/status/cancel/resume controls
+- Pause per-session incremental workers during Host rebuilds, catch up to the latest checkpoint, and atomically activate verified complete coverage
+- Preserve soft ingestion: overlong, multiline and multi-sentence model results are still recorded with warnings rather than rejected or retried
+- Keep resonance rendering unchanged; historical noncompliant long summaries require explicit regeneration, not display truncation
+- Add regression coverage for Host prompts, soft ingestion, rebuild authorization, cancellation and activation
+- Remove fullseed/migration Node CLIs, independent DeepSeek transports and plugin-specific credential paths; all summary calls use Host `ctx.llm`
+- Separate summary instructions from historical material and explicitly disable reasoning for summary requests
+- Report final rebuild progress from the activated snapshot rather than stale staging entries
+
 ## 5.0.1
 
 - Add `memory_recall({ query })` to both Continuity presets using the existing memory-resonance retrieval path

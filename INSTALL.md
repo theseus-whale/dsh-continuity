@@ -1,212 +1,84 @@
-# Install — dsh-continuity 5.0.0
+# Install and operate 5.0.2
 
-## Before install
+## Requirements
 
-```text
-back up profile and ~/.dsh/continuity
-keep the public package default-off until a local overlay is reviewed
-do not commit credentials or local session IDs
-```
+- DSH desktop with the declared Host peer packages.
+- Node.js >=22 for package installation and validation.
+- An absolute local BGE model directory for embedding-enabled features; model files are not bundled.
 
-## Required local model
+## Back up and install
 
-Embedding-enabled features require a user-supplied local copy of
-`Xenova/bge-small-zh-v1.5`; model files are not bundled. Obtain and review the
-model before enabling memory features, then set every enabled overlay's
-`embeddingModel` to its absolute directory. It must contain `config.json`,
-`tokenizer.json`, `tokenizer_config.json` and `onnx/model_quantized.onnx`.
-Missing files are an explicit error. See `docs/MODEL.md`.
-
-## Package
+1. Back up the DSH profile and `~/.dsh/continuity`.
+2. Install the reviewed package without forcing peer dependencies:
 
 ```text
-npm pack
-# install the resulting dsh-continuity-5.0.0-<hash>.tgz through the normal DSH flow
+npm install <path-to-theseus-whale-dsh-continuity-5.0.2.tgz> --ignore-scripts --no-audit --no-fund
 ```
 
-Do not install from a legacy guide or replace a live profile by hand.
+3. Point the Host bundle and scoped client module to `@theseus-whale/dsh-continuity`.
+4. Cold-start DSH and verify `plugin.version = 5.0.2`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
 
-## Public defaults
+There is no `dsh-continuity` command to run. The package has no Node CLI, separate API-key prompt, external provider module or independent DeepSeek transport.
 
-```yaml
-turnPing:
-  enabled: false
-  mode: shadow
-  localConfig: ./local/memory-resonance.json
+## Local enablement
 
-unifiedFold:
-  enabled: false
-  localConfig: ./local/unified-fold.json
-```
-
-## Enable memory resonance locally
-
-```text
-mkdir -p ~/.dsh/continuity/local
-```
-
-### Index-only (no natural cue)
-
-This creates summaries/vectors but keeps live injection off:
-
-```json
-{
-  "enabled": true,
-  "mode": "shadow",
-  "sessionIds": ["<session-id>"],
-  "boundaries": { "allowLiveInjection": false },
-  "provider": "<provider>",
-  "model": "<model>",
-  "embeddingModel": "<absolute-local-model-directory>"
-}
-```
-
-The panel should show memory enabled for the session, with retrieval/readiness
-observed only when the active index exists. No natural cue is injected while
-`allowLiveInjection` is false.
-
-### Live natural cue (complete minimal example)
-
-Public patch defaults `allowLiveInjection` to false. To actually inject a
-natural cue, the overlay must opt in explicitly:
+Public defaults remain off. Create an unpublished overlay only for the intended sessions:
 
 ```json
 {
   "enabled": true,
   "mode": "opt-in",
-  "sessionIds": ["<session-id>"],
-  "boundaries": { "allowLiveInjection": true },
-  "provider": "<provider>",
-  "model": "<model>",
-  "embeddingModel": "<absolute-local-model-directory>"
-}
-```
-
-An empty or missing `sessionIds` is an error, not all-session injection. The
-two examples are not interchangeable: the first builds an index, the second
-permits live cues.
-
-## Enable unified fold locally
-
-Create `unified-fold.json`:
-
-```json
-{
-  "enabled": true,
-  "sessionIds": ["<session-id>"],
-  "providerId": "<provider>",
-  "model": "<model>",
-  "embeddingModel": "<absolute-local-model-directory>"
-}
-```
-
-An empty `sessionIds` is deny-all; omitted IDs are an error.
-
-## Host-provided peer packages
-
-DSH supplies the host packages. The public package declares measured peer ranges
-and marks them optional so npm does not pull a mismatched host tree:
-
-```text
-@deepseek-ai/cordis                 >=4.1.0 <5
-@deepseek-ai/dsh-agent              >=0.2.2-rc.3 <0.3.0
-@deepseek-ai/dsh-compaction         >=0.2.2-rc.3 <0.3.0
-@deepseek-ai/dsh-compaction-basic   >=0.2.2-rc.3 <0.3.0
-@deepseek-ai/dsh-llm                >=0.2.2-rc.3 <0.3.0
-@deepseek-ai/dsh-session            >=0.2.2-rc.3 <0.3.0
-@deepseek-ai/dsh-token-meter        >=0.2.2-rc.3 <0.3.0
-@deepseek-ai/dsh-tools              >=0.2.2-rc.3 <0.3.0
-```
-
-Clean-room install command (do not use `--force` or `--legacy-peer-deps`):
-
-```text
-npm install <path-to-dsh-continuity-5.0.0-<hash>.tgz> --ignore-scripts --no-audit --no-fund
-```
-
-A clean-room `npm install --package-lock-only` with this package succeeds. The
-host packages remain provided by the running DSH host.
-
-## Turn-end archival worker
-
-To archive completed Host turns before folding, enable both worker flags in the
-**memory-resonance** overlay:
-
-```json
-{
+  "boundaries": {
+    "allowDefaultEnable": true,
+    "allowLiveInjection": true
+  },
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "embeddingModel": "<absolute-local-model-directory>",
+  "sessionIds": ["<local-session-id>"],
   "fullseedEnqueue": true,
   "fullseedWorker": true
 }
 ```
 
-These combine with `enabled`, the session allowlist and the provider settings in
-the examples above. The queue is persistent and deduplicated. The worker runs
-in the background; unified fold still generates any missing or stale coverage.
+`Index-only` keeps retrieval/index work separate from natural injection. `Live natural cue` additionally requires the reviewed live boundary. Installing a package or setting model names does **not** enable Host memory resonance or live injection.
 
-## Credentials: distinct CLI, Host and direct paths
+All summary generation uses Host `ctx.llm`. Existing provider credentials remain in DSH's own configuration; no credential is read from this plugin's overlay.
 
-These configuration boundaries are **not** interchangeable:
+## Rebuild the current session
 
-```text
-CLI provider module / migration / repair:
-  DSH_CONTINUITY_CREDENTIALS
-  DSH_CONTINUITY_ENDPOINT
-  DSH_CONTINUITY_PROVIDER
-  DSH_CONTINUITY_MODEL
-  used by the CLI provider-module boundary
-
-Host summary provider (default):
-  ctx.llm + overlay provider/model
-  createLlmSummaryProvider runs inside DSH
-
-Optional direct DeepSeek stream for unified fold and turn-end worker:
-  credentials in the corresponding private overlay, or DSH_CONTINUITY_CREDENTIALS
-  endpoint may be set explicitly when needed
-```
-
-The direct path preserves HTTP/provider errors without relying on the Host's
-normalized `TRANSPORT` failure. Credentials are never included in the public
-package. Setting environment variables does **not** enable Host memory resonance
-or the worker; Host enablement still requires the reviewed overlay, allowlist and
-boundaries.
-
-## Upgrade / migration flow
-
-This is the complete order for an existing user. Defaults stay off throughout
-until the explicit steps.
+Both Continuity presets expose:
 
 ```text
-1. Back up the profile and ~/.dsh/continuity.
-2. Install the package with public defaults still off.
-3. Audit and plan; this is read-only and calls no summary provider.
-     dsh-continuity migrate audit --session <id>
-     dsh-continuity migrate plan --session <id>
-4. Review the frozen plan. A plan is NOT approval.
-5. Apply explicitly; only this step may incur summary-provider cost.
-     dsh-continuity migrate apply --plan <plan> --approve \
-       --provider-module <module>
-6. If apply fails or is interrupted, resume the same plan explicitly:
-     dsh-continuity migrate resume --plan <plan> --approve \
-       --provider-module <module>
-   The previous active is preserved until activation succeeds.
-7. Verify the result:
-     dsh-continuity migrate verify --plan <plan> --query <text> \
-       --embedder-module <module>
-8. Only after the migration is reviewed, configure the local overlay and
-   restart DSH. The panel never performs migration or approval.
+memory_rebuild({ action: "probe" })
+memory_rebuild({ action: "start" })
+memory_rebuild({ action: "status", jobId? })
+memory_rebuild({ action: "cancel", jobId? })
+memory_rebuild({ action: "resume", jobId? })
 ```
 
-## Rollback
+Recommended order:
+
+1. Run `probe` once. It performs one Host model call and writes no job or index.
+2. Only after a non-empty, structurally valid `complete`, call `start` once.
+3. Use `status` to inspect the same session's persistent job; do not repeat `start` while it is active.
+4. The Host pauses that session's incremental worker, writes shadow summaries/vectors, catches up to the latest checkpoint, verifies complete coverage, then atomically activates the new base.
+5. `cancel` stops further work without activating a partial result. After a Host restart, `resume` continues the recorded job explicitly.
+
+Rebuild is strictly scoped to the calling `exec.agent.session.id`. The calling LLM does not write summaries and no subagent or additional conversation is created.
+
+## Vector-L and recall
+
+Generation requests one line, one Chinese sentence, about 100 characters and at most 256 characters, with semicolons allowed. Ingestion remains soft: overlong, multiline and multi-sentence outputs are recorded with warnings rather than rejected or retried. Resonance display is not truncated.
+
+`memory_recall({ query })` uses the same semantic resonance path as automatic memory cue. It returns pointers for exact readback; a summary is a clue, not the original evidence.
+
+## Disable and rollback
 
 ```text
-remove or rename the relevant local overlay
-restart DSH
-restore the profile/package backup if needed
+remove or rename the local overlay and cold-start to restore public default-off behavior
+restore the previous profile/package backup for a code rollback
+keep raw history and old bases; do not delete them during a package upgrade
 ```
 
-Old active indexes and raw records are not rewritten by the panel.
-
-## Historical guides
-
-Historical guides, archives and source backup files are excluded from the
-production package. Do not use old copies as current install steps.
+A failed or cancelled rebuild preserves the previous live index. A successful package installation does not itself regenerate historical summaries.

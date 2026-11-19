@@ -1,6 +1,6 @@
 {
   "name": "@theseus-whale/dsh-continuity",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Continuity host core with default-off turn-ping coverage, bounded raw retrieval, and DSH fold/session adapters",
   "type": "module",
   "license": "MIT",
@@ -17,9 +17,6 @@
     "access": "public"
   },
   "main": "./src/index.mjs",
-  "bin": {
-    "dsh-continuity": "bin/continuity-migrate.mjs"
-  },
   "exports": {
     ".": "./src/index.mjs",
     "./engine": "./src/engine.mjs",
@@ -78,6 +75,7 @@
     "./rules-lifecycle": "./src/rules-lifecycle.mjs",
     "./read-raw-chunk-tool": "./src/fullseed/read-raw-chunk-plugin.mjs",
     "./memory-recall-tool": "./src/turn-ping/memory-recall-tool.mjs",
+    "./memory-rebuild-tool": "./src/fullseed/host-rebuild-tool.mjs",
     "./raw-index": "./src/turn-ping/raw-index.mjs"
   },
   "files": [
@@ -99,12 +97,12 @@
     "templates/habits.md",
     "templates/concepts.md",
     "templates/rebuild.md",
-    "docs/*.md",
+    "docs/API-NOTES.md",
+    "docs/MODEL.md",
+    "docs/PORTABILITY.md",
+    "docs/unified-fold.md",
     "PANEL.md",
-    "INSTALL.md",
-    "bin/fullseed-run.mjs",
-    "bin/fullseed-repair.mjs",
-    "bin/continuity-migrate.mjs"
+    "INSTALL.md"
   ],
   "dsh": {
     "bundle": {
@@ -141,10 +139,7 @@
     "test:prestep-ttl": "node --test test/prestep-ttl.test.mjs",
     "test:read-tool-inject": "node --test test/read-tool-inject.test.mjs",
     "test:read-tool-preset": "node --test test/read-tool-preset.test.mjs",
-    "test:rules-lifecycle": "node --test test/rules-lifecycle.test.mjs",
-    "fullseed:run": "node bin/fullseed-run.mjs",
-    "fullseed:repair": "node bin/fullseed-repair.mjs",
-    "test:migration": "node --test test/migration-*.test.mjs"
+    "test:rules-lifecycle": "node --test test/rules-lifecycle.test.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.1.0 <5",

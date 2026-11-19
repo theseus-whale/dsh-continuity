@@ -8,10 +8,10 @@ export const DEFAULT_CONFIG = Object.freeze({
   mode: 'shadow',
   summary: Object.freeze({
     level: 'L',
-    targetChars: 256,
+    targetChars: 100,
     hardMaxChars: 256, // legacy compatibility only; never a rejection threshold
     maxAttempts: 2,
-    promptVersion: 'turn-ping-summary-v2-soft',
+    promptVersion: 'turn-ping-summary-v5-vector-l-context',
     model: 'deepseek-chat',
     temperature: 0,
   }),

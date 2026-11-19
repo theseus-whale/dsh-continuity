@@ -1,8 +1,33 @@
-# Release notes — 5.0.1
+# Release notes — 5.0.2
 
-## Active semantic recall
+## Host-only full rebuild
 
-- Add `memory_recall({ query })` to both Continuity presets, using the same `beforeAnswer` memory-resonance path as automatic `memory_cue`.
+- Add `memory_rebuild({ action: 'probe' | 'start' | 'status' | 'cancel' | 'resume', jobId? })` to both Continuity presets.
+- The calling LLM only submits or controls a job; DSH Host writes summaries through configured `ctx.llm` and local BGE.
+- Remove the fullseed and migration Node CLIs, independent DeepSeek transports, external provider module boundary and plugin-specific API-key path.
+- No CLI process, separate API-key input, subagent or additional conversation session is used.
+- Jobs start at the first eligible raw turn, checkpoint shadow progress, catch up to the latest session checkpoint, and activate only complete verified coverage.
+- Incremental work for the affected session pauses during rebuild; cancellation preserves the previous live index.
+- Final progress counts follow the activated snapshot rather than stale staging entries.
+
+## Vector-L summary contract
+
+- Prompts request one line, one Chinese sentence, a target of about 100 characters and a maximum of 256 characters, with semicolons allowed.
+- Summary requests explicitly use `reasoningEffort: 'off'`; task instructions are separated from historical raw material so the model summarizes rather than answers it.
+- Soft ingestion is unchanged: overlong, multiline and multi-sentence outputs remain accepted with warnings and are not retried or rejected.
+- Resonance rendering is unchanged; this release does not truncate or disguise historical long summaries.
+- Existing raw history and stored summaries are preserved. Regeneration is an explicit per-session rebuild operation.
+
+## Real Host verification
+
+- A real Continuity session completed Host rebuild and activated a new verified base with 3951 summaries and 3951 vectors.
+- Independent multi-frame raw replay verified every chunk ID, raw-text/raw-record hash, seq range and vector record at the activated checkpoint.
+- A second allowlisted session retained an unchanged active hash throughout the rebuild.
+- Related regression tests cover Host prompts, non-reasoning requests, soft ingestion, authorization, cancellation, session isolation, activation and final counters.
+
+## 5.0.1 active semantic recall
+
+- Add `memory_recall({ query })` to both Continuity presets, using the same memory-resonance path as automatic memory cue.
 - Respect current-session enablement and cutoff; report disabled and no-hit states without fabricating memories.
 - Exclude derived recall tool results from future summary source views and raw fallback indexing.
 - Include `memory_recall` in the panel tool catalog with its purpose and `query` parameter notes.
@@ -10,69 +35,10 @@
 
 ## Scoped UI repair
 
-- Keep the panel state route stable at `/dsh-continuity/state.json` for scoped and unscoped package names.
-- Treat unavailable Host `locale` and `slots` injections as diagnostic false values instead of failing the current-state route.
-- Quote every scoped `name` scalar in `cordis.patch.yml` so the bundle passes YAML parsing.
-- Register the web client factory as `@theseus-whale/dsh-continuity`, preventing collision with the legacy `dsh-continuity` factory during cold startup.
-- No memory, fold, migration, model, or default-policy changes.
-
-## 5.0.0 architecture
-
-## Current architecture
-
-- Public memory resonance and unified fold default off; local overlays use explicit per-session allowlists.
-- Canonical raw events are indexed immediately for lexical fallback without a model call.
-- Completed Host turns enter a stable, deduplicated background archival queue.
-- The worker writes summary/vector deltas atomically and resumes pending work after restart.
-- Unified fold verifies complete raw coverage and reuses existing turn summaries, including complete long-turn chunks.
-- Missing or stale summaries are still generated during fold; open turns remain protected.
-- `read_seq_range` and `read_raw_chunk` provide bounded exact readback; unified turn summaries without event offsets use verified raw-turn reconstruction.
-- Migration CLI provides audit, plan, apply, resume and verify.
-- The panel is read-only current Host state.
-
-## Verified locally
-
-- Real Host fold committed 128 summary blocks: 89 generated and 39 reused.
-- Active index and staging matched; raw readback passed.
-- Turn-end worker consumed its persistent queue and activated matching summary/vector deltas.
-- Production-code replay against the real active index reused existing summaries with zero model and embedding calls.
-- Source tests pass; clean-room Host-matrix installation and CLI smoke pass.
-
-## Migration
-
-```text
-plan content hash is recomputable from the plan without its hash field
-apply requires --plan --approve
-apply uses only frozen missing items; reusable items come from the frozen
-fullseed-active source
-failure preserves the previous active
-resume reuses staging; root provider counter is cumulative
-verify checks active identity, each base/delta, merged coverage, raw/vector,
-cutoff, production query and raw read
-```
-
-## Panel
-
-Sections:
-
-```text
-current session
-记忆共振
-unified fold
-migration
-runtime status and tool catalog
-diagnostics
-```
-
-No legacy architecture instructions, no provider calls from the panel, and no migration approval implied by opening it.
+- Keep panel state routing stable for scoped and unscoped package names.
+- Quote scoped `name` scalars in `cordis.patch.yml` and register the client factory as `@theseus-whale/dsh-continuity`.
+- Treat unavailable optional Host locale/slot injections as diagnostics rather than failing current state.
 
 ## Local model prerequisite
 
-The production package does not include Xenova model files. Embedding-enabled features require a user-supplied local model directory and fail before execution when required files are absent. The conversion repository did not provide sufficient redistribution evidence, so the package uses a non-bundled distribution path. See `docs/MODEL.md`.
-
-## Remaining release work
-
-```text
-Git source synchronization and CI/release workflow
-owner-reviewed publication
-```
+The production package does not include Xenova model files. Embedding-enabled features require a user-supplied local model directory and fail before execution when required files are absent. See `docs/MODEL.md`.
