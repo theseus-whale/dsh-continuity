@@ -1,6 +1,21 @@
-# Release notes — 5.0.3
+# Release notes — 5.0.4
 
-## Quiet automatic recall
+## Scoped Host module resolution
+
+- Resolve the Host panel through `@theseus-whale/dsh-continuity`, the same package used by both preset engines and their tools.
+- Keep the Host row id and state route unchanged. This prevents an installed legacy unscoped package from being loaded as a second module instance with stale version and isolated state.
+- Add regression coverage for the scoped Host reference and quoted YAML package names.
+
+## Relevant Rule Cue
+
+- Add opt-in `ruleCue` matching for individual `rules.md` and `habits.md` blocks, using the local BGE embedder and the current user input.
+- Preserve the existing full-text carrier lifecycle. Turns that inject the full carrier skip the local cue; unrelated input injects nothing.
+- Default to `shadow`; `live` additionally requires Host live-injection permission and an explicit `liveSessionIds` allowlist. Other sessions remain unaffected.
+- Select all sufficiently relevant, vector-novel blocks rather than imposing a one-rule cap, with a 0.56 confidence gate and recent-history cooldown.
+- Keep a live cue across tool follow-up steps, then retire it on the next real user input so cues do not accumulate across turns.
+- Record candidate, selection, injection and lifecycle diagnostics for replay. Regression and real Host checks cover injection, no-hit retirement, session isolation and tool-step persistence.
+
+## 5.0.3 Quiet automatic recall
 
 - Add `autoRecall.mode`: `quiet` by default, `off` for no automatic cues, and `legacy` for the previous behavior.
 - Quiet mode retrieves only when the current input expresses retrospective intent; raw fallback cannot bypass this gate.

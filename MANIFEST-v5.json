@@ -1,11 +1,11 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.3",
+  "version": "5.0.4",
   "files": [
     {
       "path": "INSTALL.md",
-      "bytes": 4336,
-      "sha256": "3aaad85ca678d34ad6401feb2969f47abc8b999ebcb449827ff3f2b07e213130"
+      "bytes": 5368,
+      "sha256": "3b6a04e58668a5cf866b4e63c62de56dbddaf711557a67b73e88787693dabeff"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 3468,
-      "sha256": "5ebdd13262309c970254e4826d176cbaf5d4b59c6aaca69f30a8230df151e7f7"
+      "bytes": 3984,
+      "sha256": "767df814322162755f4504f0e3e2241779b158744dda34711bb316d75ca82cee"
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 4029,
-      "sha256": "3306efeb0d91e0cb984440f640e284678f0e71fc1709f84a259dff377b13cfcc"
+      "bytes": 5407,
+      "sha256": "fbda930ff0a8e8e595938e1f969bf15b177f7d761fb065ffe70c1863e3f8cf07"
     },
     {
       "path": "client.js",
@@ -34,8 +34,8 @@
     },
     {
       "path": "cordis.patch.yml",
-      "bytes": 25381,
-      "sha256": "33595bf97b484cbcc5ca82ce00023232fd0635cee261c02792e619060d0308f7"
+      "bytes": 25398,
+      "sha256": "0d6929b7428269440aadf629d43d8375ceeb9ac1e637a5f9dba329d07e925af5"
     },
     {
       "path": "docs/API-NOTES.md",
@@ -80,7 +80,7 @@
     {
       "path": "package.json",
       "bytes": 12656,
-      "sha256": "1e3a057bdad5664dd8a720d2f8c6311679339f30669853a6a6740763b598a836"
+      "sha256": "f23c06a3780b043727f11194560bf4e6cd5dfc98f1be96af9a02bfd2026a599e"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -728,9 +728,14 @@
       "sha256": "a4fb34afad88aa189d2574cd7b625b7f2ec65abf926a296bed6bd57c6caf43b3"
     },
     {
+      "path": "src/rule-cue.mjs",
+      "bytes": 6440,
+      "sha256": "5f9224e59618dc96996612828798144ebd3e6886099491a5e5070ab81f99d426"
+    },
+    {
       "path": "src/rules-lifecycle.mjs",
-      "bytes": 1716,
-      "sha256": "08dc78f38b139bb736319985aeb5937397430a5737ce266386aa6a1643a6106a"
+      "bytes": 2501,
+      "sha256": "731beebdf3d81c06f83779b3967d176189fe01a89cdb02909dd00c9664f703a2"
     },
     {
       "path": "src/save-start.mjs",
@@ -984,8 +989,8 @@
     },
     {
       "path": "src/turn-ping/pre-step.mjs",
-      "bytes": 6913,
-      "sha256": "24adecb5382dc24b9d2fc2196f5edb8ac295bb0db0c125d5ac332df5a5a949be"
+      "bytes": 13399,
+      "sha256": "88c70b49d7cd8ab347e9ee2949152b40e67526ccd5dcfd1a4f080f9e3e7017e9"
     },
     {
       "path": "src/turn-ping/providers.mjs",

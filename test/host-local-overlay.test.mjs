@@ -36,7 +36,7 @@ function makeSession(id) {
 function listenerFor(config, beforeAnswer) {
   const listeners = new Map();
   const ctx = { on: (name, fn) => listeners.set(name, fn) };
-  installTurnPingPreStep({ ctx, config, beforeAnswer, log: { warn() {} } });
+  installTurnPingPreStep({ ctx, config: { ...config, ruleCue: { mode: 'off' } }, beforeAnswer, log: { warn() {} } });
   return listeners.get('agent/pre-step');
 }
 

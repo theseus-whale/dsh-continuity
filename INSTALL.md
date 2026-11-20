@@ -1,4 +1,4 @@
-# Install and operate 5.0.3
+# Install and operate 5.0.4
 
 ## Requirements
 
@@ -12,11 +12,11 @@
 2. Install the reviewed package without forcing peer dependencies:
 
 ```text
-npm install <path-to-theseus-whale-dsh-continuity-5.0.3.tgz> --ignore-scripts --no-audit --no-fund
+npm install <path-to-theseus-whale-dsh-continuity-5.0.4.tgz> --ignore-scripts --no-audit --no-fund
 ```
 
 3. Point the Host bundle and scoped client module to `@theseus-whale/dsh-continuity`.
-4. Cold-start DSH and verify `plugin.version = 5.0.3`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
+4. Cold-start DSH and verify `plugin.version = 5.0.4`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
 
 There is no `dsh-continuity` command to run. The package has no Node CLI, separate API-key prompt, external provider module or independent DeepSeek transport.
 
@@ -50,6 +50,21 @@ All summary generation uses Host `ctx.llm`. Existing provider credentials remain
 The default `autoRecall.mode` is `quiet`: ordinary chat without retrospective intent does not retrieve or inject memories. Currently visible and recently shown cues are deduplicated, and candidates are selected by vector novelty without a fixed one-hit cap. Manual `memory_recall` remains ungated.
 
 Set `autoRecall.mode` to `off` to disable automatic cue generation or `legacy` to restore the previous behavior. Optional local tuning fields are `tau`, `delta`, `noveltyThreshold` and `historyWindowMs`. Decisions are recorded in the session-local `cue-decisions.jsonl`.
+
+## Relevant Rule Cue
+
+Rule Cue evaluates individual blocks in the current session's `rules.md` and `habits.md` against the current user input. The default `ruleCue.mode` is `shadow`, which only evaluates and logs. To enable actual local cues for specific sessions, add this to the same reviewed local overlay:
+
+```json
+"ruleCue": {
+  "mode": "live",
+  "liveSessionIds": ["<local-session-id>"]
+}
+```
+
+Live injection also requires `boundaries.allowLiveInjection: true`; a session not listed in `liveSessionIds` cannot receive it. Use `off` to disable Rule Cue entirely. Optional tuning fields are `tau` (default `0.56`), `delta`, `noveltyThreshold` and `historyWindowMs`.
+
+The existing full-text carrier is preserved. A full-carrier injection turn skips the local cue, and no match injects nothing. A live cue remains available across tool follow-up steps and is retired on the next real user input. Candidate and lifecycle diagnostics are stored in the session-local `rule-cue-log.jsonl` and the configured pre-step diagnostic log.
 
 ## Rebuild the current session
 

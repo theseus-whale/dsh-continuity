@@ -77,3 +77,14 @@ test('public patch has no local session ids and uses a local unified-fold overla
   assert.match(text, /localConfig: \.\/local\/unified-fold\.json/);
   assert.match(text, /unifiedFold:\s*\n\s*enabled: false/);
 });
+
+test('Host panel and preset engine resolve the same scoped package', () => {
+  const text = fs.readFileSync(path.resolve('cordis.patch.yml'), 'utf8');
+  assert.match(
+    text,
+    /- id: dsh-continuity\s*\n\s*name: '@theseus-whale\/dsh-continuity'\s*\n\s*required: false/,
+  );
+  assert.doesNotMatch(text, /- id: dsh-continuity\s*\n\s*name: dsh-continuity\s*(?:\n|$)/);
+  const engineNames = text.match(/name: '@theseus-whale\/dsh-continuity\/engine'/g) ?? [];
+  assert.equal(engineNames.length, 2);
+});

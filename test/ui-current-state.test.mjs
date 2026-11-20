@@ -33,7 +33,7 @@ test('current UI state reports real session/disabled defaults, not hardcoded exa
     assert.equal(state.memoryResonance.enabled, false);
     assert.equal(state.unifiedFold.enabled, false);
     assert.equal(state.migration.plan, null);
-    assert.equal(state.plugin.version, '5.0.2');
+    assert.equal(state.plugin.version, JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8')).version);
     assert.equal(state.diagnostics.hostServices.sessionQuery, true);
   } finally {
     if (previous === undefined) delete process.env.DSH_CONTINUITY_HOME; else process.env.DSH_CONTINUITY_HOME = previous;

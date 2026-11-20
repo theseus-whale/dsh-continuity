@@ -29,7 +29,7 @@ test('actual pre-step handler retrieves and appends memory resonance for peer me
   const calls = [];
   installTurnPingPreStep({
     ctx,
-    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true } },
+    config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, ruleCue: { mode: 'off' } },
     beforeAnswer: async (args) => { calls.push(args); return { enabled: true, ping: { text: '[记忆共振] HIT turn-001981' }, H: 1 }; },
     contextMessage: (text) => ({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'system-prompt' } }),
   });

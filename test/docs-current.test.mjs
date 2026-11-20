@@ -15,6 +15,9 @@ test('INSTALL documents Host-only rebuild and recovery without CLI credentials',
   }
   assert.ok(text.includes('Index-only') && text.includes('Live natural cue'));
   assert.ok(text.includes('does **not** enable Host'));
+  assert.ok(text.includes('Install and operate 5.0.4'));
+  assert.ok(text.includes('theseus-whale-dsh-continuity-5.0.4.tgz'));
+  assert.equal(text.includes('5.0.3'), false);
 });
 
 test('public patch has current description, valid UTF-8, and preserved thresholds', () => {
@@ -32,7 +35,8 @@ test('README names Node/host requirements without inventing a support matrix', (
   assert.ok(text.includes('Node.js >=22'));
   assert.ok(text.includes('tested baseline'));
   assert.ok(text.includes('not a claim of support for every future Host'));
-  assert.ok(text.includes('theseus-whale-dsh-continuity-5.0.3.tgz'));
+  assert.ok(text.includes('theseus-whale-dsh-continuity-5.0.4.tgz'));
+  assert.ok(text.includes('ruleCue.liveSessionIds'));
 });
 
 test('current docs contain no Node CLI, direct credential path, or old architecture', () => {

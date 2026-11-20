@@ -76,7 +76,7 @@ test('pre-step gates ordinary input and off, while legacy and explicit recall in
     };
     installTurnPingPreStep({
       ctx,
-      config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, autoRecall: { mode } },
+      config: { mode: 'opt-in', boundaries: { allowLiveInjection: true }, autoRecall: { mode }, ruleCue: { mode: 'off' } },
       beforeAnswer: async args => { calls++; seen = args; return { enabled: true, H: 1, ping: { text: '[记忆共振] HIT' } }; },
       log: console,
     });

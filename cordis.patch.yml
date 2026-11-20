@@ -20,7 +20,7 @@
 
 - insert:
     - id: dsh-continuity
-      name: dsh-continuity
+      name: '@theseus-whale/dsh-continuity'
       required: false
       config:
         safeMode: true
