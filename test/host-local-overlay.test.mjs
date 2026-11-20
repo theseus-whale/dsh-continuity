@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { resolveTurnPingConfig } from '../src/turn-ping/local-config.mjs';
-import { installTurnPing } from '../src/turn-ping/install.mjs';
+import { installTurnPing, recordTurnPingInstallIssue } from '../src/turn-ping/install.mjs';
 import { installTurnPingPreStep } from '../src/turn-ping/pre-step.mjs';
+import { continuityState, resetState } from '../src/state.mjs';
 
 const publicConfig = { enabled: false, mode: 'shadow', localConfig: './local/memory-resonance.json' };
 const local = { enabled: true, mode: 'opt-in', boundaries: { allowDefaultEnable: true, allowLiveInjection: true }, autoRecall: { mode: 'legacy' }, provider: 'local-provider', model: 'local-model', embeddingModel: './models/Xenova/bge-small-zh-v1.5', sessionIds: ['session-local-a', 'session-local-b'] };
@@ -83,4 +84,30 @@ test('enabled overlay requires ids, rejects malformed, and provider absence is e
   assert.throws(() => resolveTurnPingConfig(publicConfig, { home }));
   const resolved = resolveTurnPingConfig(publicConfig, { home: overlayHome() });
   assert.equal(installTurnPing({ config: resolved }).reason, 'summary-provider-unavailable');
+});
+
+test('turn-ping install failures reach gate errors, DEBUG diagnostics and the panel state', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'host-install-diagnostics-'));
+  const warnings = [];
+  resetState();
+  try {
+    recordTurnPingInstallIssue({
+      home,
+      config: { diagnostics: { enabled: true } },
+      error: new Error('ctx.llm adapter could not initialize'),
+      log: { warn: message => warnings.push(message) },
+    });
+    const readLast = file => fs.readFileSync(file, 'utf8').trim().split(/\r?\n/).map(line => JSON.parse(line)).at(-1);
+    const gate = readLast(path.join(home, 'gate-errors.jsonl'));
+    const debug = readLast(path.join(home, 'turn-ping-prestep-debug.jsonl'));
+    assert.equal(gate.code, 'turn-ping-install-failed');
+    assert.match(gate.message, /ctx\.llm adapter/);
+    assert.equal(debug.kind, 'install-error');
+    assert.equal(debug.code, gate.code);
+    assert.equal(continuityState.lastError.key, 'turn-ping-install-failed');
+    assert.match(continuityState.lastError.message, /ctx\.llm adapter/);
+    assert.equal(warnings.length, 1);
+  } finally {
+    resetState();
+  }
 });

@@ -1,4 +1,4 @@
-# @theseus-whale/dsh-continuity 5.0.4
+# @theseus-whale/dsh-continuity 5.0.5
 
 DSH Host 内的连续性插件。公开默认均为 **off**；只有本地 overlay 中明确列出的会话才会启用记忆共振、轮末归档和统一折叠。
 
@@ -56,7 +56,7 @@ Verified against the installed DSH desktop runtime `0.2.2-rc.3`, Cordis `4.1.0`,
 ## Install
 
 ```text
-npm install <path-to-theseus-whale-dsh-continuity-5.0.4.tgz>
+npm install <path-to-theseus-whale-dsh-continuity-5.0.5.tgz>
 ```
 
 安装、备份、overlay、重建与回滚步骤见 [INSTALL.md](INSTALL.md)。

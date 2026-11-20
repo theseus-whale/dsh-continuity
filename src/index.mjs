@@ -22,7 +22,7 @@ import { buildFacetState } from './facets/panel-state.mjs';
 import { migrateThreadsFile } from './threads-store.mjs';
 import { installExtractionPreStep, recordExtractionInstallError, lastUserText } from './memory/extraction-pre-step.mjs';
 import { contextMessage } from './threads.mjs';
-import { installTurnPing } from './turn-ping/install.mjs';
+import { installTurnPing, recordTurnPingInstallIssue } from './turn-ping/install.mjs';
 import { resolveTurnPingConfig } from './turn-ping/local-config.mjs';
 import { turnPingBeforeAnswer, getTurnPingHost } from './turn-ping/registry.mjs';
 import { installTurnPingPreStep } from './turn-ping/pre-step.mjs';
@@ -31,7 +31,7 @@ import { wireCoverageHost } from './turn-ping/coverage/host-wire.mjs';
 import { installEngineTurnStopping } from './fullseed/worker.mjs';
 import { createFullseedWorker, workerIdentityFromConfig } from './fullseed/runtime.mjs';
 import { createHostRebuildService } from './fullseed/host-rebuild.mjs';
-import { setHostRebuildService } from './fullseed/host-rebuild-tool.mjs';
+import { setHostRebuildService, setHostRebuildUnavailable } from './fullseed/host-rebuild-tool.mjs';
 import { turnPingRoot } from './turn-ping/storage.mjs';
 import { createLlmSummaryProvider, createBgeEmbedder } from './turn-ping/host-adapters.mjs';
 import { createFullseedLlmProvider } from './fullseed/llm-adapter.mjs';
@@ -245,10 +245,11 @@ export function apply(ctx, config = {}) {
           log: (row) => log.info?.(`[dsh-continuity] fullseed worker ${JSON.stringify(row)}`),
         });
       }
-      if (turnPing.useHostAdapters === true && llm && embeddingAdapter && typeof ctx.get === 'function' && ctx.get('sessionQuery')) {
+      const sessionQuery = typeof ctx.get === 'function' ? ctx.get('sessionQuery') : null;
+      if (turnPing.useHostAdapters === true && llm && embeddingAdapter && sessionQuery) {
         setHostRebuildService(createHostRebuildService({
           home: installed.home,
-          sessionQuery: ctx.get('sessionQuery'),
+          sessionQuery,
           provider: createFullseedLlmProvider({ llm, provider: turnPing.provider, model: turnPing.model }),
           embedder: embeddingAdapter,
           allowedSessionIds: allowedSessions,
@@ -256,6 +257,16 @@ export function apply(ctx, config = {}) {
           model: turnPing.model,
         }));
         log.info?.('[dsh-continuity] Host memory_rebuild service ready (ctx.llm)');
+      } else {
+        const missing = [];
+        if (turnPing.useHostAdapters !== true) missing.push('useHostAdapters');
+        if (!llm) missing.push('ctx.llm');
+        if (!embeddingAdapter) missing.push('embedder');
+        if (!sessionQuery) missing.push('sessionQuery');
+        const message = `memory_rebuild prerequisites unavailable: ${missing.join(', ')}`;
+        const code = 'host-rebuild-prerequisites-unavailable';
+        setHostRebuildUnavailable({ code, message });
+        recordTurnPingInstallIssue({ home: installed.home, config: turnPing, code, reason: message, log });
       }
       installTurnPingPreStep({
         ctx,
@@ -272,11 +283,20 @@ export function apply(ctx, config = {}) {
         diagnosticPath: installed.diagnosticPath,
         indexFor: installed.host.rawIndexFor,
       });
-    } else if (installed.reason !== 'disabled') {
-      log.warn?.(`[dsh-continuity] turn-ping not installed: ${installed.reason}`);
+    } else if (installed.reason === 'disabled') {
+      setHostRebuildUnavailable({ code: 'turn-ping-disabled', message: 'memory resonance is disabled by local configuration' });
+    } else {
+      const code = `turn-ping-${installed.reason}`;
+      const message = `turn-ping not installed: ${installed.reason}`;
+      setHostRebuildUnavailable({ code, message });
+      recordTurnPingInstallIssue({ home: turnPing.home || continuityHome(), config: turnPing, code, reason: message, log });
     }
   } catch (error) {
-    log.warn?.(`[dsh-continuity] turn-ping install failed: ${error?.message ?? error}`);
+    const code = 'turn-ping-install-failed';
+    const message = String(error?.message ?? error);
+    const turnPing = resolvedTurnPing ?? config.turnPing ?? {};
+    setHostRebuildUnavailable({ code, message });
+    recordTurnPingInstallIssue({ home: turnPing.home || continuityHome(), config: turnPing, code, error, log });
   }
   // First history-map injection must not wait for compression pressure.
   try {

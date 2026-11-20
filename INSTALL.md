@@ -1,4 +1,4 @@
-# Install and operate 5.0.4
+# Install and operate 5.0.5
 
 ## Requirements
 
@@ -12,11 +12,11 @@
 2. Install the reviewed package without forcing peer dependencies:
 
 ```text
-npm install <path-to-theseus-whale-dsh-continuity-5.0.4.tgz> --ignore-scripts --no-audit --no-fund
+npm install <path-to-theseus-whale-dsh-continuity-5.0.5.tgz> --ignore-scripts --no-audit --no-fund
 ```
 
 3. Point the Host bundle and scoped client module to `@theseus-whale/dsh-continuity`.
-4. Cold-start DSH and verify `plugin.version = 5.0.4`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
+4. Cold-start DSH and verify `plugin.version = 5.0.5`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
 
 There is no `dsh-continuity` command to run. The package has no Node CLI, separate API-key prompt, external provider module or independent DeepSeek transport.
 
@@ -87,6 +87,12 @@ Recommended order:
 5. `cancel` stops further work without activating a partial result. After a Host restart, `resume` continues the recorded job explicitly.
 
 Rebuild is strictly scoped to the calling `exec.agent.session.id`. The calling LLM does not write summaries and no subagent or additional conversation is created.
+
+### If `probe` says the Host rebuild service is unavailable
+
+Do not retry `probe` or `start`: the rebuild service is registered only after the turn-ping Host and its prerequisites install successfully. Check the panel's recent error and `~/.dsh/continuity/gate-errors.jsonl` for the original `turn-ping-*` or `host-rebuild-prerequisites-unavailable` entry. When pre-step diagnostics are enabled, the same failure also appears as `install-error` in `turn-ping-prestep-debug.jsonl`.
+
+Fix the reported overlay, `ctx.llm`, embedder or `sessionQuery` prerequisite, cold-start DSH, and only then run one `probe`. A successful package installation alone does not prove that memory resonance or the rebuild service is ready.
 
 ## Vector-L and recall
 

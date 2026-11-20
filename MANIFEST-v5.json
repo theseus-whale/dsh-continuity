@@ -1,11 +1,11 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.4",
+  "version": "5.0.5",
   "files": [
     {
       "path": "INSTALL.md",
-      "bytes": 5368,
-      "sha256": "3b6a04e58668a5cf866b4e63c62de56dbddaf711557a67b73e88787693dabeff"
+      "bytes": 6086,
+      "sha256": "0d6c7f2b198a74212cd6306d2cc16f769a069f91f35632cbc77421b1f4196a47"
     },
     {
       "path": "LICENSE",
@@ -20,12 +20,12 @@
     {
       "path": "README.md",
       "bytes": 3984,
-      "sha256": "767df814322162755f4504f0e3e2241779b158744dda34711bb316d75ca82cee"
+      "sha256": "ad48b27e517ae5ffee5401f6c917bc72f6b35f566b4c74ce5f0fa424f2560c6b"
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 5407,
-      "sha256": "fbda930ff0a8e8e595938e1f969bf15b177f7d761fb065ffe70c1863e3f8cf07"
+      "bytes": 6113,
+      "sha256": "573d3a5b7a3ddb0bdbae0925aab6dfb1cddea42395d18ec0b86d74cb1dca68f6"
     },
     {
       "path": "client.js",
@@ -80,7 +80,7 @@
     {
       "path": "package.json",
       "bytes": 12656,
-      "sha256": "f23c06a3780b043727f11194560bf4e6cd5dfc98f1be96af9a02bfd2026a599e"
+      "sha256": "0593e1dfb08a38b234267a19e431dffd75c9160f17deb3f8f7a6b99e6b3c72c7"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -279,8 +279,8 @@
     },
     {
       "path": "src/fullseed/host-rebuild-tool.mjs",
-      "bytes": 2773,
-      "sha256": "5d7fe5706465126b96a85936a1112e2e31f1cc5c34c196f1c4b48bfa56c92901"
+      "bytes": 3560,
+      "sha256": "8c157ab262472c7efd7b376f138437c6735070c46fce07aa7c9da3ef9d716385"
     },
     {
       "path": "src/fullseed/host-rebuild.mjs",
@@ -379,8 +379,8 @@
     },
     {
       "path": "src/index.mjs",
-      "bytes": 43709,
-      "sha256": "90ad47bf9434d201d9f670d38e6753a4deba97f42967ca02fe7931ffb2f1159e"
+      "bytes": 44976,
+      "sha256": "1681bd6138745b831d1cf9237f61f779d53f704b07f4ce41dada5b07c46ea40c"
     },
     {
       "path": "src/inject-policy.mjs",
@@ -964,8 +964,8 @@
     },
     {
       "path": "src/turn-ping/install.mjs",
-      "bytes": 1327,
-      "sha256": "8054606867bb6d77f3e2f97dd926e52d732bea4cb48253e0edd2456fec2b3d1d"
+      "bytes": 2318,
+      "sha256": "f4e77b0716644d81e91ea0cf040f7b36b9c8be069fddd4d7dbf2e7690c46d9ba"
     },
     {
       "path": "src/turn-ping/local-config.mjs",

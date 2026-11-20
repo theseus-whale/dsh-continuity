@@ -1,4 +1,13 @@
-# Release notes — 5.0.4
+# Release notes — 5.0.5
+
+## Visible installation failures
+
+- Persist `turn-ping` installation and rebuild-prerequisite failures to `gate-errors.jsonl`; when pre-step diagnostics are enabled, write the same root cause to `turn-ping-prestep-debug.jsonl` as `install-error`.
+- Surface the failure in the panel's recent-error state instead of leaving it only in the Host console.
+- When the rebuild service was never registered, `memory_rebuild` now reports the original error code and message, plus the diagnostic location. `probe` cannot succeed before the turn-ping Host and rebuild prerequisites are installed.
+- Public defaults, session allowlists, live-injection boundaries and rebuild storage behavior are unchanged.
+
+## 5.0.4
 
 ## Scoped Host module resolution
 

@@ -195,6 +195,18 @@ test('probe rejects tool/reasoning transcripts but allows a slightly long single
 });
 
 
+test('unavailable rebuild reports the original installation failure and diagnostic location', async () => {
+  const tool = createMemoryRebuildTool({
+    resolveService: () => null,
+    resolveUnavailableReason: () => ({ code: 'turn-ping-install-failed', message: 'ctx.llm adapter could not initialize' }),
+  });
+  await assert.rejects(
+    tool.execute({ action: 'probe' }, { agent: { session: { id: 'probe-session' } } }),
+    /Host rebuild service unavailable; turn-ping-install-failed: ctx\.llm adapter could not initialize;.*gate-errors\.jsonl/,
+  );
+});
+
+
 test('final counter follows activated snapshot rather than stale staging entries', async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'host-rebuild-counter-'));
   const sessionId = 'counter-session';
