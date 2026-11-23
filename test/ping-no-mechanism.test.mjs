@@ -19,7 +19,7 @@ test('fullseed ping has clue note and no mechanism trailer', () => {
   const summary = { chunkId: 'chunk-a', turnId: 'turn-1', seqStart: 1, seqEnd: 2, availableCutoff: 2, summaryText: '摘要正文' };
   const ping = buildChunkPing({ summaries: [summary], scored: [{ chunkId: 'chunk-a', score: 1 }], cutoff: 2, config });
   assert.match(ping.text, /^\[记忆共振\]/);
-  assert.match(ping.text, /摘要是线索，不是原文/);
+  assert.match(ping.text, /摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。/);
   assert.doesNotMatch(ping.text, forbidden);
 });
 
@@ -28,7 +28,7 @@ test('turn-ping ping has clue note and no mechanism trailer', () => {
   const turn = { turnId: 'turn-1', seqStart: 1, seqEnd: 2 };
   const ping = buildPing({ summaryByTurn: new Map([['turn-1', summary]]), retrieval: { facets: [{ index: 0, H: 1, show: 1, high: [{ turnId: 'turn-1' }] }] }, turns: [turn], config });
   assert.match(ping.text, /^\[记忆共振｜/);
-  assert.match(ping.text, /摘要是线索，不是原文/);
+  assert.match(ping.text, /摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。/);
   assert.doesNotMatch(ping.text, forbidden);
 });
 
@@ -67,11 +67,11 @@ test('native and PTC actual ping assembly both fail closed on mechanism words', 
   const native = await legacyPing();
   const ptc = await ptcPing();
   for (const { answer } of [native, ptc]) {
-    assert.match(answer.ping.text, /摘要是线索，不是原文/);
+    assert.match(answer.ping.text, /摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。/);
     assert.doesNotMatch(answer.ping.text, /run_code|tools\.|nextByteOffset|chunkId|read_raw_chunk|read_seq_range/);
     const injected = memoryCueMessage(answer.ping.text);
     assert.equal(injected.source.kind, 'memory-cue');
-    assert.match(injected.content[0].text, /摘要是线索，不是原文/);
+    assert.match(injected.content[0].text, /摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。/);
     assert.doesNotMatch(injected.content[0].text, /run_code|tools\.|nextByteOffset|chunkId|read_raw_chunk|read_seq_range/);
     assert.ok(answer.H >= 1);
   }
@@ -88,7 +88,7 @@ test('repair cursor scans only new memory-cue and legacy turn-ping-memory inject
   const historicalViolation = { source: { kind: 'turn-ping-memory' }, content: [{ type: 'text', text: 'run_code' }] };
   const ordinaryDiscussion = { source: { kind: 'user' }, content: [{ type: 'text', text: 'run_code tools. nextByteOffset chunkId' }] };
   const runtimeContext = { source: { kind: 'user' }, content: [{ type: 'text', text: 'Current runtime context' }] };
-  const cleanPing = memoryCueMessage('摘要是线索，不是原文。');
+  const cleanPing = memoryCueMessage('摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。。');
   const messages = [historicalViolation, ordinaryDiscussion, runtimeContext, cleanPing];
   assert.deepEqual(scanInjectedSince(messages, 1), []);
   assert.equal(scanInjectedSince(messages, 0).length, 1);

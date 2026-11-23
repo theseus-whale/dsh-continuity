@@ -1,6 +1,6 @@
 import { sha256 } from './config.mjs';
 
-export const CLUE_NOTE = '摘要是线索，不是原文。';
+export const CLUE_NOTE = '摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。';
 
 const turnIndex = (turns) => {
   const sorted = [...turns].sort((a, b) => a.seqStart - b.seqStart);

@@ -108,7 +108,8 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
     const usePrototype = useHighQuality && !quiet;
     if ((cursor !== null || beforeSeq !== null) && !usePrototype) throw new Error('memory_recall: cursor and beforeSeq require manual full-library retrieval');
     if (beforeSeq !== null && (!Number.isInteger(beforeSeq) || beforeSeq < 1)) throw new Error('memory_recall: beforeSeq must be a positive integer');
-    let effectiveCutoff = beforeSeq === null ? cutoff : Math.min(cutoff, beforeSeq - 1);
+    // Availability belongs to the visible snapshot; beforeSeq only filters summary seqEnd.
+    let effectiveCutoff = cutoff;
     let excludeIds = new Set();
     let paginationOffset = 0;
     const historyRoot = turnPingRoot({ home, sessionId });
@@ -143,7 +144,7 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
         const decoded = decodeRecallCursor(cursor, { query, indexIdentity: active.identity, beforeSeq }, prototype.maxCursorIds);
         excludeIds = decoded.excludeIds;
         paginationOffset = decoded.offset;
-        effectiveCutoff = beforeSeq === null ? decoded.cutoff : Math.min(decoded.cutoff, beforeSeq - 1);
+        effectiveCutoff = decoded.cutoff;
       }
       const eligible = merged.summaries
         .map((summary, i) => ({ summary, vector: merged.vectors[i] }))

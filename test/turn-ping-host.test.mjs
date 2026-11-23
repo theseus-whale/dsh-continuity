@@ -45,7 +45,7 @@ test('enabled fold writes independent summary and vector, retrieval resolves sam
   assert.equal(answer.enabled, true);
   assert.ok(answer.ping.text.includes('turn-000001'));
   assert.ok(answer.ping.text.includes('Local seq only'));
-  assert.ok(answer.ping.text.includes('摘要是线索，不是原文'));
+  assert.ok(answer.ping.text.includes('摘要仅作定位：按 seq 回读；追溯用原文措辞＋beforeSeq 查更早。无命中≠不存在。'));
   assert.doesNotMatch(answer.ping.text, /run_code|tools\.|nextByteOffset|chunkId|read_raw_chunk|read_seq_range/);
   const retry = await host.onFold({ sessionId: 's1', fold: { compactionId: 'f1', from: 1, to: 3, cutoff: 2, shadowedSeqs: [1, 2] }, events, turns });
   assert.equal(retry.writes, 0);

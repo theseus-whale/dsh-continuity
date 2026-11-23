@@ -1,6 +1,6 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.6",
+  "version": "5.0.8",
   "files": [
     {
       "path": "INSTALL.md",
@@ -24,8 +24,8 @@
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 7194,
-      "sha256": "7d2c33fcd8598df30de1ee24a8cf00fea852d23b5ba44308556709aff1a6ac0e"
+      "bytes": 8729,
+      "sha256": "2dabec9c50e16e9f72fe811b8f54018876c50973da375cbf41bc82b51f542d5e"
     },
     {
       "path": "client.js",
@@ -80,7 +80,7 @@
     {
       "path": "package.json",
       "bytes": 12656,
-      "sha256": "2ed56a59eb7e907a7a0175d0c56fabae766d766d97420c802c5c82414aa0d5ae"
+      "sha256": "14b5307d66cec3f276c29f8596dfafb1f1ddcfc038a96f9e408d9538cdc66454"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -309,8 +309,8 @@
     },
     {
       "path": "src/fullseed/ping.mjs",
-      "bytes": 1625,
-      "sha256": "931a42c23c2a72c0c844600c5a08ee20ad45c0a317073fa0fd59c98d7346d1c8"
+      "bytes": 1700,
+      "sha256": "0330baac723be44d19ba60be899e21b9ea7988d530449c50dad798de794197f2"
     },
     {
       "path": "src/fullseed/query.mjs",
@@ -954,8 +954,8 @@
     },
     {
       "path": "src/turn-ping/host.mjs",
-      "bytes": 14533,
-      "sha256": "bcda9d1dbad55e24fee84db9e45469e3d5abdeff162a53d415946405744b1371"
+      "bytes": 14507,
+      "sha256": "f08e0cfb8391b2b21b312081ab6eef12493de63c03a25ffd050ab93299ef34d0"
     },
     {
       "path": "src/turn-ping/index.mjs",
@@ -984,8 +984,8 @@
     },
     {
       "path": "src/turn-ping/ping.mjs",
-      "bytes": 2648,
-      "sha256": "758f8a9cfee62a6b575f967d4cf46456ca38b2aa4e576a44aac9167c76ad548a"
+      "bytes": 2723,
+      "sha256": "e2c4054ed343f690b49a7bc293dacc6525982a1061a7cc15e76897fcf3d82f50"
     },
     {
       "path": "src/turn-ping/pre-step.mjs",

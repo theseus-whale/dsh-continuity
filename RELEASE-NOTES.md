@@ -1,6 +1,21 @@
-# Release notes — 5.0.6
+# Release notes — 5.0.8
 
-## Shared full-library retrieval
+## Actionable shared recall guidance
+
+- Replace the passive clue warning with concise next-step guidance in both fullseed and legacy ping builders: read by `seq` for verification; use original wording and `beforeSeq` for earlier tracing; no hit does not prove absence.
+- Automatic memory cue and manual `memory_recall` share the same note, with no additional footer or mandatory retrieval chain.
+- Add regression coverage asserting identical guidance in both ping builders, automatic cue assembly and the manual recall tool response.
+- Includes the 5.0.7 `beforeSeq` boundary repair. This display-only upgrade does not change summaries, vectors or indexes; no `memory_rebuild` is required.
+
+## 5.0.7 Historical `beforeSeq` boundary repair
+
+- Separate the active snapshot's availability cutoff from the historical `beforeSeq` content bound. Fullseed summaries keep their activation checkpoint while `beforeSeq` filters only `summary.seqEnd`.
+- Fix old summaries disappearing when their fullseed activation checkpoint is later than the requested historical boundary, including ranges whose `seqEnd` is strictly before `beforeSeq`.
+- Preserve cursor snapshot stability when `beforeSeq` and pagination are used together. Ordinary recall and automatic quiet cue behavior are unchanged.
+- Add regression coverage for `beforeSeq=10500 / 10504 / 12000`, fullseed activation checkpoints and cursor pagination.
+- This retrieval-only upgrade does not regenerate raw history, summaries, vectors or indexes; no `memory_rebuild` is required.
+
+## 5.0.6 Shared full-library retrieval
 
 - Add opt-in `retrieval.prototype.enabled` full-library ranking for an active fullseed index. The old top-12 candidate cutoff no longer determines what manual recall can find.
 - Manual `memory_recall` keeps bounded pages with v2 cursors, `beforeSeq`, vector-novel deduplication and temporal exploration. Pagination stops when every remaining candidate is below `tau`.
