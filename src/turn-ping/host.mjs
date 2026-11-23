@@ -14,6 +14,7 @@ import { buildChunkPing } from '../fullseed/ping.mjs';
 import { createRawIndex, buildRawIndexPing, RAW_INDEX_VERSION } from './raw-index.mjs';
 import { groupTurnEvents } from './turn-groups.mjs';
 import { extractVisibleMemoryIds, markCueHistory, memoryIdentity, readQuietConfig, recentCueIds, recordCueDecision, selectNovelHits } from './quiet.mjs';
+import { decodeRecallCursor, encodeRecallCursor, prototypePageCandidates, readRetrievalPrototype, selectPrototypeHits } from './retrieval-prototype.mjs';
 
 const tokenText = (event) => eventText(event).trim();
 
@@ -98,10 +99,18 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
     return { enabled: true, ...result };
   }
 
-  async function beforeAnswer({ sessionId, query, cutoff, turns, events, quiet = false, visibleMemoryIds = new Set() }) {
+  async function beforeAnswer({ sessionId, query, cutoff, turns, events, quiet = false, visibleMemoryIds = new Set(), cursor = null, beforeSeq = null }) {
     if (!config.enabled || !allowedSession(sessionId)) return { enabled: false, ping: null, H: 0 };
     const empty = { text: '', bytes: 0, sha256: sha256(''), clipped: false, omittedHigh: 0 };
     const quietConfig = readQuietConfig(config);
+    const prototype = readRetrievalPrototype(config);
+    const useHighQuality = prototype.enabled;
+    const usePrototype = useHighQuality && !quiet;
+    if ((cursor !== null || beforeSeq !== null) && !usePrototype) throw new Error('memory_recall: cursor and beforeSeq require manual full-library retrieval');
+    if (beforeSeq !== null && (!Number.isInteger(beforeSeq) || beforeSeq < 1)) throw new Error('memory_recall: beforeSeq must be a positive integer');
+    let effectiveCutoff = beforeSeq === null ? cutoff : Math.min(cutoff, beforeSeq - 1);
+    let excludeIds = new Set();
+    let paginationOffset = 0;
     const historyRoot = turnPingRoot({ home, sessionId });
     const referenceIds = quiet ? new Set([...visibleMemoryIds, ...recentCueIds(historyRoot, Date.now(), quietConfig.historyWindowMs)]) : new Set();
     const finishQuiet = ({ ping, candidates }) => {
@@ -130,27 +139,90 @@ export function createTurnPingHost({ config: overrides = {}, home, provider, emb
     const cached = loadActiveIndex(fullseedRoot);
     if (cached) {
       const { active, merged } = cached;
+      if (usePrototype && cursor !== null) {
+        const decoded = decodeRecallCursor(cursor, { query, indexIdentity: active.identity, beforeSeq }, prototype.maxCursorIds);
+        excludeIds = decoded.excludeIds;
+        paginationOffset = decoded.offset;
+        effectiveCutoff = beforeSeq === null ? decoded.cutoff : Math.min(decoded.cutoff, beforeSeq - 1);
+      }
       const eligible = merged.summaries
         .map((summary, i) => ({ summary, vector: merged.vectors[i] }))
-        .filter((row) => row.summary.availableCutoff !== null && row.summary.availableCutoff <= cutoff);
+        .filter((row) => row.summary.availableCutoff !== null && row.summary.availableCutoff <= effectiveCutoff)
+        .filter((row) => beforeSeq === null || Number(row.summary.seqEnd) < beforeSeq);
+      if (usePrototype && eligible.length === 0) {
+        return {
+          enabled: true, ping: empty, H: 0, shownIds: [], nextCursor: null,
+          retrieval: { chunks: [], cutoff: effectiveCutoff, requestedCutoff: cutoff, top: 0, threshold: config.retrieval.tau, quiet, beforeSeq, prototype: { enabled: true, candidateCount: 0, totalCount: 0, relevantCount: 0, explorationCount: 0 } },
+          indexVersion: active.identity, checkpoint: active.checkpoint,
+        };
+      }
       if (eligible.length > 0) {
         const index = { summaries: eligible.map((row) => row.summary), vectors: eligible.map((row) => row.vector) };
-        const scored = await queryIndex({ index, embedder, query, limit: config.retrieval.maxCandidatesPerFacet });
-        const top = scored[0]?.score ?? 0;
+        const candidateLimit = useHighQuality ? eligible.length : config.retrieval.maxCandidatesPerFacet;
+        const scored = await queryIndex({ index, embedder, query, limit: candidateLimit });
+        let top = scored[0]?.score ?? 0;
         const tau = quiet ? quietConfig.tau : Number(config.retrieval.tau ?? 0);
         const delta = quiet ? quietConfig.delta : Number(config.retrieval.delta ?? 0);
-        const threshold = Math.max(tau, top - delta);
+        let threshold = Math.max(tau, top - delta);
         let high = scored.filter((row) => row.score >= threshold);
-        if (quiet) {
+        let selection = null;
+        let page = null;
+        if (useHighQuality) {
+          const selectionConfig = quiet ? {
+            ...config,
+            retrieval: {
+              ...config.retrieval,
+              tau: quietConfig.tau,
+              delta: quietConfig.delta,
+              prototype: { ...config.retrieval.prototype, noveltyThreshold: quietConfig.noveltyThreshold },
+            },
+          } : config;
+          page = prototypePageCandidates({ scored, config: selectionConfig, offset: paginationOffset });
+          const excludedIds = quiet ? referenceIds : excludeIds;
+          const referenceSource = quiet ? eligible : page.candidates;
+          const references = referenceSource.filter(row => excludedIds.has(memoryIdentity(row.summary)) || excludedIds.has(row.summary.turnId)).map(row => row.vector);
+          selection = selectPrototypeHits({ scored: page.candidates, config: selectionConfig, excludeIds: excludedIds, referenceVectors: references });
+          selection.diagnostics.totalCount = page.totalCount;
+          selection.diagnostics.offset = page.offset;
+          selection.diagnostics.stratifiedCount = page.stratifiedCount;
+          high = selection.high;
+          top = selection.top;
+          threshold = selection.threshold;
+        } else if (quiet) {
           const references = eligible.filter(row => referenceIds.has(memoryIdentity(row.summary)) || referenceIds.has(row.summary.turnId)).map(row => row.vector);
           high = selectNovelHits(high.filter(row => !referenceIds.has(memoryIdentity(row.summary)) && !referenceIds.has(row.summary.turnId)), references, quietConfig.noveltyThreshold);
         }
-        const ping = buildChunkPing({ summaries: eligible.map((row) => row.summary), scored: high, cutoff, config });
+        const ping = buildChunkPing({ summaries: eligible.map((row) => row.summary), scored: high, cutoff: effectiveCutoff, config });
         const shownIds = finishQuiet({ ping, candidates: high });
-        const result = { enabled: true, retrieval: { chunks: high, cutoff, top, threshold, quiet }, ping, H: high.length, shownIds, indexVersion: active.identity, checkpoint: active.checkpoint };
-        return high.length > 0 ? result : (rawFallback() ?? result);
+        const hasMoreRelevant = Boolean(usePrototype && page
+          && page.nextOffset < scored.length
+          && scored[page.nextOffset]?.score >= config.retrieval.tau);
+        if (usePrototype && selection) selection.diagnostics.hasMoreRelevant = hasMoreRelevant;
+        let nextCursor = null;
+        if (hasMoreRelevant) {
+          const extraShownIds = high.filter(row => !page.window.includes(row)).map(row => memoryIdentity(row.summary)).filter(Boolean);
+          const explorationIds = [...new Set([...excludeIds, ...extraShownIds])];
+          if (explorationIds.length <= prototype.maxCursorIds) {
+            nextCursor = encodeRecallCursor({
+              query, indexIdentity: active.identity, checkpoint: active.checkpoint,
+              cutoff: effectiveCutoff, beforeSeq, offset: page.nextOffset, explorationIds,
+            });
+          }
+        }
+        const result = {
+          enabled: true,
+          retrieval: {
+            chunks: high, cutoff: usePrototype ? effectiveCutoff : cutoff, top, threshold, quiet,
+            ...(useHighQuality ? { prototype: selection?.diagnostics ?? null } : {}),
+            ...(usePrototype ? { requestedCutoff: cutoff, beforeSeq } : {}),
+          },
+          ping, H: high.length, shownIds, indexVersion: active.identity, checkpoint: active.checkpoint,
+          ...(usePrototype ? { nextCursor } : {}),
+        };
+        return high.length > 0 || usePrototype ? result : (rawFallback() ?? result);
       }
     }
+    if (usePrototype) throw new Error('memory_recall: full-library retrieval requires an active fullseed index');
     const storage = storageFor(sessionId);
     const summaries = await storage.summaries();
     if (summaries.length === 0) return rawFallback() ?? { enabled: true, ping: empty, H: 0 };

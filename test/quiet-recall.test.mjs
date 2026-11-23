@@ -34,7 +34,7 @@ test('cue history expires and config supports quiet/off/legacy', () => {
   assert.equal(readQuietConfig({ autoRecall: { mode: 'legacy' } }).mode, 'legacy');
 });
 
-test('fullseed quiet recall applies novelty and recent-history dedup; manual recall stays unchanged', async () => {
+test('shared full-library quiet recall keeps quiet novelty and recent-history dedup; manual recall stays unchanged', async () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-quiet-host-'));
   const sessionId = 'quiet-session';
   const root = path.join(home, 'sessions', sessionId, 'turn-ping', 'fullseed');
@@ -48,7 +48,11 @@ test('fullseed quiet recall applies novelty and recent-history dedup; manual rec
   clearActiveCache();
   const host = createTurnPingHost({
     home,
-    config: { enabled: true, boundaries: { allowDefaultEnable: true }, rawIndex: { enabled: false } },
+    config: {
+      enabled: true, boundaries: { allowDefaultEnable: true }, rawIndex: { enabled: false },
+      autoRecall: { noveltyThreshold: 0.75 },
+      retrieval: { prototype: { enabled: true, noveltyThreshold: 1 } },
+    },
     embedder: async () => [1, 1],
   });
   const first = await host.beforeAnswer({ sessionId, query: '上次讨论什么', cutoff: 10, events: [], quiet: true, visibleMemoryIds: new Set() });

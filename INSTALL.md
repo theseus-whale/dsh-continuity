@@ -1,4 +1,4 @@
-# Install and operate 5.0.5
+# Install and operate 5.0.6
 
 ## Requirements
 
@@ -12,11 +12,11 @@
 2. Install the reviewed package without forcing peer dependencies:
 
 ```text
-npm install <path-to-theseus-whale-dsh-continuity-5.0.5.tgz> --ignore-scripts --no-audit --no-fund
+npm install <path-to-theseus-whale-dsh-continuity-5.0.6.tgz> --ignore-scripts --no-audit --no-fund
 ```
 
 3. Point the Host bundle and scoped client module to `@theseus-whale/dsh-continuity`.
-4. Cold-start DSH and verify `plugin.version = 5.0.5`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
+4. Cold-start DSH and verify `plugin.version = 5.0.6`, the panel Slot, and `memory_recall` / `memory_rebuild` in the tool catalog.
 
 There is no `dsh-continuity` command to run. The package has no Node CLI, separate API-key prompt, external provider module or independent DeepSeek transport.
 
@@ -37,13 +37,20 @@ Public defaults remain off. Create an unpublished overlay only for the intended 
   "embeddingModel": "<absolute-local-model-directory>",
   "sessionIds": ["<local-session-id>"],
   "fullseedEnqueue": true,
-  "fullseedWorker": true
+  "fullseedWorker": true,
+  "retrieval": {
+    "prototype": {
+      "enabled": true
+    }
+  }
 }
 ```
 
 `Index-only` keeps retrieval/index work separate from natural injection. `Live natural cue` additionally requires the reviewed live boundary. Installing a package or setting model names does **not** enable Host memory resonance or live injection.
 
 All summary generation uses Host `ctx.llm`. Existing provider credentials remain in DSH's own configuration; no credential is read from this plugin's overlay.
+
+`retrieval.prototype.enabled` opts an active fullseed index into full-library ranking for both manual recall and quiet automatic cue. It defaults to `false`; omit it to preserve the previous path. Quiet cue retains its separate `autoRecall` thresholds, novelty/history suppression, output limits and intent gate. Upgrading the package does not require a rebuild and does not rewrite existing summaries or indexes.
 
 ## Quiet automatic recall
 
@@ -98,7 +105,7 @@ Fix the reported overlay, `ctx.llm`, embedder or `sessionQuery` prerequisite, co
 
 Generation requests one line, one Chinese sentence, about 100 characters and at most 256 characters, with semicolons allowed. Ingestion remains soft: overlong, multiline and multi-sentence outputs are recorded with warnings rather than rejected or retried. Resonance display is not truncated.
 
-`memory_recall({ query })` uses the same semantic resonance path as automatic memory cue. It returns pointers for exact readback; a summary is a clue, not the original evidence.
+`memory_recall({ query, cursor?, beforeSeq? })` uses the same semantic resonance path as automatic memory cue. With full-library retrieval enabled, pass the returned `cursor` to the next call with the unchanged query to continue pagination; `beforeSeq` restricts the search to summaries ending strictly before that seq. Stop when no cursor is returned. Results are pointers for exact readback; a summary is a clue, not the original evidence.
 
 ## Disable and rollback
 

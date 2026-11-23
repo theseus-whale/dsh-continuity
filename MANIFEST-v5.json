@@ -1,11 +1,11 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.5",
+  "version": "5.0.6",
   "files": [
     {
       "path": "INSTALL.md",
-      "bytes": 6086,
-      "sha256": "0d6c7f2b198a74212cd6306d2cc16f769a069f91f35632cbc77421b1f4196a47"
+      "bytes": 6834,
+      "sha256": "f31b115fd924d4d62530af6587a0859fe95c06665698b3c9a4a81199ccb5c5b8"
     },
     {
       "path": "LICENSE",
@@ -19,13 +19,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 3984,
-      "sha256": "ad48b27e517ae5ffee5401f6c917bc72f6b35f566b4c74ce5f0fa424f2560c6b"
+      "bytes": 4583,
+      "sha256": "b1e0f1b50f89e809f443d828aed8cb8c0328dc5c933433b13cd2a51d36894955"
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 6113,
-      "sha256": "573d3a5b7a3ddb0bdbae0925aab6dfb1cddea42395d18ec0b86d74cb1dca68f6"
+      "bytes": 7194,
+      "sha256": "7d2c33fcd8598df30de1ee24a8cf00fea852d23b5ba44308556709aff1a6ac0e"
     },
     {
       "path": "client.js",
@@ -80,7 +80,7 @@
     {
       "path": "package.json",
       "bytes": 12656,
-      "sha256": "0593e1dfb08a38b234267a19e431dffd75c9160f17deb3f8f7a6b99e6b3c72c7"
+      "sha256": "2ed56a59eb7e907a7a0175d0c56fabae766d766d97420c802c5c82414aa0d5ae"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -884,8 +884,8 @@
     },
     {
       "path": "src/turn-ping/config.mjs",
-      "bytes": 2696,
-      "sha256": "1139b3f85d7b61c7fde90bf689b1195f901b842b2fa461a1366582fb0692a131"
+      "bytes": 2886,
+      "sha256": "01bedc016a2588e305699947813f1ea2a31c54e8cc3a81610a3b95e69b408ce8"
     },
     {
       "path": "src/turn-ping/coverage/audit.mjs",
@@ -954,8 +954,8 @@
     },
     {
       "path": "src/turn-ping/host.mjs",
-      "bytes": 10068,
-      "sha256": "2b52c2f43e3018c0ad916d5277c1e44221b421fcd325d39b86062750ede779ff"
+      "bytes": 14533,
+      "sha256": "bcda9d1dbad55e24fee84db9e45469e3d5abdeff162a53d415946405744b1371"
     },
     {
       "path": "src/turn-ping/index.mjs",
@@ -979,8 +979,8 @@
     },
     {
       "path": "src/turn-ping/memory-recall-tool.mjs",
-      "bytes": 2786,
-      "sha256": "40f2abef6b6ec6a2ce59cb80013571fd8df1fc936ccc5844569f46015b103ca2"
+      "bytes": 3822,
+      "sha256": "bbe7e0fd1f8451e9c1f9c61e9aa3edff147681dbbfae3ffe6e7e039a6e96ff4e"
     },
     {
       "path": "src/turn-ping/ping.mjs",
@@ -1041,6 +1041,11 @@
       "path": "src/turn-ping/registry.mjs",
       "bytes": 509,
       "sha256": "39fcca49820422fe2b3e674e3985b2b2fe28e59d250e61d431de31b4fd14e69a"
+    },
+    {
+      "path": "src/turn-ping/retrieval-prototype.mjs",
+      "bytes": 7283,
+      "sha256": "08efa57b440c1e505dfbf254f2ae3b2e5e051f2d2ccd01cc9528e3a620e47e3b"
     },
     {
       "path": "src/turn-ping/retrieval.mjs",

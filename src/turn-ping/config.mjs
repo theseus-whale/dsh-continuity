@@ -41,6 +41,14 @@ export const DEFAULT_CONFIG = Object.freeze({
     maxSummariesGlobal: 12,
     maxSeqRefsPerFacet: 8,
     maxPingUtf8Bytes: 16384,
+    prototype: Object.freeze({
+      enabled: false,
+      candidatePool: 48,
+      noveltyThreshold: 0.75,
+      temporalSlots: 1,
+      temporalBuckets: 4,
+      maxCursorIds: 64,
+    }),
   }),
   autoRecall: Object.freeze({
     mode: 'quiet',

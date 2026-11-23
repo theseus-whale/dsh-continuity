@@ -14,6 +14,8 @@ export function createMemoryRecallTool({ beforeAnswer = turnPingBeforeAnswer, re
       additionalProperties: false,
       properties: {
         query: { type: 'string', description: 'The memory, topic, decision, or event you want to recall.' },
+        cursor: { type: 'string', description: 'Optional full-library next-page cursor returned by the same query and index.' },
+        beforeSeq: { type: 'integer', minimum: 1, description: 'Optional full-library upper bound; only summaries ending strictly before this seq are searched.' },
       },
       required: ['query'],
     },
@@ -24,6 +26,8 @@ export function createMemoryRecallTool({ beforeAnswer = turnPingBeforeAnswer, re
       const query = String(args.query ?? '').trim();
       if (!query) throw new Error('memory_recall: query required');
       if (query.length > 4000) throw new Error('memory_recall: query exceeds 4000 chars');
+      const cursor = String(args.cursor ?? '').trim() || null;
+      const beforeSeq = args.beforeSeq ?? null;
       const sessionId = exec?.agent?.session?.id;
       if (!sessionId) throw new Error('memory_recall: no current session');
       const service = resolve(exec);
@@ -33,10 +37,15 @@ export function createMemoryRecallTool({ beforeAnswer = turnPingBeforeAnswer, re
       const nodes = Array.isArray(snapshot?.surface?.nodes) ? snapshot.surface.nodes : [];
       const cutoff = Number(nodes.at(-1) ?? events.at(-1)?.seq);
       if (!Number.isInteger(cutoff)) return '[memory_recall] 没有可检索的历史边界。';
-      const result = await beforeAnswer({ sessionId: String(sessionId), query, cutoff, events });
+      const result = await beforeAnswer({ sessionId: String(sessionId), query, cutoff, events, cursor, beforeSeq });
       if (!result?.enabled) return '[memory_recall] 当前会话未启用记忆共振。';
-      if (!result.ping?.text || Number(result.H ?? 0) <= 0) return '[memory_recall] 没有回忆起可靠内容。';
-      return result.ping.text;
+      const hasHits = Boolean(result.ping?.text) && Number(result.H ?? 0) > 0;
+      if (!hasHits && !result.nextCursor) return '[memory_recall] 没有回忆起可靠内容。';
+      const footer = [];
+      const diagnostics = result.retrieval?.prototype;
+      if (diagnostics) footer.push(`[memory_recall] 全库检索：本页候选 ${diagnostics.candidateCount}／全库 ${diagnostics.totalCount ?? diagnostics.candidateCount}，相关 ${diagnostics.relevantCount}，时间探索 ${diagnostics.explorationCount}。`);
+      if (result.nextCursor) footer.push(`[memory_recall] 下一页 cursor：${result.nextCursor}`);
+      return [hasHits ? result.ping.text : '[memory_recall] 本页没有可靠内容，可继续下一页。', ...footer].join('\n\n');
     },
   };
 }
