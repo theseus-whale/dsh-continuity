@@ -8,7 +8,7 @@ export function createMemoryRecallTool({ beforeAnswer = turnPingBeforeAnswer, re
     : pick(exec?.agent?.ctx) ?? pick(exec?.agent));
   return {
     name: 'memory_recall',
-    description: 'Actively recall earlier conversation by meaning. Write what you want to remember in your own words; uses the same memory-resonance semantic retrieval as automatic memory_cue. Returns summaries and raw pointers, not exact-search matches. If you already have a seq coordinate, use read_seq_range instead.',
+    description: 'Actively recall earlier conversation by meaning. Write what you want to remember in your own words; uses the same memory-resonance semantic retrieval as automatic memory_cue. Returns summaries and raw pointers, not exact-search matches. After finding a useful HIT, use memory_related with its turnId or seq to explore semantically similar chunks before or after that memory point; use chunkIndex or chunkId only to disambiguate split chunks. If you already have a seq coordinate, use read_seq_range to read exact raw text.',
     parameters: {
       type: 'object',
       additionalProperties: false,

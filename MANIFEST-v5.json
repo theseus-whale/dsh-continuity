@@ -1,6 +1,6 @@
 {
   "kind": "dsh-continuity-5.0.0-rewrite-source-manifest",
-  "version": "5.0.9",
+  "version": "5.0.10",
   "files": [
     {
       "path": "INSTALL.md",
@@ -24,18 +24,18 @@
     },
     {
       "path": "RELEASE-NOTES.md",
-      "bytes": 9634,
-      "sha256": "c51d35706263b926e357b4421dc3b2f0fed3d114f49ab5e4513d96657bb722fb"
+      "bytes": 11588,
+      "sha256": "c25c365dd08c60db22ef2ae1a00099a900604fdbb079a867b8b96b8e4e7c8ad0"
     },
     {
       "path": "client.js",
-      "bytes": 27041,
-      "sha256": "071d49f0dd6a2c09c874a25713c7d2f0963a7587f11c78e826c62f68b7c2357a"
+      "bytes": 27600,
+      "sha256": "e7e04efa051264d9f1485adf5a453df1a587d870ca25f75e8a8fd4a9a1e06405"
     },
     {
       "path": "cordis.patch.yml",
-      "bytes": 25888,
-      "sha256": "f18041561d092b43959700598ca756b9d2e51a2b2f0cda54209ccdc44ef72d32"
+      "bytes": 26104,
+      "sha256": "5ee1f2337fa71131ae68c513d375ef5b5bc0d86b33beea51a8ba1a5ed3520bb7"
     },
     {
       "path": "docs/API-NOTES.md",
@@ -79,8 +79,8 @@
     },
     {
       "path": "package.json",
-      "bytes": 12852,
-      "sha256": "297b8ec914450421e72770ef5982d07526e67eb19e343d215db1e3f07dc36d10"
+      "bytes": 12925,
+      "sha256": "4699a8747db664b1c21df2e3d97c8039a568a89fbabb89e453adb3976b88d93c"
     },
     {
       "path": "src/asset-tool.mjs",
@@ -244,8 +244,8 @@
     },
     {
       "path": "src/fold/index-adapter.mjs",
-      "bytes": 4914,
-      "sha256": "9ac434017f4a8ae38bd92f1c8137512a5cffa99de6212af0cb7efbad3c28e477"
+      "bytes": 5399,
+      "sha256": "a8f4b1245b4aca9560cb1a991110cb12b2e6ebeb9a82390e348dcc4c1c5f43ec"
     },
     {
       "path": "src/fold/unified-config.mjs",
@@ -278,6 +278,11 @@
       "sha256": "a9303e3716a6767c468de07d5fe7d58cf878f9f1d9c8395aa25af0f978a5a038"
     },
     {
+      "path": "src/fullseed/continuation-shadow.mjs",
+      "bytes": 6978,
+      "sha256": "c4479342836725ab9ee6c79f2adfd36d08f6b99b332983d88cd4ead5851bf135"
+    },
+    {
       "path": "src/fullseed/host-rebuild-tool.mjs",
       "bytes": 3621,
       "sha256": "a61970af3d2daf6f298f59b7fe1a63e42bcef6df6825a16f1dd4bc371860a896"
@@ -306,6 +311,11 @@
       "path": "src/fullseed/llm-adapter.mjs",
       "bytes": 2459,
       "sha256": "83f5b72e2a66756f84f8a98cbbd061b291c16f8b217188858a37e6ee427c873e"
+    },
+    {
+      "path": "src/fullseed/memory-related-tool.mjs",
+      "bytes": 8811,
+      "sha256": "7e679826a4d69c347c6a4732edf893c302bf5709a5f444904f3e9fddfe8083f4"
     },
     {
       "path": "src/fullseed/ping.mjs",
@@ -379,8 +389,8 @@
     },
     {
       "path": "src/index.mjs",
-      "bytes": 45969,
-      "sha256": "099fb01286958f7252178f6306790fadcc3b87b7bb483bb741227844442a1a7e"
+      "bytes": 45987,
+      "sha256": "1703166ea58db27fa94edb31d0b676cd3ced63026e4d0a6db1c4cd69ccdb178d"
     },
     {
       "path": "src/inject-policy.mjs",
@@ -979,8 +989,8 @@
     },
     {
       "path": "src/turn-ping/memory-recall-tool.mjs",
-      "bytes": 3882,
-      "sha256": "66ed5fc17e35c6d337caa40860713741cc14e1c79382c7b4054c2ebd6279e2a5"
+      "bytes": 4102,
+      "sha256": "75de74ceb630b3b4e3725218cfa4a3320b3adfc5d9046572833411b9d5173569"
     },
     {
       "path": "src/turn-ping/ping.mjs",

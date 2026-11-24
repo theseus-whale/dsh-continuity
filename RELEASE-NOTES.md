@@ -1,6 +1,20 @@
-# Release notes — 5.0.9
+# Release notes — 5.0.10
 
-## Compact chronological chunk navigation
+## Ranked semantic neighbors with chronological anchor navigation
+
+- `memory_related` accepts `turnId`, `seq`, `chunkId` or `chunkIndex` anchors and a signed `window` from -20 through -1 or 1 through 20. Positive windows search later chunks; negative windows search earlier chunks; zero is invalid.
+- Return up to three `candidates`, sorted by cosine descending and ordinal distance ascending. Preserve `selected` as the strongest candidate with its full summary; other candidate entries contain only coordinates, cosine and ordinal distance, without repeated summaries or raw text.
+- Return `nav: { prev, next }` for the resolved anchor alongside semantic candidates. Each direction contains coordinate-only `chunkId`, `turnId`, `chunkIndex`, `seqStart` and `seqEnd`, or `null` at a timeline boundary.
+- Chronological `nav` answers what comes immediately before or after; ranked candidates answer what is semantically similar within the chosen window. Neither substitutes for the other. Split chunks sharing one seq remain distinguishable by chunk identity.
+- Empty windows return `selected: null` and `candidates: []`. Tool guidance prefers `turnId` or `seq` for ordinary anchoring and reserves `chunkIndex` or `chunkId` for disambiguating split chunks.
+
+## Duplicate active-chunk repair
+
+- Collapse exact physical copies left by overlapping deltas before building the related-chunk timeline. A repeated `chunkId` with conflicting coordinates, summary hash or vector still fails explicitly instead of silently choosing one version.
+- Fullseed unified-fold commits skip generated chunks already active with the same summary hash, append only genuinely new chunks, and reject conflicting content before writing or activating a delta.
+- Existing indexes are read without mutation. Recall, recall pagination, chronological navigation, summaries, vectors and stored indexes otherwise remain unchanged; no `memory_rebuild` is required.
+
+## 5.0.9 Compact chronological chunk navigation
 
 - Add `prev` and `next` seq ranges to each fullseed HIT, pointing to adjacent readable chunks in the same active index snapshot rather than guessing `seq ± 1`.
 - Show only existing directions and no neighbor summaries or raw text; a middle HIT uses one compact line such as `nav: prev 32910-32920 · next 32941-32948`.

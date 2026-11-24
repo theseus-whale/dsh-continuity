@@ -37,7 +37,17 @@ export function createUnifiedIndexAdapter({ home, sessionId, storage, config }) 
         }));
       },
       async commitBatch(records, { compactionId, cutoff }) {
-        const fresh = records.filter((row) => row.source === 'generated');
+        const existing = new Map(merged().summaries.map((row) => [row.chunkId, row]));
+        const fresh = records.filter((row) => {
+          if (row.source !== 'generated') return false;
+          const chunkId = row.summary.chunkId ?? row.summary.turnId;
+          const previous = existing.get(chunkId);
+          if (!previous) return true;
+          if (previous.summarySha256 !== row.summary.summarySha256) {
+            throw new Error(`unified fold: conflicting active chunkId ${chunkId}`);
+          }
+          return false;
+        });
         if (fresh.length === 0) return { mode: 'fullseed', deltaId: null };
         const vectors = fresh.map((row) => row.vector);
         if (vectors.some((v) => !v)) throw new Error('unified fold: fullseed batch needs one vector per summary');

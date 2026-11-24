@@ -115,6 +115,8 @@
             name: '@theseus-whale/dsh-continuity/memory-recall-tool'
           - id: memory-rebuild-tool
             name: '@theseus-whale/dsh-continuity/memory-rebuild-tool'
+          - id: memory-related-tool
+            name: '@theseus-whale/dsh-continuity/memory-related-tool'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal
@@ -331,6 +333,8 @@
             name: '@theseus-whale/dsh-continuity/memory-recall-tool'
           - id: memory-rebuild-tool
             name: '@theseus-whale/dsh-continuity/memory-rebuild-tool'
+          - id: memory-related-tool
+            name: '@theseus-whale/dsh-continuity/memory-related-tool'
           - id: command-goal
             name: '@deepseek-ai/dsh-command-goal'
           - id: tool-goal

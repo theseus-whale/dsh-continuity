@@ -231,8 +231,12 @@ window.__ModuleLoader__.load({
         params: 'action 必填：probe、start、status、cancel、resume；jobId 可选。使用 Host flash 与本地 BGE，只影响当前会话。',
       },
       memory_recall: {
-        note: '用自己的话主动去回忆；与自动 memory_cue 共用 Xenova 语义检索，返回相关摘要和原文指针。',
+        note: '用自己的话主动去回忆；与自动 memory_cue 共用 Xenova 语义检索，返回相关摘要和原文指针。找到回忆点后，可用 memory_related 在它前后推着找。',
         params: 'query 必填；不是 BM25、精确匹配或 seq 坐标读取。',
+      },
+      memory_related: {
+        note: '通常流程：memory_recall 找回忆点 → 用它在该点的邻近摘要块中找语义近邻 → read_seq_range 回读原文。最多返回三条排序候选；selected 保留第一条完整摘要，其余只给坐标与分数。相似不保证续接。',
+        params: '通常用 turnId／seq 定位；同一轮有多个 chunk 时用 chunkIndex 或 chunkId 消歧。window 默认 5：1–20 向后，-1～-20 向前；0 非法。',
       },
       read_seq_range: {
         note: '按当前会话的 seq 范围读取原始对话，用来核对旧消息和精确措辞。',
