@@ -44,6 +44,10 @@ unifiedFold:
 
 在已有 active fullseed 索引的会话中，可通过本地 overlay 的 `retrieval.prototype.enabled: true` 启用全库排序。手动 `memory_recall` 支持 `cursor` 分页与 `beforeSeq` 上限，并进行向量去重和时间探索；剩余候选全部低于 `tau` 时停止分页。自动 quiet cue 共用这套选择层，但继续使用自己的阈值、近期历史抑制、条数限制和意图门槛，不产生分页游标。该配置默认为 `false`；未启用时保留原检索路径，只应在已有 active fullseed 索引的会话中开启。
 
+## Chronological chunk navigation
+
+每个 fullseed HIT 可带一行精简的 `nav: prev A-B · next C-D`，指向同一 active 快照中前后相邻的可回读正文 chunk。只输出 seq 区间，不附邻居摘要或原文；首尾只显示存在的方向。导航遵守当前 cutoff 和 `beforeSeq` 边界，不改变索引，也不需要 rebuild。
+
 ## Relevant Rule Cue
 
 `ruleCue` 可按当前用户输入匹配 `rules.md` / `habits.md` 的独立条目，补充相关规则的注意力；原有全文 carrier 保留，全文注入轮次不重复添加，无命中不注入。默认 `shadow` 只评估和记录；`live` 还必须设置 `boundaries.allowLiveInjection: true` 并显式配置 `ruleCue.liveSessionIds`，不会扩展到其他会话。局部提示在当前任务的工具步骤间保持，在下一条真实用户输入时退休，避免逐轮累积。
