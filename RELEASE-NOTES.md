@@ -1,6 +1,14 @@
-# Release notes — 5.0.8
+# Release notes — 5.0.9
 
-## Actionable shared recall guidance
+## Compact chronological chunk navigation
+
+- Add `prev` and `next` seq ranges to each fullseed HIT, pointing to adjacent readable chunks in the same active index snapshot rather than guessing `seq ± 1`.
+- Show only existing directions and no neighbor summaries or raw text; a middle HIT uses one compact line such as `nav: prev 32910-32920 · next 32941-32948`.
+- Automatic cue and manual `memory_recall` share the same fullseed rendering. Navigation respects the active cutoff and the caller's historical `beforeSeq` view.
+- Add regression coverage for unsorted input, middle/first/last/single chunks, unavailable future chunks and bounded historical views.
+- Display-only upgrade: summaries, vectors, chunk identities and stored indexes are unchanged; no `memory_rebuild` is required.
+
+## 5.0.8 Actionable shared recall guidance
 
 - Replace the passive clue warning with concise next-step guidance in both fullseed and legacy ping builders: read by `seq` for verification; use original wording and `beforeSeq` for earlier tracing; no hit does not prove absence.
 - Automatic memory cue and manual `memory_recall` share the same note, with no additional footer or mandatory retrieval chain.

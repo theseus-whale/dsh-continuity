@@ -9,6 +9,8 @@ export const CLUE_NOTE = '摘要仅作定位：按 seq 回读；追溯用原文�
 export function buildChunkPing({ summaries, scored, cutoff, config }) {
   const active = summaries.filter((summary) => summary.availableCutoff !== null && summary.availableCutoff <= cutoff);
   const byChunk = new Map(active.map((summary) => [summary.chunkId, summary]));
+  const timeline = [...active].sort((a, b) => a.seqStart - b.seqStart || a.seqEnd - b.seqEnd);
+  const positions = new Map(timeline.map((summary, index) => [summary.chunkId, index]));
   const hits = [];
   for (const row of scored) {
     const summary = byChunk.get(row.chunkId ?? row.summary?.chunkId);
@@ -19,6 +21,13 @@ export function buildChunkPing({ summaries, scored, cutoff, config }) {
   const lines = [];
   for (const summary of hits) {
     lines.push(`- HIT ${summary.chunkId}｜${summary.turnId}｜seq ${summary.seqStart}-${summary.seqEnd}｜${summary.summaryText}`);
+    const index = positions.get(summary.chunkId);
+    const previous = index > 0 ? timeline[index - 1] : null;
+    const next = Number.isInteger(index) && index + 1 < timeline.length ? timeline[index + 1] : null;
+    const navigation = [];
+    if (previous) navigation.push(`prev ${previous.seqStart}-${previous.seqEnd}`);
+    if (next) navigation.push(`next ${next.seqStart}-${next.seqEnd}`);
+    if (navigation.length > 0) lines.push(`  nav: ${navigation.join(' · ')}`);
   }
   let text = hits.length > 0 ? ['[记忆共振]', ...lines].join('\n') : '';
   let omittedHigh = Math.max(0, scored.length - hits.length);
